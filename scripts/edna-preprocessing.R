@@ -90,32 +90,54 @@ edna_imputed <- edna_samples %>%
   dplyr::select(1:5) %>%
   bind_cols(imputation_out)
 
-# # aggregate (verbose)
-# counts_depth <- edna_imputed %>%
-#   group_by(cruise, line, sta) %>%
-#   count(name = "n_depth")
-# 
-# counts_cruise <- counts_depth %>%
-#   group_by(cruise) %>%
-#   count(name = "n_cruise")
-# 
-# edna_imputed %>% 
-#   left_join(counts_depth) %>%
-#   left_join(counts_cruise) %>%
-#   mutate(obs.weight = (1/n_depth)*(1/n_cruise)) %>%
-#   group_by(cruise) %>%
-#   summarize(across(starts_with('asv'), ~weighted.mean(.x, obs.weight)))
-
-# aggregate (efficient)
-edna_agg <- edna_imputed %>%
+# aggregate (verbose)
+counts_depth <- edna_imputed %>%
   group_by(cruise, line, sta) %>%
-  summarize(across(starts_with('asv'), ~mean(log(.x))), .groups = 'drop') %>%
+  count(name = "n_depth")
+
+counts_cruise <- counts_depth %>%
   group_by(cruise) %>%
-  summarize(across(starts_with('asv'), ~exp(mean(.x))))
+  count(name = "n_sta")
+
+edna_agg <- edna_imputed %>%
+  left_join(counts_depth) %>%
+  left_join(counts_cruise) %>%
+  mutate(obs.weight = (1/n_depth)*(1/n_sta)) %>%
+  # dplyr::select(cruise, line, sta, depthm, obs.weight)
+  group_by(cruise) %>%
+  summarize(across(starts_with('asv'), ~exp(weighted.mean(log(.x), obs.weight))))
+
+# # aggregate (efficient)
+# edna_agg <- edna_imputed %>%
+#   group_by(cruise, line, sta) %>%
+#   summarize(across(starts_with('asv'), ~mean(log(.x))), .groups = 'drop') %>%
+#   group_by(cruise) %>%
+#   summarize(across(starts_with('asv'), ~exp(mean(.x))))
 
 # interpretation: average proportion of asv.XXX across survey is ZZZ
-# problem: average proportions don't follow sum constraint
+# problem: average proportions don't follow sum constraint exactly... rescale???
 edna_agg %>% dplyr::select(-cruise) %>% rowSums()
 
+# probably yes, note effect of imputation on aggregated compositions
+edna_agg %>% 
+  dplyr::select(-cruise) %>% 
+  summarize(across(everything(), max)) %>%
+  gather() %>%
+  arrange(desc(value))
 
+# *much* smaller maxima
+edna_imputed %>% 
+  dplyr::select(starts_with('asv')) %>% 
+  summarize(across(everything(), max)) %>%
+  gather() %>%
+  arrange(desc(value))
 
+# proposal (think/discuss/analyze)
+edna_data <- select(edna_agg, cruise) %>%
+  bind_cols(select(edna_agg, -cruise)/rowSums(select(edna_agg, -cruise)))
+
+edna_data %>% select(-cruise) %>% rowSums()
+edna_data %>% select(-cruise) %>% 
+  summarize(across(everything(), max)) %>%
+  gather() %>%
+  arrange(desc(value))
