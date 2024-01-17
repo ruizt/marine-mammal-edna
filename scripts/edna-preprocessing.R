@@ -3,7 +3,7 @@ library(tidyverse)
 # read in metadata
 metadata_raw <- read_csv("data/NCOG_sample_log_DNA_meta_2014-2020.csv")
 
-# 27 cruises total
+# 27 cruises in total
 metadata_raw %>%
   count(Cruise)
 
