@@ -1,6 +1,6 @@
 # RUN ONCE, THEN COMMENT OUT
-# source('scripts/sng/edna-preprocessing.R')
-# rm(list = ls())
+#source('scripts/sng/edna-preprocessing.R')
+#rm(list = ls())
 
 # script starts here
 library(tidyverse)
@@ -97,7 +97,34 @@ alpha_div %>%
 
 # further explorations??
 
+#alpha div grouping by line boxplot
+alpha_div|>
+  group_by(line)|>
+  ggplot(aes(x=line, y=alpha.div.sh)) + 
+  geom_boxplot() + 
+  scale_y_continuous(breaks=seq(0,6,1)) +
+  theme_bw()
 
+#alpha div vs line barchart
+alpha_div|>
+  group_by(line)|>
+  summarize(alpha = mean(alpha.div.sh))|>
+  ggplot(aes(x=line, y=alpha)) + 
+  geom_bar(stat="identity", col="steelblue", fill="steelblue")
+
+# alpha div vs station boxplot
+alpha_div |>
+  group_by(sta) |>
+  ggplot(aes(x=sta, y=alpha.div.sh)) + geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 90))
+
+# alpha div vs station barchart
+alpha_div|>
+  group_by(sta)|>
+  summarize(alpha = mean(alpha.div.sh))|>
+  ggplot(aes(x=sta, y=alpha)) + 
+  geom_bar(stat="identity", col="steelblue", fill="steelblue") +
+  theme(axis.text.x = element_text(angle = 90))
 
 # pairwise beta diversity for one cruise
 edna16s_reads %>%
