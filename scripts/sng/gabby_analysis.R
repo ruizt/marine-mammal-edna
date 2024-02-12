@@ -149,38 +149,30 @@ edna16s_reads %>%
 
 # -------------------------------------------
 
-# join alpha_div data and calcofi data
+# join alpha_div data and metadata
 
-calcofi_clean <- calcofi|>
-  clean_names() |>
-  mutate(line = as.character(line), sta=as.character(sta))
+metadata2 <- metadata |>
+  mutate(Sample.Name = paste("X", Sample.Name, sep = "")) |>
+  rename("sample.id" = "Sample.Name") |>
+  mutate(Lat_Dec = as.numeric(Lat_Dec)) 
+  
 
-loc <- alpha_div |>
-  mutate(depthm = as.double(depthm),line = as.double(line), sta=as.double(sta)) |>
-  mutate(line = as.character(line), sta=as.character(sta)) |>
-  left_join(calcofi_clean, by = c("sta", "line"))
-
-
-# order by latitude (filter data by depth ranges to see changes from depth-to-depth)
-
-# boxplot: alpha div by latitude, colored by line
-loc |>
-  ggplot(aes(x = lat_dec, y = alpha.div.sh, col = line)) +
-  geom_boxplot() +
-  labs(title = "Alpha Diversity by Latitude") +
-  xlab("Latitude") + ylab("Alpha Diversity") +
-  scale_color_discrete(name = "Transect") +
-  theme_minimal()
+loc <- alpha_div|>
+  inner_join(metadata2,  by = "sample.id") |>
+  clean_names()|>
+  mutate(depthm = as.numeric(depthm)) |>
+  rename("alpha.div.sh" = "alpha_div_sh")
 
 # alpha div vs station boxplot, ordered by latitude
 loc |>
+  mutate(lat_dec = as.numeric(lat_dec)) |>
   arrange(lat_dec) |>
   mutate(sta = factor(sta, levels = unique(sta))) |>
   ggplot(aes(x = sta, y = alpha.div.sh)) +  
   geom_boxplot() +
   xlab("Station (ordered by latitude)") + ylab("Alpha Diversity") +
-  theme(axis.text.x = element_text(angle = 90)) +
-  theme_minimal() 
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90)) 
 
 # alpha div vs line boxplot, ordered by latitude
 loc |>
@@ -195,7 +187,8 @@ loc |>
 
 # alpha diversity and depth (binned) (boxplots)
 loc |>
-  mutate(depth_bins = cut(depthm, breaks=c(0, 100, 200, 300, 400, 500, 600)))|>
+  mutate(depth_bins = cut(depthm, breaks = seq(0, 150, by = 50)))|>
+  filter(!is.na(depth_bins)) |>
   ggplot(aes(x = lat_dec, y = alpha.div.sh, col=line)) +
   geom_boxplot() +
   facet_wrap(~depth_bins)+
@@ -206,7 +199,8 @@ loc |>
 
 # alpha diversity and depth (binned) (scatter)
 loc |>
-  mutate(depth_bins = cut(depthm, breaks=c(0, 100, 200, 300, 400, 500, 600)))|>
+  mutate(depth_bins = cut(depthm, breaks = seq(0, 150, by = 50)))|>
+  filter(!is.na(depth_bins)) |>
   ggplot(aes(x = lat_dec, y = alpha.div.sh, col=line)) +
   geom_point() +
   facet_wrap(~depth_bins)+
@@ -215,23 +209,31 @@ loc |>
   scale_color_discrete(name = "Transect") +
   theme_minimal()
 
-# latitude vs depth (scatter) w/ alpha div as color map
-loc |>
-  ggplot(aes(x=lat_dec, y = depthm, color=alpha.div.sh, alpha=1/2)) + geom_point()+
-  labs(title = "Latitude vs Depth") +
-  xlab("Latitude") + ylab("Depth") +
-  scale_color_continuous(name = "Alpha Diversity") 
-
 # latitude vs Alpha Diversity (scatter) w/ depth as color map
-
 loc |>
   ggplot(aes(x=lat_dec, y = alpha.div.sh, color=depthm, alpha=1/2)) + geom_point()+
   labs(title = "Latitude vs Depth") +
   xlab("Latitude") + ylab("Alpha Diversity") +
-  scale_color_continuous(name = "Depth") 
+  scale_color_continuous(name = "Depth", trans = "reverse") +
+  guides(alpha = FALSE)
 
+# latitude vs alpha div faceted by season
 
+loc2 <- loc |>
+  mutate(date = mdy(date),  
+         season = case_when(
+           month(date) %in% 3:5 ~ "Spring",
+           month(date) %in% 6:8 ~ "Summer",
+           month(date) %in% 9:11 ~ "Fall",
+           month(date) %in% c(12, 1, 2) ~ "Winter"
+         )) 
 
+loc2 |>
+  filter(!is.na(season)) |>
+  ggplot(aes(x=lat_dec, y = alpha.div.sh, color="coral", alpha=0.5)) + 
+  geom_point() +
+  facet_wrap(~season)+
+  guides(alpha = FALSE, color = FALSE)
 
 # read docs
 ?betadiver
