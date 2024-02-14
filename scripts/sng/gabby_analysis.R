@@ -235,6 +235,14 @@ loc2 |>
   facet_wrap(~season)+
   guides(alpha = FALSE, color = FALSE)
 
+# get same depth bins as nick
+# if any trends in alpha diversity correlates with mammal abundance
+# fit simple models of abundance
+# ggsave exploratory graphics 
+# metadata cruise: drop 20
+# mammal sightings cruise: drop CC
+
+
 # read docs
 ?betadiver
 
