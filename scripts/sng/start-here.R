@@ -146,5 +146,3 @@ edna16s_reads %>%
 betadiver(help = T)
 
 # further explorations?
-
-
