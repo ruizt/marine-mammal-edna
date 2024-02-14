@@ -1,18 +1,16 @@
-
-  
-
-
-
-
-
 # RUN ONCE, THEN COMMENT OUT
 #source('scripts/sng/edna-preprocessing.R')
 #rm(list = ls())
 
 # script starts here
+library(readr)
 library(tidyverse)
 library(vegan)
 load('data/ncog-16s.RData')
+library(janitor)
+library(viridis)
+
+calcofi = read_csv("CalCOFIStationOrder.csv")
 
 ## metadata summaries
 
@@ -104,6 +102,7 @@ alpha_div %>%
 
 # further explorations??
 
+
 #alpha div grouping by line boxplot
 alpha_div|>
   group_by(line)|>
@@ -111,6 +110,8 @@ alpha_div|>
   geom_boxplot() + 
   scale_y_continuous(breaks=seq(0,6,1)) +
   theme_bw()
+
+# order by latitude (filter data by depth ranges to see changes from depth-to-depth) 
 
 #alpha div vs line barchart
 alpha_div|>
@@ -132,12 +133,107 @@ alpha_div|>
   ggplot(aes(x=sta, y=alpha)) + 
   geom_bar(stat="identity", col="steelblue", fill="steelblue") +
   theme(axis.text.x = element_text(angle = 90))
+# group by line
+
+# alpha div vs depth by line
+alpha_div|>
+  ggplot(aes(x=depthm, y=alpha.div.sh, color=sta)) + geom_point() +
+  facet_wrap(~line)
+
 
 # pairwise beta diversity for one cruise
 edna16s_reads %>%
   filter(cruise == cruises[1], as.numeric(depthm) < 30) %>%
   betadiver() %>%
   plot()
+
+# -------------------------------------------
+
+# join alpha_div data and metadata
+
+metadata2 <- metadata |>
+  mutate(Sample.Name = paste("X", Sample.Name, sep = "")) |>
+  rename("sample.id" = "Sample.Name") |>
+  mutate(Lat_Dec = as.numeric(Lat_Dec)) 
+  
+
+loc <- alpha_div|>
+  inner_join(metadata2,  by = "sample.id") |>
+  clean_names()|>
+  mutate(depthm = as.numeric(depthm)) |>
+  rename("alpha.div.sh" = "alpha_div_sh")
+
+# alpha div vs station boxplot, ordered by latitude
+loc |>
+  mutate(lat_dec = as.numeric(lat_dec)) |>
+  arrange(lat_dec) |>
+  mutate(sta = factor(sta, levels = unique(sta))) |>
+  ggplot(aes(x = sta, y = alpha.div.sh)) +  
+  geom_boxplot() +
+  xlab("Station (ordered by latitude)") + ylab("Alpha Diversity") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90)) 
+
+# alpha div vs line boxplot, ordered by latitude
+loc |>
+  arrange(lat_dec) |>
+  mutate(line = factor(line, levels = unique(line))) |>
+  ggplot(aes(x = line, y = alpha.div.sh)) +  
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 90)) +
+  xlab("Transect (ordered by latitude)") + ylab("Alpha Diversity") +
+  theme_minimal()
+
+
+# alpha diversity and depth (binned) (boxplots)
+loc |>
+  mutate(depth_bins = cut(depthm, breaks = seq(0, 150, by = 50)))|>
+  filter(!is.na(depth_bins)) |>
+  ggplot(aes(x = lat_dec, y = alpha.div.sh, col=line)) +
+  geom_boxplot() +
+  facet_wrap(~depth_bins)+
+  labs(title = "Alpha Diversity by Latitude and Depth") +
+  xlab("Latitude") + ylab("Alpha Diversity") +
+  scale_color_discrete(name = "Transect") +
+  theme_minimal()
+
+# alpha diversity and depth (binned) (scatter)
+loc |>
+  mutate(depth_bins = cut(depthm, breaks = seq(0, 150, by = 50)))|>
+  filter(!is.na(depth_bins)) |>
+  ggplot(aes(x = lat_dec, y = alpha.div.sh, col=line)) +
+  geom_point() +
+  facet_wrap(~depth_bins)+
+  labs(title = "Alpha Diversity by Latitude and Depth") +
+  xlab("Latitude") + ylab("Alpha Diversity") +
+  scale_color_discrete(name = "Transect") +
+  theme_minimal()
+
+# latitude vs Alpha Diversity (scatter) w/ depth as color map
+loc |>
+  ggplot(aes(x=lat_dec, y = alpha.div.sh, color=depthm, alpha=1/2)) + geom_point()+
+  labs(title = "Latitude vs Depth") +
+  xlab("Latitude") + ylab("Alpha Diversity") +
+  scale_color_continuous(name = "Depth", trans = "reverse") +
+  guides(alpha = FALSE)
+
+# latitude vs alpha div faceted by season
+
+loc2 <- loc |>
+  mutate(date = mdy(date),  
+         season = case_when(
+           month(date) %in% 3:5 ~ "Spring",
+           month(date) %in% 6:8 ~ "Summer",
+           month(date) %in% 9:11 ~ "Fall",
+           month(date) %in% c(12, 1, 2) ~ "Winter"
+         )) 
+
+loc2 |>
+  filter(!is.na(season)) |>
+  ggplot(aes(x=lat_dec, y = alpha.div.sh, color="coral", alpha=0.5)) + 
+  geom_point() +
+  facet_wrap(~season)+
+  guides(alpha = FALSE, color = FALSE)
 
 # read docs
 ?betadiver
@@ -146,5 +242,4 @@ edna16s_reads %>%
 betadiver(help = T)
 
 # further explorations?
-
 
