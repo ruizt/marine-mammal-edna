@@ -34,6 +34,7 @@ imputation_out <- edna_samples %>%
                            z.warning = 1)
 
 edna_imputed <- edna_samples %>%
+  slice(-c(215, 432)) %>%
   dplyr::select(1:5) %>%
   bind_cols(imputation_out)
 
