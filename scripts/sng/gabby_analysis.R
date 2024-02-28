@@ -324,6 +324,7 @@ temp_bp <- mammal_meta |>
   theme(axis.text.x = element_text(angle = 90))
 temp_bp
 
+
 temp_bm <-mammal_meta |>
   ggplot(aes(x=mean_temp, y= bm)) +
   geom_point(col="orchid")+
@@ -336,7 +337,8 @@ temp_mn <- mammal_meta |>
   theme(axis.text.x = element_text(angle = 90))
 temp_mn
 
-grid.arrange(temp_bp, temp_bm, temp_mn, ncol=3)
+mammal_temp <- grid.arrange(temp_bp, temp_bm, temp_mn, ncol=3)
+mammal_temp
 
 # -------------------------------------------
 # aggreagate metadata by cruise (e.g. avg temp)
@@ -549,12 +551,6 @@ loc|>
   scale_color_viridis(name="Alpha Div") 
 
 
-
-# look at depth too
-# which physical vars are correlated w depth and diversity
-# then we can adjust for those variables
-# depth, temperature, location
-# depth and how it connects w other physical variables
 
 #18S: more variability around phytoplanton
 # 16s: more variabilitry around bacteria
