@@ -1,0 +1,207 @@
+d,p,c,o,f,g,weight,coef_estimates
+d__Eukaryota, p__Dinoflagellata, c__Dinophyceae, o__Gymnodiniphycidae, f__Gymnodinium_clade, g__Erythropsidinium,0.07377425758597643,-51.69130307366249
+d__Eukaryota, p__Picozoa, c__Picomonadida, o__Picomonadida, f__Picomonadida, g__Picomonadida,0.016415768633731974,-6.057558009892652
+d__Eukaryota, p__MAST-7, c__MAST-7B, o__MAST-7B, f__MAST-7B, g__MAST-7B,0.01710471484376576,-13.397105695568733
+d__Eukaryota, p__Picozoa, c__Picomonadida, o__Picomonadida, f__Picomonadida, g__Picomonadida,0.007870376677010757,-4.636507798474687
+d__Eukaryota,NA,NA,NA,NA,NA,0.015975272147173588,-11.268763917980813
+d__Eukaryota, p__Prymnesiophyceae, c__Prymnesiophyceae, o__Prymnesiales, f__Prymnesiales, g__Chrysochromulina,0.004365323000751292,-6.896153719450632
+d__Eukaryota, p__Prymnesiophyceae, c__Prymnesiophyceae, o__Prymnesiales, f__Prymnesiales,NA,0.014149687123320057,10.241939961579291
+d__Eukaryota, p__Dinoflagellata, c__Dinophyceae,NA,NA,NA,0.06787129329277361,170.60531737934986
+d__Eukaryota, p__Protalveolata, c__Syndiniales, o__Syndiniales, f__Syndiniales_Group_II, g__Syndiniales_Group_II,0.012626010623687844,2.532933733021995
+d__Bacteria,NA,NA,NA,NA,NA,0.049449787643415226,-0.8196853063248192
+d__Eukaryota, p__Prymnesiophyceae, c__Prymnesiophyceae, o__Prymnesiales, f__Prymnesiales,NA,0.005562532598214481,-1.4437191193351406
+d__Eukaryota, p__Dinoflagellata, c__Dinophyceae, o__Gymnodiniphycidae, f__Kareniaceae, g__Karlodinium,0.05558812002497749,55.84576500425358
+d__Eukaryota, p__Arthropoda, c__Maxillopoda, o__Cyclopoida, f__Cyclopoida, g__Cyclopoida,0.04840980969446581,-40.260743580759495
+d__Eukaryota, p__Protalveolata, c__Syndiniales, o__Syndiniales, f__Syndiniales_Group_I, g__Syndiniales_Group_I,0.017103886072135085,-15.67516608350883
+d__Eukaryota, p__Protalveolata, c__Syndiniales, o__Syndiniales, f__Syndiniales_Group_III, g__Syndiniales_Group_III,0.001510647890062913,-2.425210984688583
+d__Eukaryota, p__Incertae_Sedis, c__Incertae_Sedis, o__Incertae_Sedis, f__Incertae_Sedis, g__Telonema,0.016986633862431294,8.851302810144988
+d__Eukaryota, p__Protalveolata, c__Syndiniales, o__Syndiniales,NA,NA,0.046906649493494115,-55.616765157386155
+d__Bacteria, p__Proteobacteria, c__Alphaproteobacteria, o__SAR11_clade, f__Clade_II, g__Clade_II,0.17111664496620024,33.82526153673767
+d__Bacteria, p__Proteobacteria, c__Gammaproteobacteria, o__SAR86_clade, f__SAR86_clade, g__SAR86_clade,0.031999254692940966,-53.02079979716985
+d__Eukaryota, p__Protalveolata, c__Syndiniales, o__Syndiniales, f__Syndiniales_Group_I, g__Syndiniales_Group_I,0.015518930921405204,14.803486104039617
+d__Eukaryota, p__Kathablepharidae, c__Kathablepharidae, o__Kathablepharidae, f__Kathablepharidae, g__Leucocryptos,0.00967411043841082,-0.2887367306972739
+d__Eukaryota, p__Ascomycota, c__Schizosaccharomycetes, o__Schizosaccharomycetales, f__Schizosaccharomycetaceae, g__Schizosaccharomyces,0.42105938902186696,-82.62929267229538
+d__Eukaryota, p__Ochrophyta, c__MOCH-2, o__MOCH-2, f__MOCH-2, g__MOCH-2,0.0016046358221309166,0.5992183618086705
+d__Eukaryota, p__Protalveolata, c__Syndiniales, o__Syndiniales, f__Syndiniales_Group_I, g__Syndiniales_Group_I,0.008673720269545937,-10.589921528286073
+d__Eukaryota, p__Protalveolata, c__Syndiniales, o__Syndiniales, f__Syndiniales_Group_II, g__Syndiniales_Group_II,0.02548379470317459,-14.956749974710505
+d__Eukaryota, p__Picozoa, c__Picomonadida, o__Picomonadidae, f__Picomonadidae, g__Picomonas,0.04133415374250138,-19.65122367687564
+d__Eukaryota, p__Dinoflagellata, c__Dinophyceae, o__Gymnodiniphycidae, f__Gymnodinium_clade, g__Erythropsidinium,0.05236705001284701,21.935942445873252
+d__Eukaryota, p__Dinoflagellata, c__Dinoflagellata, o__Dinoflagellata, f__Dinoflagellata, g__Dinoflagellata,0.017024444589783947,2.840051876688845
+d__Eukaryota, p__Holozoa, c__Choanoflagellida, o__Acanthoecida, f__Stephanoecidae, g__Stephanoecidae,0.0018878022679472523,-1.8026120182160246
+d__Eukaryota, p__Protalveolata, c__Syndiniales, o__Syndiniales, f__Syndiniales_Group_III, g__Syndiniales_Group_III,0.028742964329492197,-34.90211935728314
+d__Eukaryota, p__Retaria, c__RAD_B, o__RAD_B, f__RAD_B, g__RAD_B,0.050973722707098774,23.220493607182863
+d__Eukaryota, p__Prymnesiophyceae, c__Prymnesiophyceae, o__Prymnesiales, f__Prymnesiales,NA,0.012043250207941792,7.624744993170369
+d__Eukaryota, p__Prymnesiophyceae, c__Prymnesiophyceae, o__Prymnesiales, f__Prymnesiales, g__Chrysochromulina,0.008161395926265962,0.16691502630074811
+d__Eukaryota, p__Incertae_Sedis, c__Incertae_Sedis, o__Incertae_Sedis, f__Incertae_Sedis, g__Palpitomonas,0.0032718418977884726,-0.5982521727011232
+d__Eukaryota, p__Protalveolata, c__Syndiniales, o__Syndiniales, f__Syndiniales_Group_II, g__Syndiniales_Group_II,0.053746777132473604,21.68866623930728
+d__Eukaryota, p__Holozoa, c__Choanoflagellida, o__Acanthoecida, f__Stephanoecidae, g__Marine_Choanoflagellates_1,0.0027677686620220542,-1.0831305964294895
+d__Archaea, p__Thermoplasmatota, c__Thermoplasmata, o__Marine_Group_II, f__Marine_Group_II, g__Marine_Group_II,0.03478976117855743,22.305338350728842
+d__Eukaryota, p__Protalveolata, c__Syndiniales, o__Syndiniales, f__Syndiniales_Group_II, g__Syndiniales_Group_II,0.04908798761317101,-83.14571004619593
+d__Bacteria, p__Proteobacteria, c__Alphaproteobacteria, o__Parvibaculales, f__OCS116_clade, g__OCS116_clade,0.058373020140029354,-6.310486344511557
+d__Eukaryota, p__Diatomea, c__Bacillariophyceae, o__Bacillariophyceae, f__Bacillariophyceae,NA,0.0032380605161441986,-7.67156896395162
+d__Bacteria, p__Proteobacteria, c__Alphaproteobacteria, o__SAR11_clade, f__Clade_IV, g__Clade_IV,0.039395347486679014,-44.309386317678474
+d__Eukaryota, p__Protalveolata, c__Syndiniales, o__Syndiniales, f__Syndiniales_Group_I, g__Syndiniales_Group_I,0.01369493460356212,-31.7432377120314
+d__Eukaryota, p__MAST-7, c__MAST-7, o__MAST-7, f__MAST-7, g__MAST-7,0.01259980188598501,8.780635491183723
+d__Eukaryota, p__Protalveolata, c__Syndiniales, o__Syndiniales, f__Syndiniales_Group_II, g__Syndiniales_Group_II,0.004492632992686821,-6.4759165912124645
+d__Eukaryota, p__Ochrophyta, c__Pelagophyceae, o__Pelagomonadales, f__Pelagomonadales, g__Aureococcus,0.0453654508899878,21.713620519602276
+d__Eukaryota, p__Incertae_Sedis, c__Incertae_Sedis, o__Incertae_Sedis, f__Incertae_Sedis, g__Telonema,0.027677039503090882,6.6770172400212955
+d__Eukaryota, p__Prymnesiophyceae, c__Prymnesiophyceae, o__Prymnesiophyceae, f__Prymnesiophyceae, g__Phaeocystis,0.025651957034538275,6.4572281984185125
+d__Eukaryota,NA,NA,NA,NA,NA,0.002294726291445322,0.5271324612474054
+d__Eukaryota, p__Ochrophyta, c__Pelagophyceae, o__Pelagomonadales, f__Pelagomonadales, g__Aureococcus,0.011104221624871088,-12.319653902529932
+d__Eukaryota, p__Dinoflagellata, c__Dinophyceae,NA,NA,NA,0.39860512528161307,84.82171086955981
+d__Eukaryota,NA,NA,NA,NA,NA,0.012173762817089227,-1.5707496513282058
+d__Eukaryota, p__Ochrophyta, c__Dictyochophyceae, o__Pedinellales, f__Pedinellales, g__Pedinellales,0.006351883098758892,-3.864349911703386
+d__Eukaryota, p__Dinoflagellata, c__Dinophyceae, o__Peridiniphycidae, f__Thoracosphaeraceae, g__Pentapharsodinium,0.009944583200261236,-6.382333698741959
+d__Eukaryota, p__Retaria, c__Acantharia, o__Arthracanthida, f__Arthracanthida, g__Arthracanthida,0.06210126872333118,132.0326794773705
+d__Eukaryota, p__Prymnesiophyceae, c__Prymnesiophyceae, o__Prymnesiales, f__Prymnesiales,NA,0.0506170679517606,-32.13049743276625
+d__Eukaryota, p__Ochrophyta, c__Dictyochophyceae, o__Pedinellales, f__Pedinellales, g__Pedinellales,0.009149214106834638,-10.266828388883326
+d__Eukaryota, p__Protalveolata, c__Syndiniales, o__Syndiniales, f__Syndiniales_Group_II, g__Syndiniales_Group_II,0.005933643513733709,0.6393981032183391
+d__Bacteria, p__Proteobacteria, c__Alphaproteobacteria, o__SAR11_clade, f__Clade_III, g__Clade_III,0.0305083733156595,-10.697151111694339
+d__Eukaryota, p__Arthropoda, c__Maxillopoda, o__Calanoida, f__Calanoida, g__Calanoida,0.8061535196552007,40.214915936645276
+d__Eukaryota, p__Holozoa, c__Choanoflagellida, o__Acanthoecida, f__Stephanoecidae, g__Marine_Choanoflagellates_1,0.0018804099849158667,-3.1998879514518688
+d__Eukaryota,NA,NA,NA,NA,NA,0.04022573322766143,33.08658946199628
+d__Eukaryota, p__MAST-3, c__MAST-3E, o__MAST-3E, f__MAST-3E, g__MAST-3E,0.005876589269223011,-3.4878618118232536
+d__Eukaryota, p__Protalveolata, c__Syndiniales, o__Syndiniales, f__Syndiniales_Group_I, g__Syndiniales_Group_I,0.005373011389868972,-7.358611508865962
+d__Eukaryota, p__MAST-3, c__MAST-3J, o__MAST-3J, f__MAST-3J, g__MAST-3J,0.00869540838538134,-5.436703607083612
+d__Eukaryota, p__Protalveolata, c__Syndiniales, o__Syndiniales,NA,NA,0.006004525913021524,-7.477079730470716
+d__Eukaryota, p__Protalveolata, c__Syndiniales, o__Syndiniales, f__Syndiniales_Group_III, g__Syndiniales_Group_III,0.008279230874511236,-14.572663081872564
+d__Eukaryota,NA,NA,NA,NA,NA,0.006256392814304989,7.809101369737414
+d__Eukaryota, p__Holozoa, c__Choanoflagellida, o__Acanthoecida,NA,NA,0.007909419850553257,-3.142161740617451
+d__Eukaryota, p__Discoba, c__Discoba, o__Jakobida, f__Jakobida, g__Jakobida,0.003037712316580348,-6.295069009019189
+d__Eukaryota, p__Dinoflagellata, c__Dinophyceae, o__Gymnodiniphycidae, f__Kareniaceae, g__Karlodinium,0.02107772724257237,-5.615384750378456
+d__Bacteria, p__Proteobacteria, c__Gammaproteobacteria, o__SAR86_clade, f__SAR86_clade, g__SAR86_clade,0.051266464716011644,6.510254633933863
+d__Bacteria, p__Proteobacteria, c__Alphaproteobacteria, o__Rhodospirillales, f__AEGEAN-169_marine_group, g__AEGEAN-169_marine_group,0.2271420088862265,-6.672952772385944
+d__Eukaryota, p__Dinoflagellata, c__Dinophyceae, o__Gonyaulacales, f__Gonyaulacales, g__Azadinium,0.10518652927382982,53.851431624973294
+d__Eukaryota, p__Ochrophyta, c__MOCH-2, o__MOCH-2, f__MOCH-2, g__MOCH-2,0.06911657706707602,-0.5066053452106702
+d__Eukaryota,NA,NA,NA,NA,NA,0.03227287768416472,26.663175164211573
+d__Eukaryota, p__Diatomea, c__Mediophyceae, o__Mediophyceae, f__Mediophyceae, g__Mediophyceae,0.017011793355975347,7.127299221513892
+d__Eukaryota, p__Ochrophyta, c__MOCH-2, o__MOCH-2, f__MOCH-2, g__MOCH-2,0.0036477295948228084,2.7649562549587507
+d__Bacteria, p__Proteobacteria,NA,NA,NA,NA,0.004208664944426256,-2.628692434316254
+d__Eukaryota,NA,NA,NA,NA,NA,0.5397082278306786,-70.01355269768253
+d__Eukaryota, p__Prymnesiophyceae, c__Prymnesiophyceae, o__Prymnesiales, f__Prymnesiales, g__OLI16029,0.017850806508015713,-0.3052281448986842
+d__Eukaryota, p__Ochrophyta,NA,NA,NA,NA,0.013176041063845734,-2.6265389963970653
+d__Bacteria, p__Verrucomicrobiota, c__Verrucomicrobiae, o__Verrucomicrobiales, f__Rubritaleaceae, g__Roseibacillus,0.005275493362362235,10.351734735694079
+d__Bacteria, p__Proteobacteria, c__Alphaproteobacteria, o__Puniceispirillales, f__SAR116_clade, g__Candidatus_Puniceispirillum,0.046394401641585134,1.6612649272394766
+d__Archaea, p__Thermoplasmatota, c__Thermoplasmata, o__Marine_Group_II, f__Marine_Group_II, g__Marine_Group_II,0.20598682402647236,108.07377936359794
+d__Eukaryota, p__Chlorophyta, c__Mamiellophyceae, o__Mamiellales, f__Mamiellales, g__Micromonas,0.08697603104438627,0.2386446850487376
+d__Eukaryota, p__Incertae_Sedis, c__Incertae_Sedis, o__Incertae_Sedis, f__Incertae_Sedis, g__Telonema,0.010794308317584217,1.444663742184027
+d__Eukaryota, p__Ochrophyta, c__Chrysophyceae, o__uncultured, f__uncultured, g__uncultured,0.0016576577788211223,-1.90876329322775
+d__Eukaryota, p__Ciliophora, c__Intramacronucleata, o__Conthreep, f__Oligohymenophorea, g__uncultured,0.017336222396181208,-17.95654429490545
+d__Eukaryota, p__Protalveolata, c__Syndiniales, o__Syndiniales, f__Syndiniales_Group_I, g__Syndiniales_Group_I,0.03063036206570569,49.68519636715443
+d__Bacteria, p__Proteobacteria, c__Alphaproteobacteria, o__Puniceispirillales, f__SAR116_clade, g__SAR116_clade,0.04172760586134691,14.461466288842601
+d__Eukaryota, p__Incertae_Sedis, c__Incertae_Sedis, o__Incertae_Sedis, f__Incertae_Sedis, g__Pirsonia,0.004403638841884367,-4.903193286729708
+d__Eukaryota,NA,NA,NA,NA,NA,0.008712024752840955,9.400802726347742
+d__Eukaryota, p__Protalveolata, c__Syndiniales, o__Syndiniales, f__Syndiniales_Group_I, g__Syndiniales_Group_I,0.021922758551771265,-42.74445992503321
+d__Eukaryota, p__Dinoflagellata, c__Dinophyceae, o__Gymnodiniphycidae, f__Gymnodinium_clade, g__Chytriodinium,0.08290535561526127,-106.7209503182375
+d__Eukaryota, p__Protalveolata, c__Syndiniales, o__Syndiniales, f__Syndiniales, g__Amoebophrya,0.005806818513694347,-1.5158908590885352
+d__Bacteria, p__Proteobacteria, c__Alphaproteobacteria, o__SAR11_clade, f__Clade_I, g__Clade_Ia,0.15423486159450558,-22.662686137627578
+d__Eukaryota, p__Dinoflagellata, c__Dinophyceae, o__Gymnodiniphycidae, f__Gymnodinium_clade, g__Paragymnodinium,0.026386482085392043,-16.695260192878827
+d__Eukaryota, p__Ciliophora, c__Intramacronucleata, o__Conthreep, f__Nassophorea, g__uncultured,0.0020111507512069206,-0.37529539218534
+d__Eukaryota, p__Ochrophyta, c__Pelagophyceae, o__Pelagophyceae, f__Pelagophyceae, g__Pelagophyceae,0.010517811422925844,-0.6343084536669814
+d__Eukaryota, p__Ciliophora, c__Intramacronucleata, o__Spirotrichea, f__Oligotrichia,NA,0.09511769252537061,45.04909200987453
+d__Eukaryota, p__Dinoflagellata, c__Dinophyceae, o__Gymnodiniphycidae, f__Gymnodiniphycidae, g__Gyrodinium,0.10478790545666199,79.01474204335236
+d__Eukaryota, p__Ciliophora, c__Intramacronucleata, o__Spirotrichea, f__Choreotrichia, g__uncultured,0.009633703223282912,2.9931276893824714
+d__Eukaryota, p__Dinoflagellata, c__Dinophyceae, o__Gymnodiniphycidae, f__Gymnodinium_clade,NA,0.9889708121720779,-18.859648132008722
+d__Eukaryota, p__Ochrophyta, c__Chrysophyceae, o__uncultured, f__uncultured, g__uncultured,0.004789005581153364,1.9720790150303973
+d__Eukaryota, p__Ciliophora, c__Intramacronucleata, o__Spirotrichea, f__Oligotrichia, g__Pseudotontonia,0.0244237975895163,-47.976019069423174
+d__Bacteria, p__Proteobacteria, c__Alphaproteobacteria, o__Rhodospirillales, f__AEGEAN-169_marine_group, g__AEGEAN-169_marine_group,0.03187249753193654,-14.025736675793317
+d__Eukaryota, p__Cryptophyceae, c__Cryptophyceae, o__Cryptomonadales, f__Cryptomonadales, g__Teleaulax,0.009930764821296801,4.737339219098403
+d__Eukaryota, p__Picozoa, c__Picomonadida, o__Picomonadida, f__Picomonadida, g__Picomonadida,0.022398867245923666,4.156491646192055
+d__Eukaryota, p__Ciliophora, c__Intramacronucleata, o__Conthreep, f__Phyllopharyngea, g__Pithites,0.005310987255992424,-4.035329099194436
+d__Archaea, p__Thermoplasmatota, c__Thermoplasmata, o__Marine_Group_II, f__Marine_Group_II, g__Marine_Group_II,0.30046913008193454,-49.7069794389464
+d__Eukaryota, p__Dinoflagellata, c__Dinophyceae, o__Gymnodiniphycidae, f__Gymnodinium_clade,NA,0.03318281079979701,-32.928177042282165
+d__Eukaryota, p__Incertae_Sedis, c__Incertae_Sedis, o__Incertae_Sedis, f__Incertae_Sedis, g__Telonema,0.010661971319703627,2.6811163210027535
+d__Eukaryota, p__Protalveolata, c__Syndiniales, o__Syndiniales, f__Syndiniales_Group_I, g__Syndiniales_Group_I,0.018672103700952195,6.424048719898471
+d__Eukaryota, p__MAST-1, c__MAST-1D, o__MAST-1D, f__MAST-1D, g__MAST-1D,0.02856852188277159,-28.89674861608115
+d__Eukaryota, p__Cercozoa, c__Chlorarachniophyta, o__Chlorarachniophyta, f__Chlorarachniophyta, g__NOR26,0.011049213972449243,-10.98229635299207
+d__Eukaryota, p__Dinoflagellata, c__Dinophyceae,NA,NA,NA,0.4048559648092347,124.87279531596914
+d__Eukaryota, p__Ochrophyta, c__Ochrophyta, o__Ochrophyta, f__Ochrophyta, g__Bolidomonas,0.0035923697157313143,1.195660722240469
+d__Eukaryota, p__Picozoa, c__Picozoa, o__Picozoa, f__Picozoa, g__Picozoa,0.0018256793370476094,-1.9563392950917327
+d__Eukaryota, p__MAST-3,NA,NA,NA,NA,0.00915758281941281,15.954346135629663
+d__Eukaryota, p__Prymnesiophyceae, c__Prymnesiophyceae, o__Prymnesiales, f__Prymnesiales, g__Chrysochromulina,0.02034367444293742,11.179114959083826
+d__Eukaryota, p__Arthropoda, c__Maxillopoda, o__Calanoida, f__Calanoida, g__Calanoida,1.0488242530953742,6.382206792554854
+d__Eukaryota, p__Prymnesiophyceae, c__Prymnesiophyceae, o__Prymnesiales, f__Prymnesiales, g__Chrysochromulina,0.005636312142289379,3.447379155863989
+d__Eukaryota, p__Protalveolata, c__Syndiniales, o__Syndiniales, f__Syndiniales_Group_II, g__Syndiniales_Group_II,0.007362602606542184,-12.641438046900758
+d__Eukaryota, p__Cnidaria, c__Hydrozoa, o__Trachylinae, f__Trachylinae, g__Trachylinae,0.07452936291274981,-25.59040552238747
+d__Eukaryota, p__Prymnesiophyceae, c__uncultured, o__uncultured, f__uncultured, g__uncultured,0.08374463013801704,27.26180381491674
+d__Eukaryota, p__Chlorophyta, c__Mamiellophyceae, o__Mamiellales, f__Mamiellales, g__Bathycoccus,0.31887414142989035,-76.77603093109792
+d__Eukaryota,NA,NA,NA,NA,NA,0.05209076142736437,-48.10939346047272
+d__Eukaryota,NA,NA,NA,NA,NA,0.021426554342649853,-29.638074193677042
+d__Eukaryota, p__Protalveolata, c__Syndiniales, o__Syndiniales, f__Syndiniales_Group_I, g__Syndiniales_Group_I,0.021274506929775297,-57.56995828219894
+d__Eukaryota, p__Ciliophora, c__Intramacronucleata, o__Spirotrichea, f__Oligotrichia, g__Pseudotontonia,0.007840184665495405,4.425716781675874
+d__Eukaryota, p__MAST-3, c__MAST-3I, o__MAST-3I, f__MAST-3I, g__MAST-3I,0.031145930553773606,2.0265000682017145
+d__Eukaryota, p__Dinoflagellata, c__Dinophyceae, o__Gymnodiniphycidae,NA,NA,0.03315418288967454,54.8552991533132
+d__Eukaryota, p__Dinoflagellata, c__Dinophyceae,NA,NA,NA,0.03491841850312964,17.348668307937647
+d__Eukaryota, p__Arthropoda, c__Maxillopoda, o__Cyclopoida, f__Cyclopoida, g__Cyclopoida,0.008526443987267759,6.30882170410672
+d__Eukaryota, p__Ciliophora, c__Intramacronucleata, o__Spirotrichea, f__Oligotrichia,NA,0.07319266011482334,-15.11792531578509
+d__Eukaryota, p__Ochrophyta, c__Pelagophyceae, o__Pelagomonadales, f__Pelagomonadales, g__Pelagomonadales,0.4548617987618137,184.86905866150124
+d__Eukaryota, p__Ciliophora, c__Intramacronucleata, o__Spirotrichea, f__Choreotrichia, g__Amphorellopsis,0.00707982812903596,6.4418768640738815
+d__Eukaryota, p__Protalveolata, c__Syndiniales, o__Syndiniales, f__Syndiniales_Group_II, g__Syndiniales_Group_II,0.01035895413714215,6.913987592408502
+d__Eukaryota, p__Prymnesiophyceae, c__Prymnesiophyceae, o__Prymnesiales, f__Prymnesiales, g__Chrysochromulina,0.012065338488988749,0.8303871815535364
+d__Eukaryota, p__Dinoflagellata, c__Dinophyceae, o__Gymnodiniphycidae, f__Gymnodinium_clade, g__Erythropsidinium,0.005441354870688678,-12.621480921895893
+d__Bacteria, p__Proteobacteria, c__Alphaproteobacteria, o__SAR11_clade, f__Clade_I, g__Clade_Ia,0.3848550089213986,157.92798095315672
+d__Eukaryota, p__MAST-1, c__MAST-1C, o__MAST-1C, f__MAST-1C, g__MAST-1C,0.012754029366606624,-16.2240788470073
+d__Eukaryota, p__Ciliophora, c__Intramacronucleata, o__Conthreep, f__Oligohymenophorea, g__uncultured,0.005328641083832909,-3.1317051852576805
+d__Eukaryota, p__Prymnesiophyceae, c__Prymnesiophyceae, o__Prymnesiophyceae, f__Prymnesiophyceae, g__Phaeocystis,0.02707418567702042,14.449300042644143
+d__Eukaryota,NA,NA,NA,NA,NA,0.010368649739181847,0.22539479829452258
+d__Eukaryota, p__Dinoflagellata, c__Incertae_Sedis, o__Incertae_Sedis, f__Incertae_Sedis, g__Haplozoon,0.055289543675805325,4.816929912315768
+d__Eukaryota, p__MAST-1, c__MAST-1A, o__MAST-1A, f__MAST-1A, g__MAST-1A,0.005038633619215085,7.231637965210769
+d__Eukaryota, p__Dinoflagellata, c__Dinoflagellata, o__Dinoflagellata, f__Dinoflagellata, g__Dinoflagellata,0.010671043973961139,-2.247140532030638
+d__Eukaryota, p__Incertae_Sedis, c__Incertae_Sedis, o__Incertae_Sedis, f__Incertae_Sedis, g__Palpitomonas,0.0030102798803693298,-1.9817928234885973
+d__Eukaryota, p__Dinoflagellata, c__Dinophyceae, o__Prorocentrales, f__Prorocentrales, g__Prorocentrum,0.005613009149735295,8.957001216405999
+d__Eukaryota, p__MAST-4, c__MAST-4, o__MAST-4, f__MAST-4, g__MAST-4,0.1218975661282914,-77.70659200513505
+d__Eukaryota, p__Ochrophyta, c__Ochrophyta, o__Ochrophyta, f__Ochrophyta, g__Bolidomonas,0.005952563038338809,-0.18025240059151526
+d__Eukaryota, p__Protalveolata, c__Syndiniales, o__Syndiniales, f__Syndiniales_Group_II, g__Syndiniales_Group_II,0.0065881020539995325,-10.065458396852991
+d__Eukaryota,NA,NA,NA,NA,NA,0.053047798620974446,42.5674080817183
+d__Eukaryota, p__Dinoflagellata, c__Dinophyceae, o__Gymnodiniphycidae,NA,NA,0.009360696286878196,10.841864126547264
+d__Eukaryota, p__Ciliophora, c__Intramacronucleata, o__Spirotrichea, f__Oligotrichia, g__Strombidium,0.014024888099921548,5.013344741228142
+d__Eukaryota, p__Prymnesiophyceae,NA,NA,NA,NA,0.010190964929534332,7.266823898547529
+d__Eukaryota,NA,NA,NA,NA,NA,0.028785449633138407,-43.008509066413644
+d__Eukaryota, p__MAST-1, c__MAST-1C, o__MAST-1C, f__MAST-1C, g__MAST-1C,0.01990738173524641,-9.355398971292075
+d__Eukaryota, p__Centrohelida, c__Centrohelida, o__Centrohelida, f__Centrohelida, g__Centrohelida,0.01172987955756096,4.107272061236121
+d__Eukaryota, p__Incertae_Sedis, c__Incertae_Sedis, o__Incertae_Sedis, f__Incertae_Sedis, g__Telonema,0.003646725689583197,-5.717012813108806
+d__Eukaryota, p__Protalveolata, c__Syndiniales, o__Syndiniales, f__Syndiniales_Group_I, g__Syndiniales_Group_I,0.0676361513257006,-97.90497632588318
+d__Eukaryota, p__Dinoflagellata, c__Dinophyceae, o__Gymnodiniphycidae, f__Gymnodinium_clade, g__Gymnodinium,0.006410413225437985,-5.023417941689325
+d__Eukaryota, p__Dinoflagellata, c__Dinophyceae, o__Gymnodiniphycidae, f__uncultured, g__uncultured,0.02461283287655759,7.039466661562454
+d__Eukaryota, p__Cryptophyceae, c__Cryptophyceae, o__Cryptomonadales, f__Cryptomonadales, g__Teleaulax,0.029809965952563706,24.39737681100597
+d__Bacteria, p__Proteobacteria,NA,NA,NA,NA,0.006118957489551751,-2.7328661967731924
+d__Bacteria,NA,NA,NA,NA,NA,0.022393045462900357,-4.4804461279806045
+d__Eukaryota, p__Protalveolata, c__Syndiniales, o__Syndiniales,NA,NA,0.01625162187125624,-17.51600921912229
+d__Eukaryota, p__Tunicata, c__Appendicularia, o__Copelata, f__Oikopleuridae, g__Oikopleuridae,0.021515679111673916,-1.9153477689284395
+d__Eukaryota, p__Ochrophyta, c__Chrysophyceae, o__uncultured, f__uncultured, g__uncultured,0.003067786145446277,-4.60470275186284
+d__Bacteria, p__Proteobacteria, c__Alphaproteobacteria, o__SAR11_clade, f__Clade_IV, g__Clade_IV,0.053329580524797394,-92.95998984827571
+d__Eukaryota, p__Protalveolata, c__Syndiniales, o__Syndiniales, f__Syndiniales_Group_I, g__Syndiniales_Group_I,0.023379100412149252,-27.981901528407988
+d__Eukaryota,NA,NA,NA,NA,NA,0.006402710860820498,-7.781764300291167
+d__Archaea, p__Thermoplasmatota, c__Thermoplasmata, o__Marine_Group_II, f__Marine_Group_II, g__Marine_Group_II,0.12471742024698898,29.13036629063167
+d__Eukaryota, p__Protalveolata, c__Syndiniales, o__Syndiniales, f__Syndiniales_Group_III, g__Syndiniales_Group_III,0.0053431945618576246,-10.347278311641464
+d__Eukaryota,NA,NA,NA,NA,NA,0.0186068531269079,-24.374191675282233
+d__Eukaryota, p__Chlorophyta, c__Mamiellophyceae, o__Mamiellales, f__Mamiellales, g__Ostreococcus,0.013214749104455324,-17.06420064289194
+d__Eukaryota, p__Prymnesiophyceae, c__Prymnesiophyceae, o__Isochrysidales, f__Isochrysidales, g__Emiliania,0.010154476032518291,-3.8803181749731
+d__Eukaryota, p__Ciliophora, c__Intramacronucleata, o__Spirotrichea, f__Oligotrichia, g__uncultured,0.008798684023474623,1.7384767321412413
+d__Eukaryota, p__Holozoa, c__Choanoflagellida, o__Acanthoecida, f__Acanthoecidae, g__Pleurasiga,0.004138170783932916,-3.3733050381462104
+d__Eukaryota, p__Cnidaria, c__Hydrozoa, o__Siphonophorae, f__Siphonophorae, g__Siphonophorae,0.06411406035755901,1.2032320407954495
+d__Eukaryota, p__Protalveolata, c__Syndiniales, o__Syndiniales, f__Syndiniales_Group_I, g__Syndiniales_Group_I,0.02877792202508739,-15.732516090716215
+d__Bacteria, p__Proteobacteria, c__Alphaproteobacteria, o__Puniceispirillales, f__SAR116_clade, g__SAR116_clade,0.010385605458372943,16.209100183561205
+d__Eukaryota, p__Arthropoda, c__Maxillopoda, o__Cyclopoida, f__Cyclopoida, g__Cyclopoida,0.8780329723422355,6.361723313435039
+d__Eukaryota,NA,NA,NA,NA,NA,0.004521126733015287,3.4113705883600214
+d__Eukaryota, p__Protalveolata, c__Syndiniales, o__Syndiniales, f__Syndiniales, g__Duboscquella,0.008579510768189615,-7.723865840696006
+d__Eukaryota, p__Dinoflagellata, c__Dinophyceae, o__Gymnodiniphycidae, f__Suessiaceae, g__Biecheleria,0.0026938687636015204,13.046179382343322
+d__Eukaryota, p__Kathablepharidae, c__Kathablepharidae, o__Kathablepharidae, f__Kathablepharidae, g__Leucocryptos,0.07538341655720172,67.62796359312412
+d__Eukaryota, p__Dinoflagellata, c__Dinophyceae,NA,NA,NA,0.006360559302701777,-9.487827214327034
+d__Eukaryota, p__MAST-4, c__MAST-4D, o__MAST-4D, f__MAST-4D, g__MAST-4D,0.00834006162879528,4.511776411943983
+d__Bacteria, p__Proteobacteria, c__Gammaproteobacteria, o__SAR86_clade, f__SAR86_clade, g__SAR86_clade,0.018032630385810922,2.766241518802556
+d__Eukaryota,NA,NA,NA,NA,NA,0.00958586883799686,-2.8600342704099173
+d__Eukaryota, p__Protalveolata, c__Syndiniales, o__Syndiniales, f__Syndiniales_Group_III, g__Syndiniales_Group_III,0.07131039803657224,41.75633273034639
+d__Eukaryota, p__Cercozoa, c__Chlorarachniophyta, o__Chlorarachniophyta, f__Chlorarachniophyta, g__NOR26,0.007157029544895541,7.306304026886076
+d__Eukaryota, p__Dinoflagellata, c__Dinophyceae,NA,NA,NA,0.34225718771874103,-87.97963764361197
+d__Eukaryota, p__Dinoflagellata, c__Dinophyceae, o__Gymnodiniphycidae,NA,NA,0.10543495853308243,89.27175769339414
+d__Eukaryota, p__Cryptophyceae, c__Cryptophyceae, o__Cryptomonadales, f__Cryptomonadales, g__Geminigera,0.025063228213530866,19.295924239982046
+d__Bacteria, p__Proteobacteria, c__Alphaproteobacteria, o__SAR11_clade, f__Clade_I, g__Clade_Ia,0.30333744609502417,22.070485217569193
+d__Eukaryota, p__MAST-1, c__MAST-1B, o__MAST-1B, f__MAST-1B, g__MAST-1B,0.009840815188954041,-5.5580086948412974
+d__Eukaryota, p__Dinoflagellata, c__Dinophyceae,NA,NA,NA,0.12393128665816258,-80.06083073979107
+d__Archaea, p__Thermoplasmatota, c__Thermoplasmata, o__Marine_Group_II, f__Marine_Group_II, g__Marine_Group_II,0.568365677012408,27.086962351160146
+d__Eukaryota, p__MAST-4, c__MAST-4, o__MAST-4, f__MAST-4, g__MAST-4,0.02979659749241932,-47.16945922519507
+d__Bacteria, p__Proteobacteria, c__Alphaproteobacteria, o__SAR11_clade, f__Clade_IV, g__Clade_IV,0.020136731031549872,-24.22796972223239
+d__Eukaryota, p__Cryptophyceae, c__Cryptophyceae, o__Cryptomonadales, f__Cryptomonadales, g__Cryptomonadales,0.009500997287909332,6.920655602117529
+d__Eukaryota, p__Kathablepharidae, c__Kathablepharidae, o__Kathablepharidae, f__Kathablepharidae, g__Leucocryptos,0.0057733083841043555,-0.9132032366277337
+d__Eukaryota, p__Ochrophyta,NA,NA,NA,NA,0.022644923335499653,-5.2206626072309765
