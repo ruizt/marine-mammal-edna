@@ -352,7 +352,7 @@ loc|>
   labs(title="Temperature vs Alpha Div binned by Depth")
 
 
-/Users/gabriellelow/Downloads/marine-mammal-edna/rslt/plots
+#/Users/gabriellelow/Downloads/marine-mammal-edna/rslt/plots
 # color by depth
 loc|>
   ggplot(aes(x=t_deg_c , y = alpha.div.sh, col=depthm, alpha=0.5)) +
