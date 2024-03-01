@@ -57,6 +57,10 @@ l <- model$loadings
 loading_df <- data.frame(matrix(as.numeric(l), attributes(l)$dim, dimnames=attributes(l)$dimnames))
 loading_df$asv = rownames(loading_df)
 
+# coefficients
+model$coefficients |> as_tibble()
+
+
 # estimates for 7 components
 loading_df$coef_estimates <- model$coefficients %>% as.data.frame() %>% select(7) %>% pull()
 
@@ -103,7 +107,7 @@ f <- spls(x = asv_predictors, y = asv_sightings$Bm_scaled, K = cv$K.opt, eta = c
 
 pred <- predict.spls(f, type = 'fit')
 
-var(Bm_scaled - pred)/var(Bm_scaled)
+1 - var(Bm_scaled - pred)/var(Bm_scaled)
 var(Bm_scaled - model$fitted.values)/var(Bm_scaled)
 
 # show results of selected variables
@@ -121,4 +125,31 @@ pred <- predict.spls(f, type = 'fit')
 var(Bm_scaled - pred)/var(Bm_scaled)
 
 # cbind(pred, Bm_scaled)
+
+## EXPERIMENTATION
+
+tbl <- f$projection |>
+  bind_cols(filter(coef.f, estimate != 0)) |>
+  rename(reg.coef = estimate) |>
+  rownames_to_column('short.id') |>
+  left_join(dplyr::select(taxa, silva_Taxon, short.id), by = 'short.id') |>
+  separate(silva_Taxon, into = c('d', 'p', 'c', 'o', 'f', 'g'), sep = ';') 
+
+view(tbl)
+
+coef_pred <- predict(f, type = 'coefficient') |> as.data.frame()
+bind_cols(coef.f, coef_pred)
+bind_cols(pred, Bm_scaled)
+
+pred_manual <- rep(f$mu, 25) + scale(as.matrix(asv_predictors), center = T, scale = T) %*% coef.f$estimate
+bind_cols(pred, pred_manual)
+
+x_mx <- as.matrix(asv_predictors[, tbl$short.id]) %*% ß
+fit <- lm(y ~ x, data = bind_cols(y = Bm_scaled,x = x_mx))
+f$projection %*% coef(fit)[2:3]
+filter(coef.f, estimate != 0)
+
+tbl |>
+  write_csv('rslt/taxa-weights-18s-spls.csv')
+
 
