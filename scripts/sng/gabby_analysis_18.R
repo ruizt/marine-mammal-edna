@@ -320,5 +320,104 @@ alpha_meta_18|>
 
 
 # 9 taxa
+taxa9 = read_csv("rslt/taxa-weights-18s-spls.csv")
+taxa9$short.id
+
+# get sample IDs of 9 taxa
+reads_9 <- edna18s_reads|>
+  select(sample.id, cruise, line, sta, asv.1638, asv.12465, asv.13584, asv.17696, 
+         asv.22999, asv.28914, asv.31220, asv.32287, asv.37041) |>
+  rename(sample_id = sample.id)
+
+# merge with alpha meta data
+alpha_meta_9 <- reads_9 |>
+  inner_join(alpha_meta_18,  by = "sample_id") |>
+  rename(cruise=cruise.x, line = line.x, sta=sta.x) |>
+  select(-c(cruise.y, line.y, sta.y, cruise_2))
+  
+
+# Temperature vs asv.1638 binned by Depth
+alpha_meta_9|>
+  ggplot(aes(x=t_deg_c , y = asv.1638, col="orangered", alpha=0.5)) +
+  facet_wrap(~depth_bins) +
+  geom_point()+
+  guides(color=FALSE, alpha=FALSE)+
+  labs(title="Temperature vs asv.1638 binned by Depth")
 
 
+# asv vs depth
+asv_columns <- c("asv.1638", "asv.12465", "asv.13584", "asv.17696", 
+                 "asv.22999", "asv.28914", "asv.31220", "asv.32287", "asv.37041")
+
+sums <- list()
+plots <- list()
+
+for (asv_col in asv_columns) {
+  # sums
+  sum_val <- sum(alpha_meta_9[[asv_col]])
+  sums[[asv_col]] <- sum_val
+  
+  # scatterplot
+  plot_point <- alpha_meta_9 |>
+    ggplot(aes(x=depthm , y = .data[[asv_col]], col="orangered", alpha=0.5)) +
+    geom_point()+
+    guides(color=FALSE, alpha=FALSE)+
+    labs(title=paste("Depth vs", asv_col))
+  
+  # boxplot
+  plot_boxplot <- alpha_meta_9 |>
+    ggplot(aes(x=depth_bins , y = .data[[asv_col]], col="orangered")) +
+    geom_boxplot()+
+    guides(color=FALSE, alpha=FALSE)+
+    labs(title=paste("Depth vs", asv_col))
+  
+  # store plots
+  plots[[paste("point", asv_col)]] <- plot_point
+  plots[[paste("boxplot", asv_col)]] <- plot_boxplot
+}
+
+# asv.1638
+plots[[paste("point", "asv.1638")]]
+plots[[paste("boxplot", "asv.1638")]]
+
+# asv.12465
+plots[[paste("point", "asv.12465")]]
+plots[[paste("boxplot", "asv.12465")]]
+
+# asv.13584
+plots[[paste("point", "asv.13584")]]
+plots[[paste("boxplot", "asv.13584")]]
+
+# asv.17696
+plots[[paste("point", "asv.17696")]]
+plots[[paste("boxplot", "asv.17696")]]
+
+# asv.22999
+plots[[paste("point", "asv.22999")]]
+plots[[paste("boxplot", "asv.22999")]]
+
+# asv.28914
+plots[[paste("point", "asv.28914")]]
+plots[[paste("boxplot", "asv.28914")]]
+
+# asv.31220
+plots[[paste("point", "asv.31220")]]
+plots[[paste("boxplot", "asv.31220")]]
+
+# asv.32287
+plots[[paste("point", "asv.32287")]]
+plots[[paste("boxplot", "asv.32287")]]
+
+# asv.37041
+plots[[paste("point", "asv.37041")]]
+plots[[paste("boxplot", "asv.37041")]]
+
+# df with the asv sums
+asv_sums <- data.frame(
+  asv = c("asv.1638", "asv.12465", "asv.13584", "asv.17696", "asv.22999", 
+          "asv.28914", "asv.31220", "asv.32287", "asv.37041"), 
+  asv_sum = c(sums[["asv.1638"]], sums[["asv.12465"]], sums[["asv.13584"]],
+              sums[["asv.17696"]], sums[["asv.22999"]], sums[["asv.28914"]],
+              sums[["asv.31220"]], sums[["asv.32287"]], sums[["asv.37041"]])
+)
+  
