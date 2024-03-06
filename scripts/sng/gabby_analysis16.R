@@ -417,10 +417,7 @@ loc|>
   guides(alpha = FALSE)
 # oxygen vs depth
 loc|>
-  group_by(cruise) |>
-  mutate(mean_oxy = mean(o2ml_l),
-         mean_depth = mean(depthm))|>
-  ggplot(aes(x=mean_depth, y = mean_oxy, col=alpha.div.sh, alpha=0.5))+
+  ggplot(aes(x=depthm, y = o2ml_l, col=alpha.div.sh, alpha=0.5))+
   geom_point()+
   guides(alpha=FALSE)+
   scale_color_viridis(name="Alpha Div") 
@@ -443,10 +440,7 @@ loc|>
   guides(alpha = FALSE)
 # phosphate vs depth
 loc|>
-  group_by(cruise) |>
-  mutate(mean_po4 = mean(po4ug),
-         mean_depth = mean(depthm))|>
-  ggplot(aes(x=mean_depth, y = mean_po4, col=alpha.div.sh, alpha=0.5))+
+  ggplot(aes(x=depthm, y = po4ug, col=alpha.div.sh, alpha=0.5))+
   geom_point()+
   guides(alpha=FALSE)+
   scale_color_viridis(name="Alpha Div") 

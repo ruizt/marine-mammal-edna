@@ -44,7 +44,7 @@ sampling_counts18 <- metadata18 %>%
   filter((76 < line) & (line < 93.4)) 
 
 # transect IDs
-transects18 <- sampling_counts %>% pull(line) %>% unique()
+transects18 <- sampling_counts18 %>% pull(line) %>% unique()
 
 # number of observations per transect/cruise for common transects
 sampling_counts18 %>%
@@ -80,7 +80,7 @@ alpha_div18 <- sampinfo %>%
 # diversity by depth
 alpha_div18 %>%
   mutate(depth = as.numeric(depthm),
-         depth.fac = cut_number(depth, 3)) %>%
+         depth.fac = cut_number(depth, 10)) %>%
   ggplot(aes(x = alpha.div.sh, y = depth.fac)) + 
   geom_boxplot()
 
@@ -113,8 +113,10 @@ alpha_meta_18 <- alpha_div18|>
   rename("alpha.div.sh" = "alpha_div_sh")
 
 alpha_meta_18 <- alpha_meta_18 |>
-  mutate(depth_bins = cut_number(depthm, n = 3))|>
-  filter(!is.na(depth_bins)) 
+  mutate(depth_bins = cut_number(depthm, n = 3),
+         depth_bins2 = cut_interval(depthm, n = 10))|>
+  filter(!is.na(depth_bins)) |>
+  filter(!is.na(depth_bins2))
 
 # temp and alpha binned by depth
 alpha_meta_18|>
@@ -321,6 +323,7 @@ alpha_meta_18|>
 
 # 9 taxa
 taxa9 = read_csv("rslt/taxa-weights-18s-spls.csv")
+head(taxa9)
 taxa9$short.id
 
 # get sample IDs of 9 taxa
@@ -364,9 +367,11 @@ for (asv_col in asv_columns) {
     guides(color=FALSE, alpha=FALSE)+
     labs(title=paste("Depth vs", asv_col))
   
-  # boxplot
+  # boxplot 
+  # note: boxplots are cut_interval, not cut_number b/c R wouldn't let
+  # me do cut_number
   plot_boxplot <- alpha_meta_9 |>
-    ggplot(aes(x=depth_bins , y = .data[[asv_col]], col="orangered")) +
+    ggplot(aes(x=depth_bins2 , y = .data[[asv_col]], col="orangered")) +
     geom_boxplot()+
     guides(color=FALSE, alpha=FALSE)+
     labs(title=paste("Depth vs", asv_col))
@@ -420,4 +425,8 @@ asv_sums <- data.frame(
               sums[["asv.17696"]], sums[["asv.22999"]], sums[["asv.28914"]],
               sums[["asv.31220"]], sums[["asv.32287"]], sums[["asv.37041"]])
 )
-  
+
+# divide all read counts by sum (find in preprocessing) -> relative abundances
+# depth profile: density chart
+# create more bins (10) for boxplots
+# look at asvs vs oxygen and chlorophyll
