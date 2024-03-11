@@ -80,7 +80,7 @@ alpha_div18 <- sampinfo %>%
 # diversity by depth
 alpha_div18 %>%
   mutate(depth = as.numeric(depthm),
-         depth.fac = cut_number(depth, 10)) %>%
+         depth.fac = cut_number(depth, 3)) %>%
   ggplot(aes(x = alpha.div.sh, y = depth.fac)) + 
   geom_boxplot()
 
@@ -430,3 +430,86 @@ asv_sums <- data.frame(
 # depth profile: density chart
 # create more bins (10) for boxplots
 # look at asvs vs oxygen and chlorophyll
+
+plots_oxy <- list()
+# Plot asvs vs. Oxygen binned by depth
+for (asv_col in asv_columns) {
+  oxy_plot <- alpha_meta_9 |>
+    ggplot(aes(x = o2ml_l, y = .data[[asv_col]], col = "orangered", alpha = 0.5)) +
+    facet_wrap(~depth_bins) +
+    geom_point() +
+    guides(color = FALSE, alpha = FALSE) +
+    labs(title = paste("Oxygen vs", asv_col, "binned by Depth"))
+  
+  plots_oxy[[paste(asv_col)]] <- oxy_plot
+}
+
+
+# asv.1638
+plots_oxy[[paste("asv.1638")]]
+
+# asv.12465
+plots_oxy[[paste("asv.12465")]]
+
+# asv.13584
+plots_oxy[[paste("asv.13584")]]
+
+# asv.17696
+plots_oxy[[paste("asv.17696")]]
+
+# asv.22999
+plots_oxy[[paste("asv.22999")]]
+
+# asv.28914
+plots_oxy[[paste("asv.28914")]]
+
+# asv.31220
+plots_oxy[[paste("asv.31220")]]
+
+# asv.32287
+plots_oxy[[paste("asv.32287")]]
+
+# asv.37041
+plots_oxy[[paste("asv.37041")]]
+
+
+
+plots_chlor <- list()
+# Plot asvs vs. chlorophyll binned by depth
+for (asv_col in asv_columns) {
+  chlor_plot <- alpha_meta_9 |>
+    ggplot(aes(x = chlor_a, y = .data[[asv_col]], col = "orangered", alpha = 0.5)) +
+    facet_wrap(~depth_bins) +
+    geom_point() +
+    guides(color = FALSE, alpha = FALSE) +
+    labs(title = paste("Chlorophyll vs", asv_col, "binned by Depth"))
+  
+  plots_chlor[[paste(asv_col)]] <- chlor_plot
+}
+
+# asv.1638
+plots_chlor[[paste("asv.1638")]]
+
+# asv.12465
+plots_chlor[[paste("asv.12465")]]
+
+# asv.13584
+plots_chlor[[paste("asv.13584")]]
+
+# asv.17696
+plots_chlor[[paste("asv.17696")]]
+
+# asv.22999
+plots_chlor[[paste("asv.22999")]]
+
+# asv.28914
+plots_chlor[[paste("asv.28914")]]
+
+# asv.31220
+plots_chlor[[paste("asv.31220")]]
+
+# asv.32287
+plots_chlor[[paste("asv.32287")]]
+
+# asv.37041
+plots_chlor[[paste("asv.37041")]]
