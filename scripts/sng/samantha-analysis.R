@@ -1,5 +1,6 @@
 # further explorations by sam 
 library(ggplot2)
+library(tidyverse)
 theme_set(theme_grey())
 # grouping by station
 alpha_div %>%
@@ -158,13 +159,95 @@ betadiver(help = T)
 
 # further explorations?
 # examining other variables 
-alpha_div <- alpha_div |>
-  rename(sample.id = Sample.Name)
+alpha_div2 <- alpha_div |>
+  select(Sample.Name, line, sta, depthm, alpha.div.sh) |>
+  mutate(Sample.Name = substr(Sample.Name, 2, nchar(alpha_div2$Sample.Name)))
 
 
-chlor <- metadata |>
+chlor <- metadata %>%
   select(Sample.Name, Cruise, Depthm, Time, Distance, NO3ug, NH3ug, ChlorA)
 
-full_join(alpha_div, chlor, by =)
+meta2 <- inner_join(alpha_div2, chlor, by = "Sample.Name")
+
+
+
+##### Investigating Nitrate, Distance from shore, Chlorophyll, and line #####
+
+# Nitrate measurements compared to distance scatter
+ggplot(data = meta2, aes(x = NO3ug, y = alpha.div.sh)) + 
+  geom_point() + 
+  scale_y_continuous(limits = c(0,6))
+# closer look 
+meta2 %>%
+  filter(NO3ug != 0) %>%
+  ggplot(aes(x = NO3ug, y = alpha.div.sh)) + 
+  geom_point() + 
+  scale_y_continuous(limits = c(3,6)) +
+  scale_x_continuous(limits = c(0, 10))
+
+meta2 %>%
+  filter(NO3ug != 0, NO3ug <10) %>%
+  mutate(nitrate = as.numeric(NO3ug),
+         nitrate.fac = cut_number(nitrate, 4)) %>%
+  ggplot(aes(x = alpha.div.sh, y = nitrate.fac)) + 
+  geom_boxplot()
+
+meta2 %>%
+  filter(NO3ug == 0) %>%
+  ggplot(aes(x = alpha.div.sh)) + 
+  geom_histogram()
+
+
+# Nitrate by Chlorophyll scatter
+ggplot(data = meta2, aes(x = NO3ug, y = ChlorA)) + 
+  geom_point()
+#  closer look
+ggplot(data = meta2, aes(x = NO3ug, y = ChlorA)) + 
+  geom_point() + 
+  scale_y_continuous(limits = c(0,7.5)) + 
+  scale_x_continuous(limits = c(0,7.5))
+
+# boxplot distance from shore by diversity
+meta2 %>%
+  mutate(dist = as.numeric(Distance),
+         dist.fac = cut_number(dist, 4)) %>%
+  ggplot(aes(x = dist.fac, y = alpha.div.sh)) + 
+  geom_boxplot()
+
+meta2 %>%
+  mutate(dist = as.numeric(Distance),
+         dist.fac = cut_number(dist, 4)) %>%
+  ggplot(aes(x = depthm, y = alpha.div.sh, color = dist.fac)) + 
+  geom_point() + facet_wrap(~dist.fac)
+
+## fix axes
+# ggplot(data = meta2, aes(x = Distance, y = depthm, color = alpha.div.sh)) + geom_point()
+
+
+# Nitrate and distance from shore
+meta2 %>%
+  mutate(dist = as.numeric(Distance),
+         dist.fac = cut_number(dist, 2)) %>%
+  filter(!is.na(dist.fac)) %>%
+  ggplot(aes(x = dist.fac, y = NO3ug)) + 
+  geom_boxplot()
+
+meta2 %>%
+  mutate(dist = as.numeric(Distance),
+         dist.fac = cut_number(dist, 4)) %>%
+  filter(!is.na(dist.fac)) %>%
+  ggplot(aes(x = dist.fac, y = alpha.div.sh)) + 
+  geom_boxplot()
+
+# Chlorophyll and distance from shore
+meta2 %>%
+  mutate(dist = as.numeric(Distance),
+         dist.fac = cut_number(dist, 4)) %>%
+  ggplot(aes(x = ChlorA, y = dist.fac)) + 
+  geom_boxplot()
+
+# chlorophyll by line
+ggplot(data = meta2, aes(x = line, y = ChlorA)) + geom_boxplot()
+
 
 
