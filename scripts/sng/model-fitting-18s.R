@@ -4,6 +4,7 @@ library(spls)
 load('data/ncog-18s.RData')
 
 ## DATA FILTERING AND AGGREGATION ----------------------------------------------
+
 # dplyr::select columns of interest based on nonzero frequency across samples
 cols_of_interest <- edna_samples %>%
   dplyr::select(starts_with('asv')) %>%
@@ -12,10 +13,10 @@ cols_of_interest <- edna_samples %>%
   t() %>%
   as_tibble() %>%
   gather(col, prop.nz) %>%
-  filter(prop.nz > 0.5) %>% 
+  filter(prop.nz > 0.5) %>% # experiment?
   pull(col)
 
-# edna_samples %>% 
+# edna_samples %>%
 #   dplyr::select(all_of(cols_of_interest)) %>%
 #   mutate(across(everything(), ~(.x > 0))) %>%
 #   rowSums() %>%
@@ -25,7 +26,8 @@ cols_of_interest <- edna_samples %>%
 #   mutate(q = row_number()/nrow(edna_samples)) %>%
 #   ggplot(aes(x = prop.asv.nz, y = q)) +
 #   geom_step() +
-#   labs(y = 'proportion of samples', x = 'proportion of nonzero reads')
+#   labs(y = 'proportion of samples', x = 'proportion of nonzero reads') +
+#   geom_vline(xintercept = 0.5)
 
 # zero imputation (bayesian multiplicative, martin-fernandez 2015, luz calle 2019)
 imputation_out <- edna_samples %>% 
@@ -43,7 +45,7 @@ edna_imputed <- edna_samples %>%
 
 # aggregate, first across depth, then across line and station
 edna_agg <- edna_imputed %>%
-  group_by(cruise, line, sta) %>%
+  group_by(cruise, line, sta) %>% # depth filtering or depth weighting?
   summarize(across(starts_with('asv'), ~mean(log(.x))), .groups = 'drop') %>%
   group_by(cruise) %>%
   summarize(across(starts_with('asv'), ~mean(.x)))
@@ -84,9 +86,10 @@ asv_sightings <- cbind(Bm_scaled, asv_predictors)
 # cross validate using K=2 to 8 latent components and eta = 0.1 to 0.9
 set.seed(30424)
 cv <- cv.spls(asv_predictors, Bm_scaled, eta = seq(0.1,0.9,0.1), K = c(1:8))
+cv$eta.opt
 
 # fit model with best eta
-f <- spls(x = asv_predictors, y = asv_sightings$Bm_scaled, K = 2, eta = cv$eta.opt)
+f <- spls(x = asv_predictors, y = asv_sightings$Bm_scaled, K = 2, eta = 0.4)
 print(f)
 
 # variance explained (rough)
