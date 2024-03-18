@@ -99,13 +99,20 @@ plot(model)
 # Fit initial sPLS model
 ###############################################################################
 # cross validate using K=2 to 8 latent components and eta = 0.1 to 0.9
+set.seed(30424)
 cv <- cv.spls(asv_predictors, Bm_scaled, 
-              eta = seq(0.1,0.9,0.1), K = c(2:8))
+              eta = seq(0.1,0.9,0.1), K = c(1:8))
 
 # fit model with best K and eta
-f <- spls(x = asv_predictors, y = asv_sightings$Bm_scaled, K = cv$K.opt, eta = cv$eta.opt)
+f <- spls(x = asv_predictors, y = asv_sightings$Bm_scaled, K = 2, eta = cv$eta.opt)
+print(f)
 
 pred <- predict.spls(f, type = 'fit')
+
+bind_cols(cruise = intersect(drop_na(scaled_sightings)$cruiseID, edna_data$cruise),
+  observed = Bm_scaled,
+  predicted = pred[, 1]) |>
+  write_csv('rslt/preds-18s-spls.csv')
 
 1 - var(Bm_scaled - pred)/var(Bm_scaled)
 var(Bm_scaled - model$fitted.values)/var(Bm_scaled)
@@ -152,4 +159,4 @@ filter(coef.f, estimate != 0)
 tbl |>
   write_csv('rslt/taxa-weights-18s-spls.csv')
 
-
+pred
