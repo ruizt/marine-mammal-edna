@@ -35,7 +35,7 @@ scaled_sightings_imp <- scaled_sightings |>
                           runif(n = length(bm == 0), min = 0, max = bm.min),
                           bm),
          mn.imp = if_else(mn == 0,
-                          runif(n = length(bm == 0), min = 0, max = mn.min),
+                          runif(n = length(mn == 0), min = 0, max = mn.min),
                           mn))
 
 # subtract seasonal averages
@@ -46,11 +46,11 @@ sightings <- scaled_sightings_imp |>
                    .fns = list(mean = ~mean(log(.x), na.rm = T)),
                    .names = 'log.{.col}.{.fn}')) |>
   right_join(scaled_sightings_imp) |>
-  transmute(cruise = cruise,
+  mutate(cruise = cruise,
             bp = log(bp.imp) - log.bp.imp.mean,
             bm = log(bm.imp) - log.bm.imp.mean,
-            mn = log(mn.imp) - log.mn.imp.mean)
-
+            mn = log(mn.imp) - log.mn.imp.mean,
+         .keep = "none")
 
 # clr transformation
 clr_out <- edna_data |> 
