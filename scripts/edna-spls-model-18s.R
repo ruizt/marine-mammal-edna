@@ -22,6 +22,7 @@ scaled_sightings <- read_csv("data/CC_on_effort_scaled_sightings_Ceta_SCB.csv") 
   dplyr::select(cruise, season, bp, bm, mn)
 
 # impute zeroes with uniform random numbers up to seasonal minima
+set.seed(30924)
 scaled_sightings_imp <- scaled_sightings |>
   group_by(season) |>
   summarize(across(where(is.numeric), 
@@ -35,7 +36,7 @@ scaled_sightings_imp <- scaled_sightings |>
                           runif(n = length(bm == 0), min = 0, max = bm.min),
                           bm),
          mn.imp = if_else(mn == 0,
-                          runif(n = length(bm == 0), min = 0, max = mn.min),
+                          runif(n = length(mn == 0), min = 0, max = mn.min),
                           mn))
 
 # subtract seasonal averages
@@ -76,7 +77,7 @@ whales <- inner_join(sightings, clr_centered, by = 'cruise')
 
 # data inputs
 x <- dplyr::select(whales, starts_with('asv'))
-y <- pull(whales, bm) 
+y <- pull(whales, mn) 
 
 # hyperparameter grid
 grid_res <- 40
@@ -103,7 +104,7 @@ eta_init <- cv_out_init$eta.opt
 mspe_grid_init <- cv_out_init$mspemat[, 1]
 mspe_init <- mspe_grid_init[which(eta_grid_logspace == eta_init)]
 mspe_init_se <- sd(mspe_grid_init)/sqrt(grid_res)
-eta_range_ix <- which(mspe_grid_init <= mspe_init + 4*mspe_init_se)
+eta_range_ix <- which(mspe_grid_init <= mspe_init + 10*mspe_init_se)
 eta_grid <- seq(from = eta_grid_logspace[min(eta_range_ix)],
                 to = eta_grid_logspace[max(eta_range_ix)],
                 length = grid_res)
