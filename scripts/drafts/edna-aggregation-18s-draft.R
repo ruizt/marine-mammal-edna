@@ -34,26 +34,8 @@ imputation_out <- edna_samples %>% # use for relative abundances (maybe)
                            z.warning = 1)
 
 edna_imputed <- edna_samples %>%
-  slice(-c(215, 432)) %>%
   dplyr::select(1:5) %>%
   bind_cols(imputation_out)
-
-# # aggregate (verbose)
-# counts_depth <- edna_imputed %>%
-#   group_by(cruise, line, sta) %>%
-#   count(name = "n_depth")
-# 
-# counts_cruise <- counts_depth %>%
-#   group_by(cruise) %>%
-#   count(name = "n_sta")
-# 
-# edna_agg <- edna_imputed %>%
-#   left_join(counts_depth) %>%
-#   left_join(counts_cruise) %>%
-#   mutate(obs.weight = (1/n_depth)*(1/n_sta)) %>%
-#   # dplyr::select(cruise, line, sta, depthm, obs.weight)
-#   group_by(cruise) %>%
-#   summarize(across(starts_with('asv'), ~exp(weighted.mean(log(.x), obs.weight))))
 
 # aggregate (efficient)
 edna_agg <- edna_imputed %>%
@@ -74,5 +56,5 @@ edna_data_clo <- edna_data %>% select(-cruise) %>%
 
 edna_data_clo <- cbind(cruises, edna_data_clo)
 
-# save
+# save 
 save(list = 'edna_data', file = 'data/edna_18s_processed.RData')
