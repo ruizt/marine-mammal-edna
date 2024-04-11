@@ -47,11 +47,11 @@ sightings <- scaled_sightings_imp |>
                    .fns = list(mean = ~mean(log(.x), na.rm = T)),
                    .names = 'log.{.col}.{.fn}')) |>
   right_join(scaled_sightings_imp) |>
-  transmute(cruise = cruise,
+  mutate(cruise = cruise,
             bp = log(bp.imp) - log.bp.imp.mean,
             bm = log(bm.imp) - log.bm.imp.mean,
-            mn = log(mn.imp) - log.mn.imp.mean)
-
+            mn = log(mn.imp) - log.mn.imp.mean,
+         .keep = "none")
 
 # clr transformation
 clr_out <- edna_data |> 
