@@ -39,6 +39,8 @@ edna_imputed <- edna_samples |>
   dplyr::select(1:5) |>
   bind_cols(imputation_out)
 
+save(edna_imputed, file = 'data/edna-samples-imputed-18s.RData')
+
 # aggregate to cruise level
 depth_weight_fn <- function(depth){
   dgamma(depth, shape = 3, scale = 10)
