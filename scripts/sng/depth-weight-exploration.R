@@ -47,16 +47,18 @@ depth_weight_fn <- function(depth, alpha, beta){
 
 ##Grid search over shape and scale to maximize alpha diversity
 #full list of summary statistics (Mean, median, sd, quartiles, min, max, etc)
-alpha.vec <- seq(3,3,1)
-beta.vec <- seq(10,10,1)
+alpha.vec <- seq(2,11,1)
+beta.vec <- seq(1,15,1)
 
+avgDivsDF <- data.frame(0,0,0)
+names(avgDivsDF) = c("alpha", "beta", "avgDiv")
 
 
 for (a in alpha.vec){
   for (b in beta.vec){
 edna_agg <- edna_imputed |>
   mutate(depthm = as.numeric(depthm),
-         weight = depth_weight_fn(depthm,a, b)) |>
+         weight = depth_weight_fn(depthm, a, b)) |>
   group_by(cruise, line, sta) |>
   summarize(across(starts_with('asv'), 
                    ~weighted.mean(log(.x), weight)), ## automatically normalizes weights
@@ -66,16 +68,38 @@ edna_agg <- edna_imputed |>
   group_by(cruise) |>
   summarize(across(starts_with('asv'), ~mean(.x)))
 
+edna_data <- edna_agg |> mutate(exp(pick(-cruise)))
+
 # split into sample info and asvs
-asv <- edna_agg |> 
+asv <- edna_data |> 
   dplyr::select(starts_with('asv'))
 
-sampinfo <- edna_agg |> 
+sampinfo <- edna_data |> 
   dplyr::select(-starts_with('asv'))
 
 # alpha diversity measures
 alpha_divs <- sampinfo %>%
   bind_cols(alpha.div.sh = diversity(asv, index = 'shannon')) 
 
+alpha_div <- alpha_divs |> 
+  slice(-14) |> 
+  summarise(avgDiv = mean(alpha.div.sh))
+
+newRow = c(a,b, alpha_div$avgDiv)
+
+print(newRow)
+
+avgDivsDF <- rbind(avgDivsDF, setNames(newRow,names(avgDivsDF)))
   }
-  }
+}
+
+
+avgDivsDF <- avgDivsDF |> 
+  slice(-1)
+
+avgDivsDF |> 
+  filter((alpha-1)* beta >= 10)
+
+library(rgl)
+
+with(avgDivsDF, plot3d(x = alpha, y = beta, z = avgDiv))
