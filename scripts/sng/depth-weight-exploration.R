@@ -51,7 +51,7 @@ alpha.vec <- seq(2,11,1)
 beta.vec <- seq(1,15,1)
 
 gs1 <- data.frame(0,0,0,0,0,0,0,0,0)
-names(gammaDF) = c("alpha", "beta", "avgDiv", "SD", "Min", "25", "50","75", "Max")
+names(gs1) = c("alpha", "beta", "avgDiv", "SD", "Min", "25", "50","75", "Max")
 
 
 for (a in alpha.vec){
