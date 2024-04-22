@@ -291,3 +291,85 @@ gs2 |>
 library(rgl)
 
 with(gs2, plot3d(x = alpha, y = beta, z = avgDiv))
+
+with(gs2, plot3d(x = alpha, y = beta, z = SD))
+
+
+############################################################
+## Binned depths ###########################################
+############################################################
+
+binnedDepth <- edna_imputed |> 
+  mutate(depthRNG = cut_number(as.numeric(depthm),3)) 
+
+binnedDepth |> 
+  dplyr::select(depthRNG)
+
+gs3 <- data.frame(0,0,0,0,0,0,0,0,0,0)
+names(gs3) = c("w1", "w2", "w3", "avgDiv", "SD", "Min", "25", "50","75", "Max")
+
+
+binned_weight_fn <- function(depthRNG, w1, w2, w3){
+  return(ifelse(depthRNG == "[0,10]", w1, ifelse(depthRNG == "(10,36.3]", w2, w3)))
+}
+
+w1.vec = c(0.1,0.5,1)
+w2.vec = c(0.1,0.5,1)
+w3.vec = c(0.1,0.5,1)
+
+for (w1 in w1.vec) {
+  for (w2 in w2.vec) {
+    for (w3 in w3.vec) {
+      
+      edna_agg <- binnedDepth |>
+        mutate(depthm = as.numeric(depthm),
+               weight = binned_weight_fn(depthRNG, w1, w2, w3)) |>
+        group_by(cruise, line, sta) |>
+        summarize(across(starts_with('asv'), 
+                         ~weighted.mean(log(.x), weight)), ## automatically normalizes weights
+                  .groups = 'drop') |>
+        group_by(cruise, line) |>
+        summarize(across(starts_with('asv'), ~mean(.x))) |>
+        group_by(cruise) |>
+        summarize(across(starts_with('asv'), ~mean(.x)))
+      
+      edna_data <- edna_agg |> mutate(exp(pick(-cruise))) 
+      
+      # split into sample info and asvs
+      asv <- edna_data |> 
+        dplyr::select(starts_with('asv'))
+      
+      sampinfo <- edna_data |> 
+        dplyr::select(-starts_with('asv'))
+      
+      # alpha diversity measures
+      alpha_divs <- sampinfo %>%
+        bind_cols(alpha.div.sh = diversity(asv, index = 'shannon')) 
+      
+      alpha_div <- alpha_divs |> 
+        #slice(-14) |> 
+        summarise(avgDiv = mean(alpha.div.sh),
+                  sd = sd(alpha.div.sh),
+                  min = min(alpha.div.sh),,
+                  twentyfifth = quantile(alpha.div.sh, .25),
+                  fifty = quantile(alpha.div.sh, .50),
+                  seventyfifth = quantile(alpha.div.sh, .75),
+                  max = max(alpha.div.sh))
+      
+      newRow = c(w1,w2,w3, alpha_div$avgDiv, alpha_div$sd, alpha_div$min, alpha_div$twentyfifth, alpha_div$fifty, alpha_div$seventyfifth, alpha_div$max)
+      
+      print(newRow)
+      
+      gs3 <- rbind(gs3, setNames(newRow,names(gs3)))
+      
+    }
+  }
+}
+
+gs3 <- gs3 |> 
+  slice(-1)
+
+
+  
+
+          
