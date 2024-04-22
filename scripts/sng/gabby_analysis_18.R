@@ -478,7 +478,7 @@ plots_chlor <- list()
 # Plot asvs vs. chlorophyll binned by depth
 for (asv_col in asv_columns) {
   chlor_plot <- alpha_meta_9 |>
-    ggplot(aes(x = chlor_a, y = .data[[asv_col]], col = "orangered", alpha = 0.5)) +
+    ggplot(aes(x = log(chlor_a), y = log(.data[[asv_col]]+1), col = "orangered", alpha = 0.5)) +
     facet_wrap(~depth_bins) +
     geom_point() +
     guides(color = FALSE, alpha = FALSE) +
@@ -486,11 +486,11 @@ for (asv_col in asv_columns) {
   
   plots_chlor[[paste(asv_col)]] <- chlor_plot
 }
-
+# do log transformation
 # asv.1638
 plots_chlor[[paste("asv.1638")]]
 
-# asv.12465
+# asv.12465 (abundant in almost every sample)
 plots_chlor[[paste("asv.12465")]]
 
 # asv.13584

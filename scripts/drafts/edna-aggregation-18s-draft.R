@@ -26,7 +26,7 @@ edna_samples %>%
   labs(y = 'proportion of samples', x = 'proportion of nonzero reads')
 
 # zero imputation (bayesian multiplicative, martin-fernandez 2015, luz calle 2019)
-imputation_out <- edna_samples %>% 
+imputation_out <- edna_samples %>% # use for relative abundances (maybe)
   dplyr::select(all_of(cols_of_interest)) %>%
   zCompositions::cmultRepl(label = 0, 
                            method = 'GBM', 
