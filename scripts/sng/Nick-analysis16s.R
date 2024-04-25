@@ -602,8 +602,3 @@ alpha_meta |>
   facet_wrap(~fct_relevel(season, "Winter", "Spring", "Summer", "Fall"))
 
 
-### Check out the 9 asvs by season
-### Recompute alpha div, beta div
-### Check to see same patterns over 18s as we saw in 16s
-
-
