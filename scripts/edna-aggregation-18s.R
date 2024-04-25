@@ -3,6 +3,8 @@ library(compositions)
 library(zCompositions)
 load('data/ncog-18s.RData')
 
+## FILTERING AND IMPUTATION
+
 # dplyr::select columns of interest based on nonzero frequency across samples
 cols_of_interest <- edna_samples |>
   dplyr::select(starts_with('asv')) |>
@@ -40,10 +42,38 @@ edna_imputed <- edna_samples |>
   bind_cols(imputation_out)
 
 save(edna_imputed, file = 'data/edna-samples-imputed-18s.RData')
+load('data/edna-samples-imputed-18s.RData')
+
+## AGGREGATION
+
+edna_imputed |>
+  mutate(depth = as.numeric(depthm)) |> 
+  ggplot(aes(x = depth)) +
+  geom_histogram(bins = 20) +
+  facet_wrap(~cruise)
+
+edna_imputed |>
+  mutate(depth.fac = cut(as.numeric(depthm), 
+                         breaks = c(0, 20, 50, 100, 200),
+                         right = F)) |>
+  group_by(cruise, line, sta, depth.fac) |>
+  count() |>
+  arrange(desc(n)) |>
+  group_by(cruise, depth.fac) |>
+  count() |>
+  ggplot(aes(x = depth.fac, y = n)) +
+  geom_col() +
+  facet_wrap(~cruise)
+
+edna_imputed |>
+  group_by(cruise, line, sta) |>
+  count() |>
+  pull(n) |>
+  unique()
 
 # aggregate to cruise level
 depth_weight_fn <- function(depth){
-  dgamma(depth, shape = 3, scale = 10)
+  dgamma(depth, shape = 2, scale = 5)
 }
 
 edna_agg <- edna_imputed |>

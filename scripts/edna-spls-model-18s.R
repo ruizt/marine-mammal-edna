@@ -2,6 +2,8 @@ library(compositions)
 library(pls)
 library(spls)
 library(tidyverse)
+library(RColorBrewer)
+
 
 ## DATA PREPARATION ------------------------------------------------------------
 
@@ -77,69 +79,104 @@ whales <- inner_join(sightings, clr_centered, by = 'cruise')
 
 # data inputs
 x <- dplyr::select(whales, starts_with('asv'))
-y <- pull(whales, mn) 
+mn <- pull(whales, mn) # humpback
+bp <- pull(whales, bp) # fin
+bm <- pull(whales, bm) # blue
+n <- nrow(whales)
 
 # hyperparameter grid
-grid_res <- 40
-eta_grid_logspace <- seq(-2.5, -0.001, length = grid_res) |> exp()
-eta_grid_linspace <- seq(0.001, 0.999, length = grid_res)
+grid_res <- 200
+eta_grid_logspace <- rev(1 - exp(seq(-4, -0.01, length = grid_res)))
 
-# loocv to choose hyperparameter -- initial pass
-set.seed(32824)
-cv_out_init <- cv.spls(x, y, 
-                       K = 2, 
-                       eta = eta_grid_logspace, 
-                       fold = length(y), scale.x = F, scale.y = F,
-                       plot.it = F)
+# loocv to choose hyperparameters
+cv_mn <- cv.spls(x, mn, 
+                 K = 2, 
+                 scale.x = F, scale.y = F,
+                 eta = eta_grid_logspace, 
+                 fold = n,
+                 plot.it = F)
 
-plot(log(eta_grid_logspace), 
-     cv_out_init$mspemat[,1], 
-     type = 'l',
-     xlab = expr(log(eta)),
-     ylab = 'LOOCV MSPE') 
-abline(v = log(cv_out_init$eta.opt), lty = 2)
+cv_bp <- cv.spls(x, bp, 
+                 K = 2, 
+                 scale.x = F, scale.y = F,
+                 eta = eta_grid_logspace, 
+                 fold = n,
+                 plot.it = F)
 
-# loocv to choose hyperparameter -- second pass
-eta_init <- cv_out_init$eta.opt
-mspe_grid_init <- cv_out_init$mspemat[, 1]
-mspe_init <- mspe_grid_init[which(eta_grid_logspace == eta_init)]
-mspe_init_se <- sd(mspe_grid_init)/sqrt(grid_res)
-eta_range_ix <- which(mspe_grid_init <= mspe_init + 10*mspe_init_se)
-eta_grid <- seq(from = eta_grid_logspace[min(eta_range_ix)],
-                to = eta_grid_logspace[max(eta_range_ix)],
-                length = grid_res)
+cv_bm <- cv.spls(x, bm, 
+                 K = 2, 
+                 scale.x = F, scale.y = F,
+                 eta = eta_grid_logspace, 
+                 fold = n,
+                 plot.it = F)
 
-cv_out <- cv.spls(x, y, 
-                  K = 2, 
-                  eta = eta_grid, 
-                  fold = length(y), scale.x = F, scale.y = F,
-                  plot.it = F)
+# examine mspe and manually pick eta
+eta_df <- tibble(eta = eta_grid_logspace) |>
+  bind_cols(bm = cv_bm$mspemat[, 1],
+            bp = cv_bp$mspemat[, 1],
+            mn = cv_mn$mspemat[, 1]) 
 
-eta_min <- cv_out$eta.opt
-mspe_grid <- cv_out$mspemat[, 1]
-mspe_min <- mspe_grid[which(eta_grid == eta_min)]
-mspe_se <- sd(mspe_grid)/sqrt(grid_res)
-eta_1se <- eta_grid[which(mspe_grid <= mspe_min + 5*mspe_se) |> max()]
+eta_df |>
+  pivot_longer(-eta, values_to = 'mspe', names_to = 'species') |>
+  ggplot(aes(x = (eta), y = mspe)) +
+  geom_path() +
+  facet_wrap(~species) +
+  scale_y_log10() + 
+  geom_vline(aes(xintercept = eta.approx), 
+             data = tibble(species = c('bm', 'bp', 'mn'),
+                           eta.approx = c(0.48, 0.61, 0.45)))
 
-plot(log(eta_grid), 
-     cv_out$mspemat[,1], 
-     type = 'l',
-     xlab = expr(log(eta)),
-     ylab = 'LOOCV MSPE') 
-abline(h = mspe_min + 5*mspe_se, lty = 2)
-abline(v = log(eta_1se), lty = 2)
+eta_sel <- tibble(species = c('bm', 'bp', 'mn'),
+                  eta.approx = c(0.48, 0.61, 0.45))
 
-# fit spls model
-fit <- spls(x, y, K = 2, eta = eta_1se, scale.x = F, scale.y = F)
-fit
+# choose closest grid points to selected eta
+mspe_df <- eta_df |>
+  pivot_longer(-eta, values_to = 'mspe', names_to = 'species') |>
+  left_join(eta_sel, by = 'species') |>
+  group_by(species) |>
+  slice_min(abs(eta - eta.approx)) |>
+  dplyr::select(-eta.approx)
 
-# variability explained
-fitted_vals <- predict(fit, x, type = 'fit')
-1 - ((length(y) - 2)*var(y - fitted_vals))/((length(y) - 1)*var(y))
+eta_bm <- filter(mspe_df, species == 'bm') |> pull(eta)
+eta_bp <- filter(mspe_df, species == 'bp') |> pull(eta)
+eta_mn <- filter(mspe_df, species == 'mn') |> pull(eta)
 
-# estimate of prediction error
-mspe <- mspe_grid[eta_grid == eta_1se]
-sqrt(mspe) |> exp()
+# fit spls models
+fit_bm <- spls(x, bm, K = 2, eta = eta_bm, 
+            scale.x = F, scale.y = F)
+fit_bp <- spls(x, bp, K = 2, eta = eta_bp, 
+               scale.x = F, scale.y = F)
+fit_mn <- spls(x, mn, K = 2, eta = eta_mn, 
+               scale.x = F, scale.y = F)
+
+## MODEL OUTPUTS
+
+# extract predictions
+pred_bp <- predict(fit_bp)
+pred_mn <- predict(fit_mn)
+pred_bm <- predict(fit_bm)
+
+# summary statistics for responses
+whale_summaries <- whales |>
+  dplyr::select(2:4) |>
+  pivot_longer(everything(), names_to = 'species', values_to = 'density') |>
+  group_by(species) |>
+  summarize(mean.log.density = mean(density),
+            var.log.density = var(density)) 
+
+fit_summary <- tibble(species = c('bp', 'bm', 'mn'),
+                      n.asv = c(nrow(fit_bp$projection),
+                                nrow(fit_bm$projection),
+                                nrow(fit_mn$projection)),
+                      var.expl = c(1 - ((n - 2)*var(bp - pred_bp)/((n - 1)*var(bp))),
+                                   1 - ((n - 2)*var(bm - pred_bm)/((n - 1)*var(bm))),
+                                   1 - ((n - 2)*var(mn - pred_mn)/((n - 1)*var(mn))))) |>
+  left_join(mspe_df, by = 'species') |>
+  left_join(whale_summaries, by = 'species') |>
+  dplyr::select(-eta)
+
+fit_summary
+
 
 # # verify fitted model components
 # x_sel <- dplyr::select(x, rownames(fit$projection))
@@ -151,14 +188,158 @@ sqrt(mspe) |> exp()
 # (fit$projection %*% lm(y ~ x_sel_proj)$coef[2:3]) |>
 #   bind_cols(fit$betahat[fit$betahat != 0])
 
-selected_asvs <- tibble(short.id = colnames(x)[fit$A],
-       coef = fit$betahat[fit$A]) |>
+# extract selected asvs
+asv_bp <- tibble(short.id = colnames(x)[fit_bp$A],
+                 coef = fit_bp$betahat[fit_bp$A]) |>
   left_join(dplyr::select(taxa, silva_Taxon, short.id), by = 'short.id') |>
   separate(silva_Taxon, into = c('d', 'p', 'c', 'o', 'f', 'g'), sep = ';') |>
   arrange(coef)
 
-selected_asvs |>
-  group_by(p) |>
-  summarize(count = n(),
-            mean.coef = mean(coef)) |>
-  arrange(desc(count))
+asv_bm <- tibble(short.id = colnames(x)[fit_bm$A],
+                 coef = fit_bm$betahat[fit_bm$A]) |>
+  left_join(dplyr::select(taxa, silva_Taxon, short.id), by = 'short.id') |>
+  separate(silva_Taxon, into = c('d', 'p', 'c', 'o', 'f', 'g'), sep = ';') |>
+  arrange(coef)
+
+asv_mn <- tibble(short.id = colnames(x)[fit_mn$A],
+                 coef = fit_mn$betahat[fit_mn$A]) |>
+  left_join(dplyr::select(taxa, silva_Taxon, short.id), by = 'short.id') |>
+  separate(silva_Taxon, into = c('d', 'p', 'c', 'o', 'f', 'g'), sep = ';') |>
+  arrange(coef)
+
+
+# join asvs across species
+asv_sel <- full_join(asv_bm, asv_bp, 
+          by = c('short.id', 'd', 'p', 'c', 'o', 'f', 'g'),
+          suffix = c('.bm', '.bp')) |>
+  full_join(asv_mn, 
+            by = c('short.id', 'd', 'p', 'c', 'o', 'f', 'g')) |>
+  rename(coef.mn = coef) 
+
+# visualize
+pal <- colorRampPalette(c('#649dfa', '#02204f'), bias = 1)
+
+asv_sel |>
+  mutate(phylum = str_remove(p, 'p__') |> str_trim() |> replace_na('Unknown')) |> 
+  dplyr::select(short.id, phylum, starts_with('coef')) |>
+  rename_with(~str_remove(.x, 'coef.')) |>
+  pivot_longer(bm:mn, names_to = 'species', values_to = 'coef') |>
+  mutate(species = factor(species, levels = c('bm', 'bp', 'mn'), labels = c('blue', 'fin','humpback'))) |>
+  mutate(phylum = fct_reorder(phylum, coef, ~max(abs(.x), na.rm = T), .na_rm = F),
+         coef.trans = 100*(2^coef - 1)) |>
+  ggplot(aes(y = phylum)) +
+  geom_col(aes(x = coef.trans, fill = phylum),
+           width = 1,
+           position = position_dodge2(preserve = 'single',
+                                      padding = 0.1)) +
+  facet_wrap(~species) +
+  scale_fill_manual(values = pal(26)) +
+  guides(fill = guide_none()) +
+  scale_x_continuous(n.breaks = 4) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        panel.grid.major.x = element_line(linewidth = 0.1, 
+                                          color = 'black'),
+        panel.grid.major.y = element_line(linewidth = 0.1, 
+                                          color = 'grey')) +
+  labs(x = 'percent change in median density', 
+       y = '',
+       title = '')
+
+ggsave(filename = 'rslt/plots/42524/asv-sel-all.png',
+       height = 6, width = 8, dpi = 300)
+
+asv_mn |>
+  mutate(phylum = str_remove(p, 'p__') |> str_trim() |> replace_na('Unknown')) |> 
+  mutate(phylum = fct_reorder(phylum, coef, ~max(abs(.x))),
+         x = 100*(2^coef - 1)) |>
+  ggplot(aes(y = phylum)) +
+  geom_col(aes(x = x, fill = phylum),
+           width = 1,
+           position = position_dodge2(preserve = 'single',
+                                      padding = 0.1)) +
+  scale_fill_manual(values = pal(19)) +
+  guides(fill = guide_none()) +
+  scale_x_continuous(n.breaks = 4) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        panel.grid.major.x = element_line(linewidth = 0.1, 
+                                          color = 'black'),
+        panel.grid.major.y = element_line(linewidth = 0.1, 
+                                          color = 'grey')) +
+  labs(x = 'percent change in density', 
+       y = '',
+       title = 'humpback')
+
+ggsave(filename = 'rslt/plots/42524/asv-sel-mn.png',
+       height = 4, width = 5, dpi = 300)
+
+
+asv_bm |>
+  mutate(phylum = str_remove(p, 'p__') |> str_trim() |> replace_na('Unknown')) |> 
+  mutate(phylum = fct_reorder(phylum, coef, ~max(abs(.x))),
+         x = 100*(2^coef - 1)) |>
+  ggplot(aes(y = phylum)) +
+  geom_col(aes(x = x, fill = phylum),
+           width = 1,
+           position = position_dodge2(preserve = 'single',
+                                      padding = 0.1)) +
+  scale_fill_manual(values = pal(19)) +
+  guides(fill = guide_none()) +
+  scale_x_continuous(n.breaks = 4) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        panel.grid.major.x = element_line(linewidth = 0.1, 
+                                          color = 'black'),
+        panel.grid.major.y = element_line(linewidth = 0.1, 
+                                          color = 'grey')) +
+  labs(x = 'percent change in density', 
+       y = '',
+       title = 'blue')
+
+ggsave(filename = 'rslt/plots/42524/asv-sel-bm.png',
+       height = 4, width = 5, dpi = 300)
+
+asv_bp |>
+  mutate(phylum = str_remove(p, 'p__') |> str_trim() |> replace_na('Unknown')) |> 
+  mutate(phylum = fct_reorder(phylum, coef, ~max(abs(.x))),
+         x = 100*(2^coef - 1)) |>
+  ggplot(aes(y = phylum)) +
+  geom_col(aes(x = x, fill = phylum),
+           width = 1,
+           position = position_dodge2(preserve = 'single',
+                                      padding = 0.1)) +
+  scale_fill_manual(values = pal(19)) +
+  guides(fill = guide_none()) +
+  scale_x_continuous(n.breaks = 4) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        panel.grid.major.x = element_line(linewidth = 0.1, 
+                                          color = 'black'),
+        panel.grid.major.y = element_line(linewidth = 0.1, 
+                                          color = 'grey')) +
+  labs(x = 'percent change in density', 
+       y = '',
+       title = 'fin')
+
+ggsave(filename = 'rslt/plots/42524/asv-sel-bp.png',
+       height = 4, width = 5, dpi = 300)
+
+
+# tables
+library(openxlsx)
+
+xl_out <- list(bm = mutate(asv_bm, coef = 100*(2^coef - 1)),
+     bp = mutate(asv_bp, coef = 100*(2^coef - 1)),
+     mn = mutate(asv_mn, coef = 100*(2^coef - 1)),
+     fit_summary = fit_summary)
+
+write.xlsx(xl_out, 'rslt/plots/42524/tables.xlsx', rownames = F)
+
+count(group_by(asv_bm, p), name = 'bm') |>
+  full_join(count(group_by(asv_bp, p), name = 'bp'), by = 'p') |>
+  full_join(count(group_by(asv_mn, p), name = 'mn'), by = 'p')
+
+
+fit_summary
+          
