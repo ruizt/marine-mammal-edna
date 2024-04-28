@@ -1,6 +1,6 @@
 library(tidyverse)
+library(modelr)
 library(spls)
-library(openxlsx)
 
 load('data/ncog-18s-processed-2024-04-27.RData')
 load('data/ceta-density-processed-2024-04-27.RData')
@@ -10,102 +10,136 @@ whales <- inner_join(log_density_estimates_adj, edna_clr_adj, by = 'cruise')
 
 ## MODEL FITTING ---------------------------------------------------------------
 
-# data inputs
-x <- dplyr::select(whales, starts_with('asv'))
-mn <- pull(whales, mn) # humpback
-bp <- pull(whales, bp) # fin
-bm <- pull(whales, bm) # blue
-n <- nrow(whales)
+# function to fit spls model
+fit_fn <- function(.data, .var, .eta){
+  df <- as.data.frame(.data)
+  x <- dplyr::select(df, starts_with('asv'))
+  y <- pull(df, {{.var}})
+  fit <- spls(x, y, K = 2, eta = .eta, scale.x = F, scale.y = F)
+  return(fit)
+}
+
+# function to compute evaluation metrics
+metrics <- function(.fit, .data, .var){
+  # fit summaries
+  y.train <- .fit$y
+  y.train.hat <- predict(.fit, type = 'fit')
+  train.resid <- y.train - y.train.hat
+  n <- length(y.train)
+  p <- ncol(.fit$projection)
+  df <- nrow(.fit$projection)
+  rsq <- as.numeric(1 - (n - p)*var(train.resid)/((n - 1)*var(y.train)))
+  
+  # squared prediction error
+  test <- as.data.frame(.data)
+  x.test <- dplyr::select(test, starts_with('asv'))
+  y.test <- pull(test, {{.var}})
+  y.test.hat <- predict(.fit, newx = x.test, type = 'fit')
+  test.resid <- y.test - y.test.hat
+  test.spe <- as.numeric(test.resid^2)
+  
+  # outputs
+  suffix <- deparse(substitute(.var))
+  out <- data.frame(df = df,
+                    rsq = rsq,
+                    p = y.test.hat,
+                    pe = test.resid,
+                    spe = test.spe) |>
+    rename_with(~paste0(.x, '.', suffix))
+  return(out)
+}
 
 # hyperparameter grid
-grid_res <- 200
-eta_grid_logspace <- rev(1 - exp(seq(-4, -0.01, length = grid_res)))
+grid_res <- 100
+eta_grid <- rev(1 - seq(0.001, 0.999, length = grid_res)^2)
 
-# loocv to choose hyperparameters
-cv_mn <- cv.spls(x, mn, 
-                 K = 2, 
-                 scale.x = F, scale.y = F,
-                 eta = eta_grid_logspace, 
-                 fold = n,
-                 plot.it = F)
+# leave one out cross validation
+cv_out <- crossv_loo(whales) |>
+  rowwise() |>
+  mutate(eta = list(eta_grid)) |>
+  unnest(eta) |>
+  mutate(fit.bm = map2(train, eta, \(.x, .y) fit_fn(.x, bm, .y)),
+         fit.bp = map2(train, eta, \(.x, .y) fit_fn(.x, bp, .y)),
+         fit.mn = map2(train, eta, \(.x, .y) fit_fn(.x, mn, .y)),
+         bm = map2(fit.bm, test, \(.x, .y) metrics(.x, .y, bm)),
+         bp = map2(fit.bp, test, \(.x, .y) metrics(.x, .y, bp)),
+         mn = map2(fit.mn, test, \(.x, .y) metrics(.x, .y, mn))) |> 
+  dplyr::select(.id, eta, bp, bm, mn) |>
+  unnest(c(bm, bp, mn)) |>
+  pivot_longer(-(1:2)) |>
+  separate_wider_delim(name, delim = '.', names = c('metric', 'species'))
 
-cv_bp <- cv.spls(x, bp, 
-                 K = 2, 
-                 scale.x = F, scale.y = F,
-                 eta = eta_grid_logspace, 
-                 fold = n,
-                 plot.it = F)
+save(cv_out, file = paste('rslt/comp/cv-eta-', today(), '.RData', sep = ''))
 
-cv_bm <- cv.spls(x, bm, 
-                 K = 2, 
-                 scale.x = F, scale.y = F,
-                 eta = eta_grid_logspace, 
-                 fold = n,
-                 plot.it = F)
-
-# examine mspe and manually pick eta
-eta_df <- tibble(eta = eta_grid_logspace) |>
-  bind_cols(bm = cv_bm$mspemat[, 1],
-            bp = cv_bp$mspemat[, 1],
-            mn = cv_mn$mspemat[, 1]) 
-
-eta_df |>
-  pivot_longer(-eta, values_to = 'mspe', names_to = 'species') |>
-  ggplot(aes(x = (eta), y = mspe)) +
+# inspect to manually choose eta (0.6 seems reasonable across the board)
+cv_out |>
+  filter(metric %in% c('df', 'rsq', 'spe')) |>
+  group_by(eta, species, metric) |>
+  summarize(mean = mean(value),
+            sd = sd(value)) |>
+  mutate(sd = if_else(metric == 'spe', NA, sd)) |>
+  ggplot(aes(x = eta, y = mean)) +
+  facet_wrap(~metric + species, scales = 'free_y', nrow = 3) +
   geom_path() +
-  facet_wrap(~species) +
-  scale_y_log10() + 
+  geom_ribbon(aes(ymin = mean - sd,
+                  ymax = mean + sd),
+              alpha = 0.3) + 
   geom_vline(aes(xintercept = eta.approx), 
              data = tibble(species = c('bm', 'bp', 'mn'),
-                           eta.approx = c(0.65, 0.58, 0.635)))
+                           eta.approx = c(0.65, 0.55, 0.63)),
+             linetype = 'dotdash')
 
-eta_sel <- tibble(species = c('bm', 'bp', 'mn'),
-                  eta.approx = c(0.65, 0.58, 0.635))
+eta_sel_approx <- tibble(species = c('bm', 'bp', 'mn'),
+                  eta.approx = c(0.65, 0.55, 0.63))
 
 # choose closest grid points to selected eta
-mspe_df <- eta_df |>
-  pivot_longer(-eta, values_to = 'mspe', names_to = 'species') |>
-  left_join(eta_sel, by = 'species') |>
+loopreds_sel <- cv_out |>
+  left_join(eta_sel_approx, by = 'species') |>
   group_by(species) |>
   slice_min(abs(eta - eta.approx)) |>
-  dplyr::select(-eta.approx)
+  dplyr::select(-eta.approx) |>
+  filter(metric %in% c('p', 'pe', 'spe'))
 
-eta_bm <- filter(mspe_df, species == 'bm') |> pull(eta)
-eta_bp <- filter(mspe_df, species == 'bp') |> pull(eta)
-eta_mn <- filter(mspe_df, species == 'mn') |> pull(eta)
+eta_sel <- loopreds_sel |> distinct(eta, species)
+
+eta_bm <- filter(eta_sel, species == 'bm') |> pull(eta)
+eta_bp <- filter(eta_sel, species == 'bp') |> pull(eta)
+eta_mn <- filter(eta_sel, species == 'mn') |> pull(eta)
 
 # fit spls models
-fit_bm <- spls(x, bm, K = 2, eta = eta_bm, 
-            scale.x = F, scale.y = F)
-fit_bp <- spls(x, bp, K = 2, eta = eta_bp, 
-               scale.x = F, scale.y = F)
-fit_mn <- spls(x, mn, K = 2, eta = eta_mn, 
-               scale.x = F, scale.y = F)
+fit_bm <- fit_fn(whales, bm, eta_bm)
+fit_bp <- fit_fn(whales, bp, eta_bp)
+fit_mn <- fit_fn(whales, mn, eta_mn)
 
 ## MODEL OUTPUTS ---------------------------------------------------------------
 
-# extract predictions
-pred_bp <- predict(fit_bp)
-pred_mn <- predict(fit_mn)
-pred_bm <- predict(fit_bm)
+# extract responses
+x <- dplyr::select(whales, starts_with('asv'))
+bm <- pull(whales, bm)
+bp <- pull(whales, bp)
+mn <- pull(whales, mn)
+n <- nrow(whales)
 
-# summary statistics for responses
-whale_summaries <- whales |>
-  dplyr::select(2:4) |>
-  pivot_longer(everything(), names_to = 'species', values_to = 'density') |>
+# extract fitted values
+fitted_bp <- predict(fit_bp)
+fitted_mn <- predict(fit_mn)
+fitted_bm <- predict(fit_bm)
+
+# summarize prediction errors from loocv
+pred_err_df <- loopreds_sel |>
+  filter(metric == 'p') |>
   group_by(species) |>
-  summarize(var.log.adj.density = var(density)) 
+  summarize(`avg(obs:pred)` = mean(value) |> exp())
 
+# summary of model fits
 fit_summary <- tibble(species = c('bp', 'bm', 'mn'),
                       n.asv = c(nrow(fit_bp$projection),
                                 nrow(fit_bm$projection),
                                 nrow(fit_mn$projection)),
-                      var.expl = c(1 - ((n - 2)*var(bp - pred_bp)/((n - 1)*var(bp))),
-                                   1 - ((n - 2)*var(bm - pred_bm)/((n - 1)*var(bm))),
-                                   1 - ((n - 2)*var(mn - pred_mn)/((n - 1)*var(mn))))) |>
-  left_join(mspe_df, by = 'species') |>
-  left_join(whale_summaries, by = 'species') |>
-  dplyr::select(-eta)
+                      var.expl = c(1 - ((n - 2)*var(bp - fitted_bp)/((n - 1)*var(bp))),
+                                   1 - ((n - 2)*var(bm - fitted_bm)/((n - 1)*var(bm))),
+                                   1 - ((n - 2)*var(mn - fitted_mn)/((n - 1)*var(mn))))) |>
+  left_join(pred_err_df)
 
 fit_summary
 
