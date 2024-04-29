@@ -173,19 +173,21 @@ eta_grid <- seq(0.1, 0.9, by=0.1)
 
 # intialize vars to store results
 
-ncomp_eta_gs <- data.frame(0,0,0,0,0)
-names(ncomp_eta_gs) = c("ncomp", "eta", "r2", "adj_r2", "mspe")
+ncomp_eta_gs <- data.frame(0,0,0,0)
+names(ncomp_eta_gs) = c("ncomp", "eta", "adj_r2", "mspe")
 
 # loop over diff vals of ncomp
 for (ncomp in ncomp_grid) {
   for (eta in eta_grid) {
     # fit model
-    # select eta param first before fitting model
+    # select eta param first before fitting model eta_1se
     model_fit <- spls(x, y, K = 2, eta = eta_1se, scale.x = F, scale.y = F)
 
     
     # predict response variable
-    pred <- predict(model_fit, newdata = x)
+    pred <- predict(model_fit, newdata = x, type = "fit")
+    
+    n <- length(y)
     
     # adjusted r2
     adj_r2 <- 1 - (n-2)*var(y - pred)/((n -1)*var(y))
@@ -197,7 +199,7 @@ for (ncomp in ncomp_grid) {
     # print(paste("ncomp:", ncomp, "eta:", eta))
     # print(paste("adj_r2:", adj_r2))
     # print(paste("mspe:", mspe))
-    newRow <- c(ncomp, eta, r2, adj_r2 , mspe)
+    # newRow <- c(ncomp, eta, adj_r2 , mspe)
     #print(newRow)
     ncomp_eta_gs <- rbind(ncomp_eta_gs, setNames(newRow,names(ncomp_eta_gs)))
                                    
@@ -205,3 +207,10 @@ for (ncomp in ncomp_grid) {
   }
 }
 
+# scatterplot of eta vs adjusted r^2 - basically the same r^2
+ncomp_eta_gs |>
+  ggplot(aes(x=eta, y = adj_r2)) + geom_point() + ylim(0.75, 0.8)
+
+# scatterplot of eta vs mspe
+ncomp_eta_gs |>
+  ggplot(aes(x=eta, y = mspe)) + geom_point() 
