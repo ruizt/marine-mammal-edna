@@ -2,6 +2,8 @@ library(compositions)
 library(pls)
 library(spls)
 library(tidyverse)
+library(viridis)
+library(rgl)
 
 ## DATA PREPARATION ------------------------------------------------------------
 
@@ -168,7 +170,7 @@ x <- dplyr::select(whales, starts_with('asv'))
 y <- pull(whales, mn) 
 
 # num of components and sparsity grid (ncomp and eta)
-ncomp_grid <- seq(1, 10, by=1)
+ncomp_grid <- seq(1, 20, by=1)
 eta_grid <- seq(0.1, 0.9, by=0.1)
 
 # intialize vars to store results
@@ -181,12 +183,13 @@ for (ncomp in ncomp_grid) {
   for (eta in eta_grid) {
     # fit model
     # select eta param first before fitting model eta_1se
-    model_fit <- spls(x, y, K = 2, eta = eta_1se, scale.x = F, scale.y = F)
+    
+    model_fit <- spls(x, y, K = ncomp, eta = eta, scale.x = F, scale.y = F)
 
     
     # predict response variable
     pred <- predict(model_fit, newdata = x, type = "fit")
-    print(pred)
+    #print(pred)
    
     
     # r^2
@@ -212,10 +215,38 @@ for (ncomp in ncomp_grid) {
   }
 }
 
-# scatterplot of eta vs adjusted r^2 - basically the same r^2
+# get rid of row of 0s
+ncomp_eta_gs <-  ncomp_eta_gs|> 
+  slice(-1)
+
+ncomp_eta_gs |> 
+  filter(adj_r2 == min(adj_r2) | mspe == min(mspe))
+
+## PLOTS ----------
+
+# scatterplot of eta vs adjusted r^2
 ncomp_eta_gs |>
-  ggplot(aes(x=eta, y = adj_r2)) + geom_point() 
+  ggplot(aes(x=eta, y = adj_r2, color= factor(ncomp))) + geom_point() + 
+  scale_color_viridis(discrete = TRUE) + theme_bw()
 
 # scatterplot of eta vs mspe
 ncomp_eta_gs |>
-  ggplot(aes(x=eta, y = mspe)) + geom_point() 
+  ggplot(aes(x=eta, y = mspe, color= factor(ncomp))) + geom_point() + 
+  scale_color_viridis(discrete = TRUE) + theme_bw()
+
+# scatterplot of ncomp vs adjusted r^2
+ncomp_eta_gs |>
+  ggplot(aes(x=ncomp, y = adj_r2, color = eta)) + geom_point() +
+  scale_color_viridis() + theme_bw()
+
+# scatterplot of ncomp vs mspe
+ncomp_eta_gs |>
+  ggplot(aes(x=ncomp, y = mspe, color = eta)) + geom_point() +
+  scale_color_viridis() + theme_bw()
+
+# 3D graph
+# adjusted r2
+with(ncomp_eta_gs , plot3d(x = ncomp, y = eta, z = adj_r2))
+# mspe
+with(ncomp_eta_gs , plot3d(x = ncomp, y = eta, z = mspe))
+
