@@ -171,6 +171,7 @@ y <- pull(whales, mn)
 
 # num of components and sparsity grid (ncomp and eta)
 ncomp_grid <- seq(1, 20, by=1)
+# for every componenet, there is one regression coeff => focus on lower end [1,8]
 eta_grid <- seq(0.1, 0.9, by=0.1)
 
 # intialize vars to store results
@@ -202,7 +203,9 @@ for (ncomp in ncomp_grid) {
   
     
     # MSPE (mean squared prediction error)
-    mspe <- mean((y - pred) ^2)
+    mspe <- mean((y - pred) ^2) 
+  
+    
     
     # print(paste("ncomp:", ncomp, "eta:", eta))
     # print(paste("adj_r2:", adj_r2))
@@ -229,6 +232,12 @@ ncomp_eta_gs |>
   ggplot(aes(x=eta, y = adj_r2, color= factor(ncomp))) + geom_point() + 
   scale_color_viridis(discrete = TRUE) + theme_bw()
 
+# scatterplot of eta vs adjusted r^2
+ncomp_eta_gs |>
+  ggplot(aes(x=eta, y = r2, color= factor(ncomp))) + geom_point() + 
+  scale_color_viridis(discrete = TRUE) + theme_bw()
+
+
 # scatterplot of eta vs mspe
 ncomp_eta_gs |>
   ggplot(aes(x=eta, y = mspe, color= factor(ncomp))) + geom_point() + 
@@ -238,6 +247,11 @@ ncomp_eta_gs |>
 ncomp_eta_gs |>
   ggplot(aes(x=ncomp, y = adj_r2, color = eta)) + geom_point() +
   scale_color_viridis() + theme_bw()
+
+ncomp_eta_gs |>
+  ggplot(aes(x=ncomp, y = r2, color = eta)) + geom_point() +
+  scale_color_viridis() + theme_bw()
+
 
 # scatterplot of ncomp vs mspe
 ncomp_eta_gs |>
@@ -249,4 +263,22 @@ ncomp_eta_gs |>
 with(ncomp_eta_gs , plot3d(x = ncomp, y = eta, z = adj_r2))
 # mspe
 with(ncomp_eta_gs , plot3d(x = ncomp, y = eta, z = mspe))
+
+# contour plot for adjusted r^2
+ggplot(ncomp_eta_gs, aes(x = ncomp, y = eta, z = adj_r2)) +
+  geom_contour_filled()
+
+# contour plot for mspe
+ggplot(ncomp_eta_gs, aes(x = ncomp, y = eta, z = mspe)) +
+  geom_contour_filled()
+
+
+
+
+# Leave out out validation -> one observation held out 
+# cross validation method to run over grid
+# cv.spls => within same for loop
+
+# most interested in ncomp => focus on ncomp 
+# how many componenets should we pick? (eta = 0.62 if we fix components to 2)
 
