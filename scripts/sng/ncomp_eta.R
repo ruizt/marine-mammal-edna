@@ -165,7 +165,7 @@ selected_asvs |>
             mean.coef = mean(coef)) |>
   arrange(desc(count))
 
-## MODEL SPARSITY ----------
+## MODEL SPARSITY + NCOMP ----------
 x <- dplyr::select(whales, starts_with('asv'))
 y <- pull(whales, mn) 
 
@@ -273,7 +273,7 @@ ggplot(ncomp_eta_gs, aes(x = ncomp, y = eta, z = mspe)) +
   geom_contour_filled()
 
 
-
+## LEAVE OUT OUT VALIDATION -------------
 
 # Leave out out validation -> one observation held out 
 # cross validation method to run over grid
@@ -281,4 +281,159 @@ ggplot(ncomp_eta_gs, aes(x = ncomp, y = eta, z = mspe)) +
 
 # most interested in ncomp => focus on ncomp 
 # how many componenets should we pick? (eta = 0.62 if we fix components to 2)
+
+x <- dplyr::select(whales, starts_with('asv'))
+y <- pull(whales, mn) 
+
+# num of components and sparsity grid (ncomp and eta)
+ncomp_grid <- seq(1, 3, by=1)
+# for every componenet, there is one regression coeff => focus on lower end [1,8]
+eta_grid <- seq(0.1, 0.9, by=0.1)
+
+# intialize vars to store results
+
+ncomp_eta_gs <- data.frame(0,0,0,0,0)
+names(ncomp_eta_gs) = c("ncomp", "eta", "r2", "adj_r2", "mspe")
+
+# loop over diff vals of ncomp
+for (ncomp in ncomp_grid) {
+  for (eta in eta_grid) {
+   
+   for (i in 1:nrow(x)){
+      x_train <- x[-i, ] # removes ith row
+      y_train <- y[-i]  # removes ith element
+    
+    
+    # fit cross validation model
+    model_fit_cv <- cv.spls(x_train, y_train, K = ncomp, eta = eta, scale.x = F, 
+                            scale.y = F)
+    
+    # optimal number of components
+    best_ncomp <- model_fit_cv$K.opt
+    best_eta <- model_fit_cv$eta.opt
+    
+    # fit model w/ optimal number of components
+    model_fit <- spls(x_train, y_train, K = best_ncomp, eta = best_eta, scale.x = F,
+                      scale.y = F, trC)
+    
+    # predict response variable
+    pred <- predict(model_fit, newdata = x_train, type = "fit")
+    #print(pred)
+    
+    
+    # r^2
+    r2 <- 1 - (var(pred)/var(y_train))
+    
+    n <- length(y)
+    
+    # adjusted r2
+    adj_r2 <- 1 - ((1-r2)*(n-1))/(n-ncomp-1)
+    
+    
+    # MSPE (mean squared prediction error)
+    mspe <- mean((y_train - pred) ^2) 
+    
+    
+    
+    # print(paste("ncomp:", ncomp, "eta:", eta))
+    # print(paste("adj_r2:", adj_r2))
+    # print(paste("mspe:", mspe))
+    newRow <- c(ncomp, eta, r2, adj_r2 , mspe)
+    }
+    #print(newRow)
+    ncomp_eta_gs <- rbind(ncomp_eta_gs, setNames(newRow,names(ncomp_eta_gs)))
+    
+    
+  }
+}
+
+# get rid of row of 0s
+ncomp_eta_gs <-  ncomp_eta_gs|> 
+  slice(-1)
+
+ncomp_eta_gs |> 
+  filter(adj_r2 == min(adj_r2) | mspe == min(mspe))
+
+# 3D graph
+# adjusted r2
+with(ncomp_eta_gs , plot3d(x = ncomp, y = eta, z = adj_r2))
+# mspe
+with(ncomp_eta_gs , plot3d(x = ncomp, y = eta, z = mspe))
+
+# scatterplot of ncomp vs adjusted r^2
+ncomp_eta_gs |>
+  ggplot(aes(x=ncomp, y = adj_r2)) + geom_boxplot(aes(group= ncomp)) +
+  scale_color_viridis() + theme_bw()
+
+ncomp_eta_gs |>
+  ggplot(aes(x=ncomp, y = r2)) + geom_boxplot(aes(group=ncomp)) +
+  scale_color_viridis() + theme_bw()
+
+# scatterplot of eta vs adjusted r^2
+ncomp_eta_gs |>
+  ggplot(aes(x=eta, y = adj_r2, color= factor(ncomp))) + geom_point() + 
+  scale_color_viridis(discrete = TRUE) + theme_bw()
+
+## CARET: LEAVE OUT OUT VALIDATION -------------
+
+# Leave out out validation -> one observation held out 
+# cross validation method to run over grid
+# cv.spls => within same for loop
+
+# most interested in ncomp => focus on ncomp 
+# how many componenets should we pick? (eta = 0.62 if we fix components to 2)
+library(caret)
+
+x <- dplyr::select(whales, starts_with('asv'))
+y <- pull(whales, mn) 
+
+# num of components and sparsity grid (ncomp and eta)
+ncomp_grid <- seq(1, 3, by=1)
+# for every componenet, there is one regression coeff => focus on lower end [1,8]
+eta_grid <- seq(0.1, 0.9, by=0.1)
+
+# intialize vars to store results
+
+ncomp_eta_gs <- data.frame(0,0,0,0,0)
+names(ncomp_eta_gs) = c("ncomp", "eta", "r2", "adj_r2", "mspe")
+
+xy_data = data.frame(x, y)
+
+# loop over diff vals of ncomp
+for (ncomp in ncomp_grid) {
+  for (eta in eta_grid) {
+    
+      train(y~x, method = "spls", xy_data, trControl = trainControl(method = "LOOCV"))
+    
+    
+  }
+}
+
+# get rid of row of 0s
+ncomp_eta_gs <-  ncomp_eta_gs|> 
+  slice(-1)
+
+ncomp_eta_gs |> 
+  filter(adj_r2 == min(adj_r2) | mspe == min(mspe))
+
+# 3D graph
+# adjusted r2
+with(ncomp_eta_gs , plot3d(x = ncomp, y = eta, z = adj_r2))
+# mspe
+with(ncomp_eta_gs , plot3d(x = ncomp, y = eta, z = mspe))
+
+# scatterplot of ncomp vs adjusted r^2
+ncomp_eta_gs |>
+  ggplot(aes(x=ncomp, y = adj_r2)) + geom_boxplot(aes(group= ncomp)) +
+  scale_color_viridis() + theme_bw()
+
+ncomp_eta_gs |>
+  ggplot(aes(x=ncomp, y = r2)) + geom_boxplot(aes(group=ncomp)) +
+  scale_color_viridis() + theme_bw()
+
+# scatterplot of eta vs adjusted r^2
+ncomp_eta_gs |>
+  ggplot(aes(x=eta, y = adj_r2, color= factor(ncomp))) + geom_point() + 
+  scale_color_viridis(discrete = TRUE) + theme_bw()
+
 
