@@ -314,7 +314,7 @@ for (ncomp in ncomp_grid) {
     
     # fit model w/ optimal number of components
     model_fit <- spls(x_train, y_train, K = best_ncomp, eta = best_eta, scale.x = F,
-                      scale.y = F, trC)
+                      scale.y = F)
     
     # predict response variable
     pred <- predict(model_fit, newdata = x_train, type = "fit")
@@ -352,7 +352,7 @@ ncomp_eta_gs <-  ncomp_eta_gs|>
   slice(-1)
 
 ncomp_eta_gs |> 
-  filter(adj_r2 == min(adj_r2) | mspe == min(mspe))
+  filter(adj_r2 == max(adj_r2) | mspe == min(mspe))
 
 # 3D graph
 # adjusted r2
