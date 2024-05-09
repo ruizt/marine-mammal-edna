@@ -363,6 +363,8 @@ for (ncomp in ncomp_grid) {
   }
 }
 
+save(ncomp_eta_gs, file = paste('rslt/comp/ncomp_eta_gs_', lubridate::today(), '.RData', sep = ''))
+
 # get rid of row of 0s
 ncomp_eta_gs <-  ncomp_eta_gs|> 
   slice(-1)
