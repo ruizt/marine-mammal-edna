@@ -77,7 +77,7 @@ cv_out |>
   group_by(eta, species, metric) |>
   summarize(mean = mean(value),
             sd = sd(value)) |>
-  mutate(sd = if_else(metric == 'spe', NA, sd)) |>
+  # mutate(sd = if_else(metric == 'spe', NA, sd)) |>
   ggplot(aes(x = eta, y = mean)) +
   facet_wrap(~metric + species, scales = 'free_y', nrow = 3) +
   geom_path() +
@@ -106,6 +106,19 @@ eta_bm <- filter(eta_sel, species == 'bm') |> pull(eta)
 eta_bp <- filter(eta_sel, species == 'bp') |> pull(eta)
 eta_mn <- filter(eta_sel, species == 'mn') |> pull(eta)
 
+cv_out |>
+  left_join(eta_sel_approx, by = 'species') |>
+  group_by(species) |>
+  slice_min(abs(eta - eta.approx)) |>
+  dplyr::select(-eta.approx) |>
+  filter(metric %in% c('df', 'rsq', 'spe')) |>
+  group_by(species, eta, metric) |>
+  summarize(mean = mean(value)) |>
+  spread(metric, mean) |>
+  xtable::xtable() |>
+  print() |>
+  clipr::write_clip()
+
 # fit spls models
 fit_bm <- fit_fn(whales, bm, eta_bm)
 fit_bp <- fit_fn(whales, bp, eta_bp)
@@ -127,9 +140,10 @@ fitted_bm <- predict(fit_bm)
 
 # summarize prediction errors from loocv
 pred_err_df <- loopreds_sel |>
-  filter(metric == 'p') |>
+  filter(metric == 'pe') |>
   group_by(species) |>
-  summarize(`avg(obs:pred)` = mean(value) |> exp())
+  summarize(bias.ratio = mean(value) |> exp(),
+            mspe = mean(value^2))
 
 # summary of model fits
 fit_summary <- tibble(species = c('bp', 'bm', 'mn'),
@@ -141,7 +155,10 @@ fit_summary <- tibble(species = c('bp', 'bm', 'mn'),
                                    1 - ((n - 2)*var(mn - fitted_mn)/((n - 1)*var(mn))))) |>
   left_join(pred_err_df)
 
-fit_summary
+fit_summary |>
+  xtable::xtable() |>
+  print() |>
+  clipr::write_clip()
 
 # extract selected asvs
 asv_bp <- tibble(short.id = colnames(x)[fit_bp$A],
@@ -184,9 +201,23 @@ openxlsx::write.xlsx(xl_out,
 
 ## DRAFT MATERIAL --------------------------------------------------------------
 
-count(group_by(asv_bm, p), name = 'bm') |>
-  full_join(count(group_by(asv_bp, p), name = 'bp'), by = 'p') |>
-  full_join(count(group_by(asv_mn, p), name = 'mn'), by = 'p')
+count(group_by(asv_bm, d), name = 'bm') |>
+  full_join(count(group_by(asv_bp, d), name = 'bp'), by = 'd') |>
+  full_join(count(group_by(asv_mn, d), name = 'mn'), by = 'd') |>
+  pivot_longer(-d) |>
+  mutate(phylum = str_remove(d, 'd__') |> str_trim()) |>
+  drop_na() |>
+  ggplot(aes(x = name, fill = phylum)) +
+  geom_bar(position = 'fill') +
+  scale_y_continuous(labels = scales::percent)
+
+asv_sel |>
+  pivot_longer(starts_with('coef')) |>
+  mutate(species = str_remove(name, 'coef.')) |>
+  drop_na(value) |>
+  group_by(species) |>
+  summarize(across(p:g, ~length(unique(.x)))) |>
+  write.csv('rslt/tbl/classification-counts.csv')
 
 # # verify fitted model components
 # x_sel <- dplyr::select(x, rownames(fit$projection))
@@ -211,9 +242,8 @@ asv_sel |>
          coef.trans = 100*(2^coef - 1)) |>
   ggplot(aes(y = phylum)) +
   geom_col(aes(x = coef.trans, fill = phylum),
-           width = 1,
-           position = position_dodge2(preserve = 'single',
-                                      padding = 0.1)) +
+           # width = 1,
+           position = position_dodge2(preserve = 'single')) +
   facet_wrap(~species) +
   scale_fill_manual(values = pal(26)) +
   guides(fill = guide_none()) +
@@ -224,12 +254,13 @@ asv_sel |>
                                           color = 'black'),
         panel.grid.major.y = element_line(linewidth = 0.1, 
                                           color = 'grey')) +
-  labs(x = 'percent change in median density', 
+  labs(x = 'percent change in median density from seasonal average', 
        y = '',
        title = '')
 
 ggsave(filename = 'rslt/plots/42524/asv-sel-all.png',
        height = 6, width = 8, dpi = 300)
+
 
 asv_mn |>
   mutate(phylum = str_remove(p, 'p__') |> str_trim() |> replace_na('Unknown')) |> 
@@ -305,4 +336,33 @@ asv_bp |>
        title = 'fin')
 
 ggsave(filename = 'rslt/plots/42524/asv-sel-bp.png',
+       height = 4, width = 5, dpi = 300)
+
+p1 <- loopreds_sel |>
+  filter(metric == 'p') |>
+  bind_cols(obs = c(bm, bp, mn)) |>
+  ggplot(aes(x = obs, y = value)) +
+  geom_point() +
+  facet_wrap(~species) +
+  geom_abline(slope = 1, intercept = 0) +
+  theme_bw() +
+  labs(x = '',
+       y = 'prediction')
+
+p2 <- tibble(fitted = c(fitted_bm, fitted_bp, fitted_mn),
+       observed = c(bm, bp, mn),
+       species = rep(c('bm', 'bp', 'mn'), times = c(length(bm), length(bp), length(mn)))) |>
+  ggplot(aes(x = observed, y = fitted)) +
+  facet_wrap(~species) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0) +
+  theme_bw() +
+  labs(x = 'log(seasonally adjusted density)',
+       y = 'fitted value')
+
+library(patchwork)
+
+fig <- p1 + p2 + plot_layout(nrow = 2)
+
+ggsave(filename = 'rslt/plots/42524/pred-fitted.png',
        height = 4, width = 5, dpi = 300)
