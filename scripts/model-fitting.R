@@ -53,23 +53,25 @@ metrics <- function(.fit, .data, .var){
 grid_res <- 100
 eta_grid <- rev(1 - seq(0.001, 0.999, length = grid_res)^2)
 
-# leave one out cross validation
-cv_out <- crossv_loo(whales) |>
-  rowwise() |>
-  mutate(eta = list(eta_grid)) |>
-  unnest(eta) |>
-  mutate(fit.bm = map2(train, eta, \(.x, .y) fit_fn(.x, bm, .y)),
-         fit.bp = map2(train, eta, \(.x, .y) fit_fn(.x, bp, .y)),
-         fit.mn = map2(train, eta, \(.x, .y) fit_fn(.x, mn, .y)),
-         bm = map2(fit.bm, test, \(.x, .y) metrics(.x, .y, bm)),
-         bp = map2(fit.bp, test, \(.x, .y) metrics(.x, .y, bp)),
-         mn = map2(fit.mn, test, \(.x, .y) metrics(.x, .y, mn))) |> 
-  dplyr::select(.id, eta, bp, bm, mn) |>
-  unnest(c(bm, bp, mn)) |>
-  pivot_longer(-(1:2)) |>
-  separate_wider_delim(name, delim = '.', names = c('metric', 'species'))
+# # leave one out cross validation
+# cv_out <- crossv_loo(whales) |>
+#   rowwise() |>
+#   mutate(eta = list(eta_grid)) |>
+#   unnest(eta) |>
+#   mutate(fit.bm = map2(train, eta, \(.x, .y) fit_fn(.x, bm, .y)),
+#          fit.bp = map2(train, eta, \(.x, .y) fit_fn(.x, bp, .y)),
+#          fit.mn = map2(train, eta, \(.x, .y) fit_fn(.x, mn, .y)),
+#          bm = map2(fit.bm, test, \(.x, .y) metrics(.x, .y, bm)),
+#          bp = map2(fit.bp, test, \(.x, .y) metrics(.x, .y, bp)),
+#          mn = map2(fit.mn, test, \(.x, .y) metrics(.x, .y, mn))) |> 
+#   dplyr::select(.id, eta, bp, bm, mn) |>
+#   unnest(c(bm, bp, mn)) |>
+#   pivot_longer(-(1:2)) |>
+#   separate_wider_delim(name, delim = '.', names = c('metric', 'species'))
 
-save(cv_out, file = paste('rslt/comp/cv-eta-', today(), '.RData', sep = ''))
+# save(cv_out, file = paste('rslt/comp/cv-eta-', today(), '.RData', sep = ''))
+
+load('rslt/comp/cv-eta-2024-04-28.RData')
 
 # inspect to manually choose eta (0.6 seems reasonable across the board)
 cv_out |>
@@ -236,30 +238,40 @@ asv_sel |>
   mutate(phylum = str_remove(p, 'p__') |> str_trim() |> replace_na('Unknown')) |> 
   dplyr::select(short.id, phylum, starts_with('coef')) |>
   rename_with(~str_remove(.x, 'coef.')) |>
+  rowwise() |>
+  mutate(n.na = sum(is.na(c(bm, bp, mn)))) |>
+  filter(n.na < 2, 
+         phylum != 'Unknown', 
+         phylum != 'uncultured') |>
   pivot_longer(bm:mn, names_to = 'species', values_to = 'coef') |>
   mutate(species = factor(species, levels = c('bm', 'bp', 'mn'), labels = c('blue', 'fin','humpback'))) |>
-  mutate(phylum = fct_reorder(phylum, coef, ~max(abs(.x), na.rm = T), .na_rm = F),
-         coef.trans = 100*(2^coef - 1)) |>
+  group_by(phylum) |>
+  mutate(count = n()) |>
+  ungroup() |>
+  mutate(phylum = fct_reorder(phylum, count),
+         coef.trans = 100*(2^coef - 1),
+         p.ix = as.numeric(phylum) %% 2) |>
   ggplot(aes(y = phylum)) +
-  geom_col(aes(x = coef.trans, fill = phylum),
-           # width = 1,
+  geom_col(aes(x = coef.trans, fill = factor(p.ix)),
            position = position_dodge2(preserve = 'single')) +
   facet_wrap(~species) +
-  scale_fill_manual(values = pal(26)) +
+  scale_fill_manual(values = c("#04004c", "#8e87ea")) +
   guides(fill = guide_none()) +
   scale_x_continuous(n.breaks = 4) +
-  theme_bw() +
-  theme(panel.grid = element_blank(),
+  theme_bw(base_size = 16) +
+  geom_vline(xintercept = 0, linewidth = 0.3, color = "#04004c") +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.y = element_blank(),
         panel.grid.major.x = element_line(linewidth = 0.1, 
-                                          color = 'black'),
-        panel.grid.major.y = element_line(linewidth = 0.1, 
-                                          color = 'grey')) +
-  labs(x = 'percent change in median density from seasonal average', 
-       y = '',
-       title = '')
+                                          color = "#04004c"),
+        panel.background = element_rect(fill = "#fffffeff"),
+        plot.background = element_rect(fill = "#fffffeff"),
+        text = element_text(color = "#49485a")) +
+  labs(x = 'percent change in median scaled sighting', 
+       y = '')
 
-ggsave(filename = 'rslt/plots/42524/asv-sel-all.png',
-       height = 6, width = 8, dpi = 300)
+ggsave(filename = 'rslt/plots/51024/asv-sel-all.png',
+       height = 4, width = 6, dpi = 400)
 
 
 asv_mn |>
@@ -349,16 +361,27 @@ p1 <- loopreds_sel |>
   labs(x = '',
        y = 'prediction')
 
-p2 <- tibble(fitted = c(fitted_bm, fitted_bp, fitted_mn),
+tibble(fitted = c(fitted_bm, fitted_bp, fitted_mn),
        observed = c(bm, bp, mn),
-       species = rep(c('bm', 'bp', 'mn'), times = c(length(bm), length(bp), length(mn)))) |>
+       species = rep(c('blue', 'fin', 'humpback'), 
+                     times = c(length(bm), length(bp), length(mn)))) |>
   ggplot(aes(x = observed, y = fitted)) +
   facet_wrap(~species) +
   geom_point() +
   geom_abline(slope = 1, intercept = 0) +
-  theme_bw() +
-  labs(x = 'log(seasonally adjusted density)',
-       y = 'fitted value')
+  theme_bw(base_size = 18) +
+  labs(x = 'scaled sighting logratio',
+       y = 'fitted value') +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major = element_line(linewidth = 0.1, 
+                                        color = 'black'),
+        panel.background = element_rect(fill = "#fffffeff"),
+        plot.background = element_rect(fill = "#fffffeff"),
+        text = element_text(color = "#49485a"))
+
+ggsave(filename = 'rslt/plots/51024/obs-fitted.png',
+       height = 2.5, width = 6, dpi = 400)
+
 
 library(patchwork)
 
