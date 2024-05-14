@@ -40,6 +40,13 @@ edna_imputed <- edna_samples |>
   dplyr::select(1:5) |>
   bind_cols(imputation_out)
 
+
+
+
+##############################################################
+### Gamma Weight Function ####################################
+##############################################################
+
 # aggregate to cruise level
 depth_weight_fn <- function(depth, alpha, beta){
   dgamma(depth, shape = alpha, scale = beta) ##CHANGE????
@@ -286,8 +293,10 @@ gs2 <- gs2 |>
 save(gs2, file = "rslt/grid-search-narrow.RData")
 
 gs2 |> 
-  filter(avgDiv == max(gammaDF$avgDiv))
+  filter(avgDiv == max(gs2$avgDiv))
 
+gs2 |> 
+  filter(SD == max(gs2$SD))
 library(rgl)
 
 with(gs2, plot3d(x = alpha, y = beta, z = avgDiv))
@@ -300,30 +309,31 @@ with(gs2, plot3d(x = alpha, y = beta, z = SD))
 ############################################################
 
 binnedDepth <- edna_imputed |> 
-  mutate(depthRNG = cut_number(as.numeric(depthm),3)) 
+  mutate(depthRNG = case_when(as.numeric(depthm) <= 15 ~ "Surface",
+                              as.numeric(depthm) > 15 ~ "Deep")) 
 
-binnedDepth |> 
-  dplyr::select(depthRNG)
-
-gs3 <- data.frame(0,0,0,0,0,0,0,0,0,0)
-names(gs3) = c("w1", "w2", "w3", "avgDiv", "SD", "Min", "25", "50","75", "Max")
+## Try 2 bins, maybe surface and below surface
 
 
-binned_weight_fn <- function(depthRNG, w1, w2, w3){
-  return(ifelse(depthRNG == "[0,10]", w1, ifelse(depthRNG == "(10,36.3]", w2, w3)))
+gs3 <- data.frame(0,0,0,0,0,0,0,0,0)
+names(gs3) = c("w1", "w2", "avgDiv", "SD", "Min", "25", "50","75", "Max")
+
+
+binned_weight_fn <- function(depthRNG, weight1){
+  return(ifelse(depthRNG == "Surface", w1, 1 - w1))
 }
 
-w1.vec = c(0.1,0.5,1)
-w2.vec = c(0.1,0.5,1)
-w3.vec = c(0.1,0.5,1)
+w1.vec = seq(0.05,0.99, by = 0.005)
+
 
 for (w1 in w1.vec) {
-  for (w2 in w2.vec) {
-    for (w3 in w3.vec) {
       
+      w2 = (1 - w1)
+  
       edna_agg <- binnedDepth |>
+        drop_na() |> 
         mutate(depthm = as.numeric(depthm),
-               weight = binned_weight_fn(depthRNG, w1, w2, w3)) |>
+               weight = binned_weight_fn(depthRNG, w1)) |>
         group_by(cruise, line, sta) |>
         summarize(across(starts_with('asv'), 
                          ~weighted.mean(log(.x), weight)), ## automatically normalizes weights
@@ -347,7 +357,7 @@ for (w1 in w1.vec) {
         bind_cols(alpha.div.sh = diversity(asv, index = 'shannon')) 
       
       alpha_div <- alpha_divs |> 
-        #slice(-14) |> 
+        slice(-14) |> 
         summarise(avgDiv = mean(alpha.div.sh),
                   sd = sd(alpha.div.sh),
                   min = min(alpha.div.sh),,
@@ -356,20 +366,124 @@ for (w1 in w1.vec) {
                   seventyfifth = quantile(alpha.div.sh, .75),
                   max = max(alpha.div.sh))
       
-      newRow = c(w1,w2,w3, alpha_div$avgDiv, alpha_div$sd, alpha_div$min, alpha_div$twentyfifth, alpha_div$fifty, alpha_div$seventyfifth, alpha_div$max)
+      newRow = c(w1,w2, alpha_div$avgDiv, alpha_div$sd, alpha_div$min, alpha_div$twentyfifth, alpha_div$fifty, alpha_div$seventyfifth, alpha_div$max)
       
       print(newRow)
       
       gs3 <- rbind(gs3, setNames(newRow,names(gs3)))
       
     }
-  }
-}
+  
 
 gs3 <- gs3 |> 
   slice(-1)
 
 
   
+gs3 |> 
+  filter(avgDiv == max(gs3$avgDiv))
 
-          
+gs3 |> 
+  filter(SD == max(gs3$SD))
+
+## Check: across all stations, shallowest depth for each station, greatest depth fr "surface level" observation
+## Same thing for second shallowest depth
+## find min of these
+## group by cruise line, station or create a factor: is depth the minimum depth?
+
+## Separate shallowest obs vs deeper obs
+
+#### calculate avg div by depth range
+
+######################################
+## Create depth range dataframe 
+######################################
+min_depths <- edna_imputed |> 
+  group_by(cruise, line, sta) |> 
+  summarise(min.depth = min(as.numeric(depthm)), 
+            md.binary = 1)
+
+binnedDepth <- edna_imputed |> 
+  mutate(depthm = as.numeric(depthm)) |> 
+  left_join(min_depths, by = join_by(cruise,line,sta,depthm == min.depth))
+
+
+binnedDepth <- binnedDepth |> 
+  mutate(md.binary = replace_na(md.binary, 0))
+
+binnedDepth <- binnedDepth |> 
+  mutate(depth.range = case_when(md.binary == 1 ~ "Surface", 
+                                 md.binary == 0 ~ "Deep"))
+
+
+
+gs4 <- data.frame(0,0,0,0,0,0,0,0,0)
+names(gs4) = c("w1", "w2", "avgDiv", "SD", "Min", "25", "50","75", "Max")
+
+
+binned_weight_fn <- function(depth.range, weight1){
+  return(ifelse(depth.range == "Surface", w1, 1 - w1))
+}
+
+w1.vec = seq(0.05,0.99, by = 0.005)
+
+
+for (w1 in w1.vec) {
+  
+  w2 = (1 - w1)
+  
+  edna_agg <- binnedDepth |>
+    drop_na() |> 
+    mutate(depthm = as.numeric(depthm),
+           weight = binned_weight_fn(depth.range, w1)) |>
+    group_by(cruise, line, sta) |>
+    summarize(across(starts_with('asv'), 
+                     ~weighted.mean(log(.x), weight)), ## automatically normalizes weights
+              .groups = 'drop') |>
+    group_by(cruise, line) |>
+    summarize(across(starts_with('asv'), ~mean(.x))) |>
+    group_by(cruise) |>
+    summarize(across(starts_with('asv'), ~mean(.x)))
+  
+  edna_data <- edna_agg |> mutate(exp(pick(-cruise))) 
+  
+  # split into sample info and asvs
+  asv <- edna_data |> 
+    dplyr::select(starts_with('asv'))
+  
+  sampinfo <- edna_data |> 
+    dplyr::select(-starts_with('asv'))
+  
+  # alpha diversity measures
+  alpha_divs <- sampinfo %>%
+    bind_cols(alpha.div.sh = diversity(asv, index = 'shannon')) 
+  
+  alpha_div <- alpha_divs |> 
+    slice(-14) |> 
+    summarise(avgDiv = mean(alpha.div.sh),
+              sd = sd(alpha.div.sh),
+              min = min(alpha.div.sh),,
+              twentyfifth = quantile(alpha.div.sh, .25),
+              fifty = quantile(alpha.div.sh, .50),
+              seventyfifth = quantile(alpha.div.sh, .75),
+              max = max(alpha.div.sh))
+  
+  newRow = c(w1,w2, alpha_div$avgDiv, alpha_div$sd, alpha_div$min, alpha_div$twentyfifth, alpha_div$fifty, alpha_div$seventyfifth, alpha_div$max)
+  
+  print(newRow)
+  
+  gs4 <- rbind(gs4, setNames(newRow,names(gs4)))
+  
+}
+
+
+gs4 <- gs4 |> 
+  slice(-1)
+
+
+
+gs4 |> 
+  filter(avgDiv == max(gs4$avgDiv))
+
+gs4 |> 
+  filter(SD == max(gs4$SD))
