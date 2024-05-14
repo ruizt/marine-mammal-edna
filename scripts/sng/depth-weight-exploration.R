@@ -12,7 +12,7 @@ cols_of_interest <- edna_samples |>
   t() |>
   as_tibble() |>
   gather(col, prop.nz) |>
-  filter(prop.nz > 0.3) |> # adjustable?
+  filter(prop.nz > 0.05, prop.nz < 0.9) |> 
   pull(col)
 
 # filter to samples with at least 25% nonzero reads
@@ -22,7 +22,7 @@ rows_of_interest <- edna_samples |>
   mutate(total = rowMeans(pick(starts_with('asv'))),
          rownum = row_number()) |>
   dplyr::select(total, rownum) |>
-  filter(total > 0.25) |>
+  filter(total > 0.1) |>
   pull(rownum)
 
 # zero imputation (bayesian multiplicative, martin-fernandez 2015)
@@ -32,7 +32,7 @@ imputation_out <- edna_samples |>
   zCompositions::cmultRepl(label = 0, 
                            method = 'GBM', 
                            output = 'prop',
-                           z.warning = 0.75)
+                           z.warning = 0.99)
 
 # bind imputed values to sample info
 edna_imputed <- edna_samples |> 
@@ -111,7 +111,7 @@ gs1 <- gs1 |>
   slice(-1)
 
 
-save(gs1, file = "rslt/grid-search-result-wide.RData")
+##save(gs1, file = "rslt/grid-search-result-wide.RData")
 
 
 gs1 |> 
@@ -290,7 +290,7 @@ for (a in alpha.vec){
 gs2 <- gs2 |> 
   slice(-1)
 
-save(gs2, file = "rslt/grid-search-narrow.RData")
+##save(gs2, file = "rslt/grid-search-narrow.RData")
 
 gs2 |> 
   filter(avgDiv == max(gs2$avgDiv))
@@ -398,6 +398,7 @@ gs3 |>
 ######################################
 ## Create depth range dataframe 
 ######################################
+
 min_depths <- edna_imputed |> 
   group_by(cruise, line, sta) |> 
   summarise(min.depth = min(as.numeric(depthm)), 
@@ -415,7 +416,46 @@ binnedDepth <- binnedDepth |>
   mutate(depth.range = case_when(md.binary == 1 ~ "Surface", 
                                  md.binary == 0 ~ "Deep"))
 
+binnedDepth$depth.range <- factor(binnedDepth$depth.range, levels = c("Surface", "Deep"))
 
+
+
+
+####################################################
+##### ALPHA DIV BY BIN EXPLORATION
+####################################################
+
+# split into sample info and asvs
+asv <- binnedDepth |> 
+  dplyr::select(starts_with('asv'))
+
+sampinfo <- binnedDepth |> 
+  dplyr::select(-starts_with('asv'))
+
+# alpha diversity measures
+alpha_divs <- sampinfo %>%
+  bind_cols(alpha.div.sh = diversity(asv, index = 'shannon')) 
+
+alpha_divs |> 
+  filter(depth.range == "Surface",
+         depthm > 50)
+
+alpha_divs |> 
+  group_by(depth.range) |> 
+  ggplot((aes(x = depth.range, y = alpha.div.sh))) + geom_boxplot()
+
+alpha_divs |> 
+  ggplot(aes(x = depthm, y = alpha.div.sh, col = depth.range)) +
+  geom_point() + scale_color_manual(values = c("red2", "blue4"))
+
+alpha_divs |> 
+  filter(depth.range == "Surface",
+         depthm > 50)
+
+
+##############################################################################
+
+# Wide Grid Search
 
 gs4 <- data.frame(0,0,0,0,0,0,0,0,0)
 names(gs4) = c("w1", "w2", "avgDiv", "SD", "Min", "25", "50","75", "Max")
@@ -425,7 +465,7 @@ binned_weight_fn <- function(depth.range, weight1){
   return(ifelse(depth.range == "Surface", w1, 1 - w1))
 }
 
-w1.vec = seq(0.05,0.99, by = 0.005)
+w1.vec = seq(0.05,0.99, by = 0.05)
 
 
 for (w1 in w1.vec) {
@@ -487,3 +527,92 @@ gs4 |>
 
 gs4 |> 
   filter(SD == max(gs4$SD))
+
+
+gs4 |> 
+  ggplot(aes(x = w1, y = avgDiv)) +
+  geom_point() + labs(x= "Weight of Surface Measurements")
+
+# Results: Max alpha div with surface weight = 0.1, deep weight = 0.9
+#          Max SD with surface weight = 0.95, deep weight = 0.05
+
+
+#################################################################
+
+# More precise grid search: High deep weight and low surface weight 
+
+
+gs5 <- data.frame(0,0,0,0,0,0,0,0,0)
+names(gs5) = c("w1", "w2", "avgDiv", "SD", "Min", "25", "50","75", "Max")
+
+
+binned_weight_fn <- function(depth.range, weight1){
+  return(ifelse(depth.range == "Surface", w1, 1 - w1))
+}
+
+w1.vec = seq(0.01,0.25, by = 0.005)
+
+
+for (w1 in w1.vec) {
+  
+  w2 = (1 - w1)
+  
+  edna_agg <- binnedDepth |>
+    drop_na() |> 
+    mutate(depthm = as.numeric(depthm),
+           weight = binned_weight_fn(depth.range, w1)) |>
+    group_by(cruise, line, sta) |>
+    summarize(across(starts_with('asv'), 
+                     ~weighted.mean(log(.x), weight)), ## automatically normalizes weights
+              .groups = 'drop') |>
+    group_by(cruise, line) |>
+    summarize(across(starts_with('asv'), ~mean(.x))) |>
+    group_by(cruise) |>
+    summarize(across(starts_with('asv'), ~mean(.x)))
+  
+  edna_data <- edna_agg |> mutate(exp(pick(-cruise))) 
+  
+  # split into sample info and asvs
+  asv <- edna_data |> 
+    dplyr::select(starts_with('asv'))
+  
+  sampinfo <- edna_data |> 
+    dplyr::select(-starts_with('asv'))
+  
+  # alpha diversity measures
+  alpha_divs <- sampinfo %>%
+    bind_cols(alpha.div.sh = diversity(asv, index = 'shannon')) 
+  
+  alpha_div <- alpha_divs |> 
+    slice(-14) |> 
+    summarise(avgDiv = mean(alpha.div.sh),
+              sd = sd(alpha.div.sh),
+              min = min(alpha.div.sh),,
+              twentyfifth = quantile(alpha.div.sh, .25),
+              fifty = quantile(alpha.div.sh, .50),
+              seventyfifth = quantile(alpha.div.sh, .75),
+              max = max(alpha.div.sh))
+  
+  newRow = c(w1,w2, alpha_div$avgDiv, alpha_div$sd, alpha_div$min, alpha_div$twentyfifth, alpha_div$fifty, alpha_div$seventyfifth, alpha_div$max)
+  
+  print(newRow)
+  
+  gs5 <- rbind(gs5, setNames(newRow,names(gs5)))
+  
+}
+
+
+gs5 <- gs5 |> 
+  slice(-1)
+
+
+
+gs5 |> 
+  filter(avgDiv == max(gs5$avgDiv))
+
+gs5 |> 
+  filter(SD == max(gs5$SD))
+
+
+save(gs4, file = "rslt/grid-search-wide.RData")
+save(gs5, file = "rslt/grid-search-narrow.RData")
