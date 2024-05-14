@@ -2,8 +2,8 @@ library(tidyverse)
 library(modelr)
 library(spls)
 
-load('data/ncog-18s-processed-2024-04-27.RData')
-load('data/ceta-density-processed-2024-04-27.RData')
+load('data/ncog-18s-processed-2024-05-02.RData')
+load('data/ceta-density-processed-2024-05-02.RData')
 
 # combine seasonally adjusted density estimates and seasonally adjusted edna data
 whales <- inner_join(log_density_estimates_adj, edna_clr_adj, by = 'cruise')
