@@ -7,17 +7,18 @@ library(zCompositions)
 ## IMPORT READ COUNTS
 
 # read in metadata
-metadata <- read_csv("data/raw/NCOG_sample_log_DNA_meta_2014-2020.csv")
+metadata <- read_csv("data/NCOG_sample_log_DNA_meta_2014-2020.csv")
 
 # read in 18s reads
-edna_in <- read_tsv('data/raw/NCOG_18sV9_asv_count_tax_S.tsv') |>
+edna_in <- read_tsv('data/NCOG_18sV9_asv_count_tax_S.tsv') |>
   mutate(short.id = paste('asv', row_number(), sep = '.'))
 
 # retain taxon names
 taxa <- edna_in |> 
   dplyr::select(where(is.character), silva_Confidence, pr2_Confidence)
 
-# transpose and clean up names
+# transpose and clean up names 
+## (data dimensions: 1536 x 50413;  1536 obs, 50408 ASVs)
 edna_raw <- edna_in |>
   dplyr::select(-starts_with('silva'), -starts_with('pr2'), -Feature.ID) |>
   pivot_longer(-short.id, names_to = 'sample.id', values_to = 'read.count') |>
@@ -33,12 +34,14 @@ edna_raw <- edna_in |>
 #   pull(sample.id)
 
 # extract genuine samples
+## (data dimensions: 1486 x 50413;  1486 obs, 50408 ASVs)
 edna_samples <- edna_raw |>
   filter(if_all(c(cruise, line, sta, depthm), ~!is.na(.x))) 
 
 ## FILTERING AND IMPUTATION
 
 # select asv's that appear in at least 5% of samples and less than 90% of samples
+## (data dimensions: 1 x 3248;  3248 ASVs)
 cols_of_interest <- edna_samples |>
   dplyr::select(starts_with('asv')) |>
   as.matrix() |>
@@ -50,6 +53,7 @@ cols_of_interest <- edna_samples |>
   pull(col)
 
 # filter samples in which fewer than 10% of asv's of interest are present
+## (data dimensions: 1 x 1185;  1185 obs)
 rows_of_interest <- edna_samples |> 
   dplyr::select(all_of(cols_of_interest)) |>
   mutate(across(where(is.numeric), ~ .x > 0)) |>
@@ -82,6 +86,7 @@ rows_of_interest <- edna_samples |>
 #             prop = n/n())
 
 # impute zeros ( x_{ijkl} )
+## (data dimensions: 1185 x 3248;  1185 obs, 3248 ASVs)
 imputation_out <- edna_samples |> 
   dplyr::select(all_of(cols_of_interest)) |>
   slice(rows_of_interest) |>
@@ -91,13 +96,14 @@ imputation_out <- edna_samples |>
                            z.warning = 0.99)
 
 # bind imputed values to sample info
+## (data dimensions: 1185 x 3253;  1185 obs, 3248 ASVs)
 edna_imputed <- edna_samples |> 
   slice(rows_of_interest) |>
   dplyr::select(1:5) |>
   bind_cols(imputation_out)
 
 # save imputed data, for grid search (remove later)
-save(edna_imputed, file = paste('data/_draft/edna-imputed-', today(), '.RData', sep = ''))
+save(edna_imputed, file = paste('data/edna-imputed-', today(), '.RData', sep = ''))
 
 ## AGGREGATION
 
@@ -152,7 +158,7 @@ save(list = c('metadata',
 ## SCALED SIGHTING DATA --------------------------------------------------------
 
 # import whale sighting data ( y_{i} )
-density_estimates <- read_csv("data/raw/CC_on_effort_scaled_sightings_Ceta_SCB.csv") |>
+density_estimates <- read_csv("data/CC_on_effort_scaled_sightings_Ceta_SCB.csv") |>
   rename_with(tolower) |>
   rename_with(~gsub('_.*', '', .x)) |>
   mutate(cruise = str_replace(cruiseid, "CC", "X20")) |>
