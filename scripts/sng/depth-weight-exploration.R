@@ -107,8 +107,7 @@ gs1 <- gs1 |>
 save(gs1, file = "rslt/grid-search-result-wide.RData")
 
 
-gs1 |> 
-  filter(avgDiv == max(gs1$avgDiv))
+
 
 library(rgl)
 
@@ -368,6 +367,9 @@ for (w1 in w1.vec) {
 
 gs3 <- gs3 |> 
   slice(-1)
+
+gs3 |>
+  filter(avgDiv == max(gs3$avgDiv))
 
 
   
