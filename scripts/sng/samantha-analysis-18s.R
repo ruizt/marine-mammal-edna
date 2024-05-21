@@ -161,6 +161,32 @@ nitrate.fit <- lm(NO3ug~ChlorA, data = meta18)
 summary(nitrate.fit)
 
 
+#### processing meta for whales #####
+
+# 
+meta_avg <- metadata18 |>
+  select(Sample.Name, Cruise, Sta_ID, Depthm, Distance, ChlorA, O2ml_L, NO3ug) |>
+  separate(Sta_ID, into = c('line', 'sta'), sep = ' ') |>
+  group_by(Cruise) |>
+  summarize(o2 = mean(O2ml_L),
+            chlor = mean(ChlorA),
+            dist = mean(Distance), 
+            nitrate = mean(NO3ug))
+
+meta_avg <- meta_avg %>%
+  mutate(cruise = as.character(cruise))
+
+unique_cruises <- unique(metadata18$Cruise)
+num_cruises <- length(unique_cruises)
+print(num_cruises)
+
+whale <- whale |>
+  mutate(cruise = substr(cruise, 2, nchar(cruise)))
+
+metawhale <- left_join(meta_avg, whale, by = 'cruise')
+
+metawhale <- metawhale |>
+  select(cruise, season, dist, bp, bm, mn, o2, chlor, nitrate)
 
 
 
