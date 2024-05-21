@@ -78,11 +78,11 @@ library(rgl)
 
 
 # run once, then comment out; takes a few minutes but will create data files referenced below
-source('scripts/preprocessing.R') 
+#source('scripts/preprocessing.R') 
 
 # change dates to match your files (most recent date when preprocessing was run)
-load('data/ncog-18s-processed-2024-04-27.RData')
-load('data/ceta-density-processed-2024-04-27.RData')
+load('data/ncog-18s-processed-2024-05-19.RData')
+load('data/ceta-density-processed-2024-05-19.RData')
 
 # combine seasonally adjusted density estimates and seasonally adjusted edna data
 whales <- inner_join(log_density_estimates_adj, edna_clr_adj, by = 'cruise')
@@ -184,9 +184,9 @@ x <- dplyr::select(whales, starts_with('asv'))
 y <- pull(whales, mn) 
 
 # num of components and sparsity grid (ncomp and eta)
-ncomp_grid <- seq(1, 20, by=1)
+ncomp_grid <- seq(1, 50, by=1)
 # for every componenet, there is one regression coeff => focus on lower end [1,8]
-eta_grid <- seq(0.1, 0.9, by=0.1)
+eta_grid <- seq(0.01, 0.99, length.out = 50)
 
 # intialize vars to store results
 
@@ -301,9 +301,9 @@ y <- pull(whales, mn)
 n <- length(y)
 
 # num of components and sparsity grid (ncomp and eta)
-ncomp_grid <- seq(1, 5, by=1)
+ncomp_grid <- seq(1, 20, by=1)
 # for every componenet, there is one regression coeff => focus on lower end [1,8]
-eta_grid <- seq(0.01, 0.95, length = 20)
+eta_grid <- seq(0.01, 0.95, length = 50)
 
 # intialize vars to store results
 
@@ -390,7 +390,8 @@ ncomp_eta_gs |>
 # scatterplot of eta vs adjusted r^2
 ncomp_eta_gs |>
   ggplot(aes(x=eta, y = adj_r2, color= factor(ncomp))) + geom_point() + 
-  scale_color_viridis(discrete = TRUE) + theme_bw()
+  scale_color_viridis(discrete = TRUE) 
+ggsave(filename = "gl_eta_r2.png", path= "rslt/plots", plot=last_plot)
 
 ## CARET: LEAVE OUT OUT VALIDATION -------------
 
