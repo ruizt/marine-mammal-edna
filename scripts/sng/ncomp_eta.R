@@ -78,11 +78,11 @@ library(rgl)
 
 
 # run once, then comment out; takes a few minutes but will create data files referenced below
-source('scripts/preprocessing.R') 
+#source('scripts/preprocessing.R') 
 
 # change dates to match your files (most recent date when preprocessing was run)
-load('data/ncog-18s-processed-2024-04-27.RData')
-load('data/ceta-density-processed-2024-04-27.RData')
+load('data/ncog-18s-processed-2024-05-19.RData')
+load('data/ceta-density-processed-2024-05-19.RData')
 
 # combine seasonally adjusted density estimates and seasonally adjusted edna data
 whales <- inner_join(log_density_estimates_adj, edna_clr_adj, by = 'cruise')
@@ -184,9 +184,9 @@ x <- dplyr::select(whales, starts_with('asv'))
 y <- pull(whales, mn) 
 
 # num of components and sparsity grid (ncomp and eta)
-ncomp_grid <- seq(1, 20, by=1)
+ncomp_grid <- seq(1, 50, by=1)
 # for every componenet, there is one regression coeff => focus on lower end [1,8]
-eta_grid <- seq(0.1, 0.9, by=0.1)
+eta_grid <- seq(0.01, 0.99, length.out = 50)
 
 # intialize vars to store results
 
@@ -301,9 +301,9 @@ y <- pull(whales, mn)
 n <- length(y)
 
 # num of components and sparsity grid (ncomp and eta)
-ncomp_grid <- seq(1, 5, by=1)
+ncomp_grid <- seq(1, 20, by=1)
 # for every componenet, there is one regression coeff => focus on lower end [1,8]
-eta_grid <- seq(0.01, 0.95, length = 20)
+eta_grid <- seq(0.01, 0.95, length = 50)
 
 # intialize vars to store results
 
@@ -372,67 +372,8 @@ ncomp_eta_gs <-  ncomp_eta_gs|>
 ncomp_eta_gs |> 
   filter(adj_r2 == max(adj_r2) | mspe == min(mspe))
 
-# 3D graph
-# adjusted r2
-with(ncomp_eta_gs , plot3d(x = ncomp, y = eta, z = adj_r2))
-# mspe
-with(ncomp_eta_gs , plot3d(x = ncomp, y = eta, z = mspe))
-
-# scatterplot of ncomp vs adjusted r^2
-ncomp_eta_gs |>
-  ggplot(aes(x=ncomp, y = adj_r2)) + geom_boxplot(aes(group= ncomp)) +
-  scale_color_viridis() + theme_bw()
-
-ncomp_eta_gs |>
-  ggplot(aes(x=ncomp, y = r2)) + geom_boxplot(aes(group=ncomp)) +
-  scale_color_viridis() + theme_bw()
-
-# scatterplot of eta vs adjusted r^2
-ncomp_eta_gs |>
-  ggplot(aes(x=eta, y = adj_r2, color= factor(ncomp))) + geom_point() + 
-  scale_color_viridis(discrete = TRUE) + theme_bw()
-
-## CARET: LEAVE OUT OUT VALIDATION -------------
-
-# Leave out out validation -> one observation held out 
-# cross validation method to run over grid
-# cv.spls => within same for loop
-
-# most interested in ncomp => focus on ncomp 
-# how many componenets should we pick? (eta = 0.62 if we fix components to 2)
-library(caret)
-
-x <- dplyr::select(whales, starts_with('asv'))
-y <- pull(whales, mn) 
-
-# num of components and sparsity grid (ncomp and eta)
-ncomp_grid <- seq(1, 3, by=1)
-# for every componenet, there is one regression coeff => focus on lower end [1,8]
-eta_grid <- seq(0.1, 0.9, by=0.1)
-
-# intialize vars to store results
-
-ncomp_eta_gs <- data.frame(0,0,0,0,0)
-names(ncomp_eta_gs) = c("ncomp", "eta", "r2", "adj_r2", "mspe")
-
-xy_data = data.frame(x, y)
-
-# loop over diff vals of ncomp
-for (ncomp in ncomp_grid) {
-  for (eta in eta_grid) {
-    
-      train(y~x, method = "spls", xy_data, trControl = trainControl(method = "LOOCV"))
-    
-    
-  }
-}
-
-# get rid of row of 0s
-ncomp_eta_gs <-  ncomp_eta_gs|> 
-  slice(-1)
-
-ncomp_eta_gs |> 
-  filter(adj_r2 == min(adj_r2) | mspe == min(mspe))
+# highest adj_r2: ncomp = 7, eta = 0.758
+# lowest mspe: ncomp = 8, eta = 0.68
 
 # 3D graph
 # adjusted r2
@@ -440,18 +381,108 @@ with(ncomp_eta_gs , plot3d(x = ncomp, y = eta, z = adj_r2))
 # mspe
 with(ncomp_eta_gs , plot3d(x = ncomp, y = eta, z = mspe))
 
-# scatterplot of ncomp vs adjusted r^2
+# boxplots of ncomp vs adjusted r^2
+# adjusted r2 starts to decline at around 10 => model gets less helpful after 10 components
 ncomp_eta_gs |>
   ggplot(aes(x=ncomp, y = adj_r2)) + geom_boxplot(aes(group= ncomp)) +
   scale_color_viridis() + theme_bw()
 
+# less variation in r2 for higher ncomp
+# plateus around 10
 ncomp_eta_gs |>
   ggplot(aes(x=ncomp, y = r2)) + geom_boxplot(aes(group=ncomp)) +
   scale_color_viridis() + theme_bw()
 
+
 # scatterplot of eta vs adjusted r^2
+# ncomp around 12-16 for optimal adjusted r2
 ncomp_eta_gs |>
   ggplot(aes(x=eta, y = adj_r2, color= factor(ncomp))) + geom_point() + 
-  scale_color_viridis(discrete = TRUE) + theme_bw()
+  scale_color_viridis(discrete = TRUE) 
+
+# lower etas for better r2
+ncomp_eta_gs |>
+  ggplot(aes(x=ncomp, y = adj_r2, color= eta)) + geom_point() + 
+  scale_color_viridis(discrete = FALSE) 
+
+# adj r2 line plot
+# looks like eta in "blue" range - 0.45-0.64 best
+ggplot(ncomp_eta_gs, aes(x = ncomp, y = adj_r2, color = factor(eta))) +
+  geom_line() +
+  theme_bw() 
+
+# mspe line plot
+# looks like eta ~ 0.63-0.68 for ncpmp = 7 has lowest mspe
+ggplot(ncomp_eta_gs, aes(x = ncomp, y = mspe, color = factor(eta))) +
+  geom_line() +
+  theme_bw()
 
 
+
+
+
+
+
+# ## CARET: LEAVE OUT OUT VALIDATION -------------
+# 
+# # Leave out out validation -> one observation held out 
+# # cross validation method to run over grid
+# # cv.spls => within same for loop
+# 
+# # most interested in ncomp => focus on ncomp 
+# # how many componenets should we pick? (eta = 0.62 if we fix components to 2)
+# library(caret)
+# 
+# x <- dplyr::select(whales, starts_with('asv'))
+# y <- pull(whales, mn) 
+# 
+# # num of components and sparsity grid (ncomp and eta)
+# ncomp_grid <- seq(1, 3, by=1)
+# # for every componenet, there is one regression coeff => focus on lower end [1,8]
+# eta_grid <- seq(0.1, 0.9, by=0.1)
+# 
+# # intialize vars to store results
+# 
+# ncomp_eta_gs <- data.frame(0,0,0,0,0)
+# names(ncomp_eta_gs) = c("ncomp", "eta", "r2", "adj_r2", "mspe")
+# 
+# xy_data = data.frame(x, y)
+# 
+# # loop over diff vals of ncomp
+# for (ncomp in ncomp_grid) {
+#   for (eta in eta_grid) {
+#     
+#       train(y~x, method = "spls", xy_data, trControl = trainControl(method = "LOOCV"))
+#     
+#     
+#   }
+# }
+# 
+# # get rid of row of 0s
+# ncomp_eta_gs <-  ncomp_eta_gs|> 
+#   slice(-1)
+# 
+# ncomp_eta_gs |> 
+#   filter(adj_r2 == min(adj_r2) | mspe == min(mspe))
+# 
+# # 3D graph
+# # adjusted r2
+# with(ncomp_eta_gs , plot3d(x = ncomp, y = eta, z = adj_r2))
+# # mspe
+# with(ncomp_eta_gs , plot3d(x = ncomp, y = eta, z = mspe))
+# 
+# # scatterplot of ncomp vs adjusted r^2
+# ncomp_eta_gs |>
+#   ggplot(aes(x=ncomp, y = adj_r2)) + geom_boxplot(aes(group= ncomp)) +
+#   scale_color_viridis() + theme_bw()
+# 
+# ncomp_eta_gs |>
+#   ggplot(aes(x=ncomp, y = r2)) + geom_boxplot(aes(group=ncomp)) +
+#   scale_color_viridis() + theme_bw()
+# 
+# # scatterplot of eta vs adjusted r^2
+# ncomp_eta_gs |>
+#   ggplot(aes(x=eta, y = adj_r2, color= factor(ncomp))) + geom_point() + 
+#   scale_color_viridis(discrete = TRUE) + theme_bw()
+# 
+# 
