@@ -418,7 +418,8 @@ binnedDepth <- binnedDepth |>
 
 binnedDepth$depth.range <- factor(binnedDepth$depth.range, levels = c("Surface", "Deep"))
 
-
+binnedDepth <- binnedDepth |> 
+  mutate(depth.range = if_else(depth.range == "Surface" & depthm > 30, "Deep", depth.range))
 
 
 ####################################################
@@ -442,15 +443,21 @@ alpha_divs |>
 
 alpha_divs |> 
   group_by(depth.range) |> 
-  ggplot((aes(x = depth.range, y = alpha.div.sh))) + geom_boxplot()
+  ggplot((aes(x = depth.range, y = alpha.div.sh))) + 
+  geom_boxplot() + 
+  labs(y = "Alpha Diversity", x = "Depth Range", title = "Boxplot: Alpha Diversity By Depth")
+  
+#ggsave("rslt/plots/np_surface_vs_deep_BP.png")
 
 alpha_divs |> 
   ggplot(aes(x = depthm, y = alpha.div.sh, col = depth.range)) +
-  geom_point() + scale_color_manual(values = c("red2", "blue4"))
+  geom_point() + scale_color_manual(values = c("red2", "blue4")) + 
+  labs(y = "Alpha Diversity", x = "Depth (Meters)", title = "Scatterplot: Alpha Diversity By Depth", color = "Depth")
+ggsave("rslt/plots/np_surface_vs_deep_SP.png")
 
 alpha_divs |> 
   filter(depth.range == "Surface",
-         depthm > 50)
+         depthm > 30)
 
 
 ##############################################################################
@@ -550,7 +557,7 @@ binned_weight_fn <- function(depth.range, weight1){
   return(ifelse(depth.range == "Surface", w1, 1 - w1))
 }
 
-w1.vec = seq(0.01,0.25, by = 0.005)
+w1.vec = seq(0.05,0.15, by = 0.001)
 
 
 for (w1 in w1.vec) {
@@ -616,3 +623,14 @@ gs5 |>
 
 save(gs4, file = "rslt/grid-search-wide.RData")
 save(gs5, file = "rslt/grid-search-narrow.RData")
+
+
+gs5 |> 
+  ggplot(aes(x = w1, y = avgDiv)) +
+  geom_point() + labs(x= "Weight of Surface Measurements")
+
+
+
+### Implement this all into preprocessing.R
+### Save plots somewhere nice
+### Filter out "surface" measurements deeper than 30 meters

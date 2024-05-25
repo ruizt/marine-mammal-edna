@@ -102,21 +102,46 @@ edna_imputed <- edna_samples |>
   dplyr::select(1:5) |>
   bind_cols(imputation_out)
 
+# binning surface vs deep measurements
+min_depths <- edna_imputed |> 
+  group_by(cruise, line, sta) |> 
+  summarise(min.depth = min(as.numeric(depthm)), 
+            md.binary = 1)
+
+edna_imputed <- edna_imputed |> 
+  mutate(depthm = as.numeric(depthm)) |> 
+  left_join(min_depths, by = join_by(cruise,line,sta,depthm == min.depth))
+
+
+edna_imputed <- edna_imputed |> 
+  mutate(md.binary = replace_na(md.binary, 0))
+
+edna_imputed <- edna_imputed |> 
+  mutate(depth.range = case_when(md.binary == 1 ~ "Surface", 
+                                 md.binary == 0 ~ "Deep"))
+
+edna_imputed$depth.range <- factor(edna_imputed$depth.range, levels = c("Surface", "Deep"))
+
+edna_imputed <- edna_imputed |> 
+  mutate(depth.range = if_else(depth.range == "Surface" & depthm > 30, "Deep", depth.range))
+
+
+
 # save imputed data, for grid search (remove later)
 save(edna_imputed, file = paste('data/edna-imputed-', today(), '.RData', sep = ''))
 
 ## AGGREGATION
 
 # function for weighting by depth
-depth_weight_fn <- function(depth){
-  dgamma(depth, shape = 2, scale = 5)
+depth_weight_fn <- function(depth.range){
+  return(ifelse(depth.range == "Surface", 0.09, 0.91))
 }
 
 # average first over depth, then over station, then over transect ( x_{ij} )
 # interpretation: average proportion of asv.XX across cruise is ZZ
 edna_aggregated <- edna_imputed |>
   mutate(depthm = as.numeric(depthm),
-         weight = depth_weight_fn(depthm)) |>
+         weight = depth_weight_fn(depth.range)) |>
   group_by(cruise, line, sta) |>
   summarize(across(starts_with('asv'), 
                    ~weighted.mean(log(.x), weight)), 
