@@ -298,13 +298,16 @@ ggplot(ncomp_eta_gs, aes(x = ncomp, y = eta, z = mspe)) +
 
 x <- dplyr::select(whales, starts_with('asv'))
 y <- pull(whales, mn) 
+# look at diff types of whales
 n <- length(y)
 
 # num of components and sparsity grid (ncomp and eta)
-ncomp_grid <- seq(1, 20, by=1)
+ncomp_grid <- seq(1, 15, by=1)
 # for every componenet, there is one regression coeff => focus on lower end [1,8]
 eta_grid <- seq(0.01, 0.95, length = 50)
 
+# change to separate script - reiterate to diff whale species, save results to RData file in comp
+#  bp, bm and mn
 # intialize vars to store results
 
 ncomp_eta_gs <- data.frame(0,0,0,0,0,0)
@@ -399,6 +402,8 @@ ncomp_eta_gs |>
 ncomp_eta_gs |>
   ggplot(aes(x=eta, y = adj_r2, color= factor(ncomp))) + geom_point() + 
   scale_color_viridis(discrete = TRUE) 
+# look into lower number of components (try to fit with lower number)
+# advantages to go to 3-4 instead of 2?
 
 # lower etas for better r2
 ncomp_eta_gs |>
