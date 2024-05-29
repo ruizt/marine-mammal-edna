@@ -189,4 +189,18 @@ metawhale <- metawhale |>
   select(cruise, season, dist, bp, bm, mn, o2, chlor, nitrate)
 
 
+### same averaging for imputed values (or maybe non imputed idk)
+whale_imp <- density_estimates_imputed |>
+  mutate(cruise = substr(cruise, 2, nchar(cruise)))
+
+metawhale_imp <- left_join(meta_avg, whale_imp, by = 'cruise')
+
+
+# chlor and blue(?) whale densities 
+ggplot(data = metawhale_imp, aes(x = chlor, y = bm)) + 
+  geom_point()
+
+# o2 and 
+ggplot(data = metawhale_imp, aes(x = o2, y = bm.imp)) + 
+  geom_point()
 
