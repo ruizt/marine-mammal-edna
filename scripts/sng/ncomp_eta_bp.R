@@ -19,8 +19,8 @@ n <- length(y)
 ncomp_grid <- seq(1, 15, by=1)
 eta_grid <- seq(0.01, 0.95, length = 50)
 
-ncomp_eta_gs <- data.frame(0,0,0,0,0,0)
-names(ncomp_eta_gs) = c("ncomp", "eta", "r2", "adj_r2", "mspe", "nsel")
+ncomp_eta_bp <- data.frame(0,0,0,0,0,0)
+names(ncomp_eta_bp) = c("ncomp", "eta", "r2", "adj_r2", "mspe", "nsel")
 
 # loop over diff vals of ncomp
 for (ncomp in ncomp_grid) {
@@ -69,65 +69,63 @@ for (ncomp in ncomp_grid) {
     # print(paste("mspe:", mspe))
     
     newRow <- c(ncomp, eta, r2, adj_r2 , mspe, nsel)
-    ncomp_eta_gs <- rbind(ncomp_eta_gs, setNames(newRow,names(ncomp_eta_gs)))
+    ncomp_eta_bp <- rbind(ncomp_eta_bp, setNames(newRow,names(ncomp_eta_bp)))
     
     print(c(ncomp, eta))
   }
 }
 
-save(ncomp_eta_gs, file = paste('rslt/comp/ncomp_eta_gs_bp_NEW_', lubridate::today(), '.RData', sep = ''))
+save(ncomp_eta_bp, file = paste('rslt/comp/ncomp_eta_gs_bp_NEW_', lubridate::today(), '.RData', sep = ''))
 
 # get rid of row of 0s
-ncomp_eta_gs <-  ncomp_eta_gs|> 
+ncomp_eta_bp <-  ncomp_eta_bp|> 
   slice(-1)
 
-ncomp_eta_gs |> 
+ncomp_eta_bp |> 
   filter(adj_r2 == max(adj_r2) | mspe == min(mspe))
 
-# highest adj_r2: ncomp = 7, eta = 0.758
-# lowest mspe: ncomp = 8, eta = 0.68
+# highest adj_r2: ncomp = 8, eta = 0.336
+# lowest mspe: ncomp = 2, eta =0.259
 
 # 3D graph
 # adjusted r2
-with(ncomp_eta_gs , plot3d(x = ncomp, y = eta, z = adj_r2))
+with(ncomp_eta_bp , plot3d(x = ncomp, y = eta, z = adj_r2))
 # mspe
-with(ncomp_eta_gs , plot3d(x = ncomp, y = eta, z = mspe))
+with(ncomp_eta_bp , plot3d(x = ncomp, y = eta, z = mspe))
 
 # boxplots of ncomp vs adjusted r^2
-# adjusted r2 starts to decline at around 10 => model gets less helpful after 10 components
-ncomp_eta_gs |>
+# adjusted r2 starts to decline at around 8 => model gets less helpful after 8 components
+ncomp_eta_bp |>
   ggplot(aes(x=ncomp, y = adj_r2)) + geom_boxplot(aes(group= ncomp)) +
   scale_color_viridis() + theme_bw()
 
 # less variation in r2 for higher ncomp
-# plateus around 10
-ncomp_eta_gs |>
+# plateus around 8
+ncomp_eta_bp |>
   ggplot(aes(x=ncomp, y = r2)) + geom_boxplot(aes(group=ncomp)) +
   scale_color_viridis() + theme_bw()
 
 
 # scatterplot of eta vs adjusted r^2
-# ncomp around 12-16 for optimal adjusted r2
-ncomp_eta_gs |>
+# ncomp around 9-11 for optimal adjusted r2
+ncomp_eta_bp |>
   ggplot(aes(x=eta, y = adj_r2, color= factor(ncomp))) + geom_point() + 
   scale_color_viridis(discrete = TRUE) 
-# look into lower number of components (try to fit with lower number)
-# advantages to go to 3-4 instead of 2?
 
-# lower etas for better r2
-ncomp_eta_gs |>
+# eta around 0.25-0.75 for ncomp ~ 8
+ncomp_eta_bp |>
   ggplot(aes(x=ncomp, y = adj_r2, color= eta)) + geom_point() + 
   scale_color_viridis(discrete = FALSE) 
 
 # adj r2 line plot
-# looks like eta in "blue" range - 0.45-0.64 best
-ggplot(ncomp_eta_gs, aes(x = ncomp, y = adj_r2, color = factor(eta))) +
+# looks like eta in "green" range - 0.25-0.35 best for ncomp ~ 8 best
+ggplot(ncomp_eta_bp, aes(x = ncomp, y = adj_r2, color = factor(eta))) +
   geom_line() +
   theme_bw() 
 
 # mspe line plot
-# looks like eta ~ 0.63-0.68 for ncpmp = 7 has lowest mspe
-ggplot(ncomp_eta_gs, aes(x = ncomp, y = mspe, color = factor(eta))) +
+# looks like eta ~ 0.25 for ncomp ~ 2 best
+ggplot(ncomp_eta_bp, aes(x = ncomp, y = mspe, color = factor(eta))) +
   geom_line() +
   theme_bw()
 
