@@ -100,13 +100,19 @@ with(ncomp_eta_bm , plot3d(x = ncomp, y = eta, z = mspe))
 # but not much of a dip
 ncomp_eta_bm |>
   ggplot(aes(x=ncomp, y = adj_r2)) + geom_boxplot(aes(group= ncomp)) +
-  scale_color_viridis() + theme_bw()
+  scale_color_viridis() + theme_bw() +
+  labs(title="Blue Whales - Adj R^2 vs ncomp")
 
-# less variation in r2 for higher ncomp
-# plateus around 12
+
 ncomp_eta_bm |>
-  ggplot(aes(x=ncomp, y = r2)) + geom_boxplot(aes(group=ncomp)) +
-  scale_color_viridis() + theme_bw()
+  ggplot(aes(x=ncomp, y = mspe)) + geom_boxplot(aes(group=ncomp)) +
+  scale_color_viridis() + theme_bw() +
+  labs(title="Blue Whales - MSPE vs ncomp")
+
+ncomp_eta_bm |>
+  ggplot(aes(x=ncomp, y = nsel)) + geom_boxplot(aes(group=ncomp)) +
+  scale_color_viridis() + theme_bw() + 
+  labs(title="Blue Whales - # Selected ASVs vs ncomp")
 
 
 # scatterplot of eta vs adjusted r^2

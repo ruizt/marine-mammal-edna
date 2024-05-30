@@ -97,13 +97,16 @@ with(ncomp_eta_mn , plot3d(x = ncomp, y = eta, z = mspe))
 # adjusted r2 starts to decline at around 10 => model gets less helpful after 8 components
 ncomp_eta_mn |>
   ggplot(aes(x=ncomp, y = adj_r2)) + geom_boxplot(aes(group= ncomp)) +
-  scale_color_viridis() + theme_bw()
+  scale_color_viridis() + theme_bw() + labs(title="Humpback Whales - Adj R^2 vs ncomp")
 
-# less variation in r2 for higher ncomp
-# plateus around 10
+
 ncomp_eta_mn |>
-  ggplot(aes(x=ncomp, y = r2)) + geom_boxplot(aes(group=ncomp)) +
-  scale_color_viridis() + theme_bw()
+  ggplot(aes(x=ncomp, y = mspe)) + geom_boxplot(aes(group=ncomp)) +
+  scale_color_viridis() + theme_bw() + labs(title="Humpback Whales - MSPE vs ncomp")
+
+ncomp_eta_mn |>
+  ggplot(aes(x=ncomp, y = nsel)) + geom_boxplot(aes(group=ncomp)) +
+  scale_color_viridis() + theme_bw() + labs(title="Humpback Whales - # ASVs selected vs ncomp")
 
 
 # scatterplot of eta vs adjusted r^2

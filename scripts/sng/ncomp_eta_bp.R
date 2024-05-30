@@ -75,6 +75,8 @@ for (ncomp in ncomp_grid) {
   }
 }
 
+# large variability w mspe
+
 save(ncomp_eta_bp, file = paste('rslt/comp/ncomp_eta_gs_bp_NEW_', lubridate::today(), '.RData', sep = ''))
 
 # get rid of row of 0s
@@ -95,15 +97,22 @@ with(ncomp_eta_bp , plot3d(x = ncomp, y = eta, z = mspe))
 
 # boxplots of ncomp vs adjusted r^2
 # adjusted r2 starts to decline at around 8 => model gets less helpful after 8 components
+# if you add in enough components, sparisty affects adjr2 less
 ncomp_eta_bp |>
   ggplot(aes(x=ncomp, y = adj_r2)) + geom_boxplot(aes(group= ncomp)) +
-  scale_color_viridis() + theme_bw()
+  scale_color_viridis() + theme_bw() + 
+  labs(title="Fin Whales - Adj R^2 vs ncomp")
 
-# less variation in r2 for higher ncomp
-# plateus around 8
+# once above 5-6 comp, start overfitting
 ncomp_eta_bp |>
-  ggplot(aes(x=ncomp, y = r2)) + geom_boxplot(aes(group=ncomp)) +
-  scale_color_viridis() + theme_bw()
+  ggplot(aes(x=ncomp, y = mspe)) + geom_boxplot(aes(group=ncomp)) +
+  scale_color_viridis() + theme_bw()+ 
+  labs(title="Fin Whales - MSPE vs ncomp")
+
+ncomp_eta_bp |>
+  ggplot(aes(x=ncomp, y = nsel)) + geom_boxplot(aes(group=ncomp)) +
+  scale_color_viridis() + theme_bw() + 
+  labs(title="Fin Whales - # Selected ASVs vs ncomp")
 
 
 # scatterplot of eta vs adjusted r^2
@@ -125,6 +134,7 @@ ggplot(ncomp_eta_bp, aes(x = ncomp, y = adj_r2, color = factor(eta))) +
 
 # mspe line plot
 # looks like eta ~ 0.25 for ncomp ~ 2 best
+# more variability w/ sparser model
 ggplot(ncomp_eta_bp, aes(x = ncomp, y = mspe, color = factor(eta))) +
   geom_line() +
   theme_bw()
