@@ -127,12 +127,12 @@ ncomp_eta_mn |>
 # looks like ncomp around 8 is best
 ggplot(ncomp_eta_mn, aes(x = ncomp, y = adj_r2, color = factor(eta))) +
   geom_line() +
-  theme_bw() 
+  theme_bw() + labs(title="Humpback Adj R^2 Lineplot\n")
 
 # mspe line plot
 # looks like ncomp around 8 is best
 # looks like in the blue/purple range is best (0.60-0.68)
 ggplot(ncomp_eta_mn, aes(x = ncomp, y = mspe, color = factor(eta))) +
   geom_line() +
-  theme_bw()
+  theme_bw() + labs(title="Humpback MSPE Lineplot\n")
 

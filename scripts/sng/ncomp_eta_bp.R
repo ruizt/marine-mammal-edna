@@ -130,12 +130,12 @@ ncomp_eta_bp |>
 # looks like eta in "green" range - 0.25-0.35 best for ncomp ~ 8 best
 ggplot(ncomp_eta_bp, aes(x = ncomp, y = adj_r2, color = factor(eta))) +
   geom_line() +
-  theme_bw() 
+  theme_bw() + labs(title="Fin Whale Adj R^2 Lineplot")
 
 # mspe line plot
 # looks like eta ~ 0.25 for ncomp ~ 2 best
 # more variability w/ sparser model
 ggplot(ncomp_eta_bp, aes(x = ncomp, y = mspe, color = factor(eta))) +
   geom_line() +
-  theme_bw()
+  theme_bw() + labs(title="Fin Whale MSPE Lineplot")
 

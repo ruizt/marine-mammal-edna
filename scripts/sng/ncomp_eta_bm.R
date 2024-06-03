@@ -132,11 +132,11 @@ ncomp_eta_bm |>
 # looks like eta in "green" range - 0.20-0.35 for ncomp ~ 9 best
 ggplot(ncomp_eta_bm, aes(x = ncomp, y = adj_r2, color = factor(eta))) +
   geom_line() +
-  theme_bw() 
+  theme_bw() + labs(title="Blue Whale Adj R^2 Lineplot\n")
 
 # mspe line plot
 # looks like eta ~ 0.29-035. for ncomp ~ 5 has lowest mspe
 ggplot(ncomp_eta_bm, aes(x = ncomp, y = mspe, color = factor(eta))) +
   geom_line() +
-  theme_bw()
+  theme_bw() + labs(title="Blue Whale MSPE R^2 Lineplot\n")
 
