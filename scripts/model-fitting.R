@@ -86,10 +86,17 @@ cv_out |>
   geom_ribbon(aes(ymin = mean - sd,
                   ymax = mean + sd),
               alpha = 0.3) + 
+  theme_bw(base_size = 14) +
   geom_vline(aes(xintercept = eta.approx), 
              data = tibble(species = c('bm', 'bp', 'mn'),
                            eta.approx = c(0.65, 0.55, 0.63)),
-             linetype = 'dotdash')
+             linetype = 'dotdash') +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major = element_line(linewidth = 0.1, 
+                                          color = "#04004c"),
+        panel.background = element_rect(fill = "#fffffeff"),
+        plot.background = element_rect(fill = "#fffffeff"),
+        text = element_text(color = "#49485a"))
 
 eta_sel_approx <- tibble(species = c('bm', 'bp', 'mn'),
                   eta.approx = c(0.65, 0.55, 0.63))
@@ -203,6 +210,36 @@ openxlsx::write.xlsx(xl_out,
 
 ## DRAFT MATERIAL --------------------------------------------------------------
 
+cv_out |>
+  filter(metric %in% c('df', 'rsq', 'spe')) |>
+  group_by(eta, species, metric) |>
+  summarize(mean = mean(value),
+            sd = sd(value)) |>
+  # mutate(sd = if_else(metric == 'spe', NA, sd)) |>
+  ggplot(aes(x = eta, y = mean)) +
+  facet_wrap(~metric + species, scales = 'free_y', nrow = 3) +
+  geom_path() +
+  geom_ribbon(aes(ymin = mean - sd,
+                  ymax = mean + sd),
+              alpha = 0.3) + 
+  theme_bw(base_size = 16) +
+  geom_vline(aes(xintercept = eta.approx), 
+             data = tibble(species = c('bm', 'bp', 'mn'),
+                           eta.approx = c(0.65, 0.55, 0.63)),
+             linetype = 'dotdash') +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major = element_line(linewidth = 0.1, 
+                                        color = "#04004c"),
+        panel.background = element_rect(fill = "#fffffeff"),
+        plot.background = element_rect(fill = "#fffffeff"),
+        text = element_text(color = "#49485a")) +
+  scale_x_continuous(n.breaks = 4) +
+  labs(y = '')
+
+ggsave(filename = 'rslt/plots/51024/tuning.png',
+       height = 5, width = 7, dpi = 400)
+
+
 count(group_by(asv_bm, d), name = 'bm') |>
   full_join(count(group_by(asv_bp, d), name = 'bp'), by = 'd') |>
   full_join(count(group_by(asv_mn, d), name = 'mn'), by = 'd') |>
@@ -212,6 +249,7 @@ count(group_by(asv_bm, d), name = 'bm') |>
   ggplot(aes(x = name, fill = phylum)) +
   geom_bar(position = 'fill') +
   scale_y_continuous(labels = scales::percent)
+
 
 asv_sel |>
   pivot_longer(starts_with('coef')) |>
