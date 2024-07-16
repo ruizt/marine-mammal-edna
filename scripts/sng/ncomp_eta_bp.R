@@ -5,8 +5,8 @@ library(tidyverse)
 library(viridis)
 library(rgl)
 
-load('data/ncog-18s-processed-2024-05-19.RData')
-load('data/ceta-density-processed-2024-05-19.RData')
+load('data/ncog-18s-processed-2024-07-04.RData')
+load('data/ceta-density-processed-2024-07-04.RData')
 
 # combine seasonally adjusted density estimates and seasonally adjusted edna data
 whales <- inner_join(log_density_estimates_adj, edna_clr_adj, by = 'cruise')
@@ -77,7 +77,7 @@ for (ncomp in ncomp_grid) {
 
 # large variability w mspe
 
-save(ncomp_eta_bp, file = paste('rslt/comp/ncomp_eta_gs_bp_NEW_', lubridate::today(), '.RData', sep = ''))
+#save(ncomp_eta_bp, file = paste('rslt/comp/ncomp_eta_gs_bp_NEW_', lubridate::today(), '.RData', sep = ''))
 
 # get rid of row of 0s
 ncomp_eta_bp <-  ncomp_eta_bp|> 
@@ -85,6 +85,10 @@ ncomp_eta_bp <-  ncomp_eta_bp|>
 
 ncomp_eta_bp |> 
   filter(adj_r2 == max(adj_r2) | mspe == min(mspe))
+
+
+ncomp_eta_bp |> 
+  filter(adj_r2 > 0.975 & mspe < 1.5 &nsel < 2000)
 
 # highest adj_r2: ncomp = 8, eta = 0.336
 # lowest mspe: ncomp = 2, eta =0.259

@@ -5,8 +5,8 @@ library(tidyverse)
 library(viridis)
 library(rgl)
 
-load('data/ncog-18s-processed-2024-05-19.RData')
-load('data/ceta-density-processed-2024-05-28.RData')
+load('data/ncog-18s-processed-2024-07-04.RData')
+load('data/ceta-density-processed-2024-07-04.RData')
 
 # combine seasonally adjusted density estimates and seasonally adjusted edna data
 whales <- inner_join(log_density_estimates_adj, edna_clr_adj, by = 'cruise')
@@ -59,10 +59,11 @@ for (ncomp in ncomp_grid) {
     # mspe (mean squared prediction error)
     mspe <- mean((y - loo_preds)^2) 
     
+    #print(mspe)
     ## ALTERNATIVE USING CV.SPLS
-    cv_out <- cv.spls(x, y, fold = n, K = ncomp, eta = eta, scale.x = F, scale.y = F, plot.it = F)
-    mspe <- cv_out$mspemat[1]
-    
+    #cv_out <- cv.spls(x, y, fold = n, K = ncomp, eta = eta, scale.x = F, scale.y = F, plot.it = F)
+    #mspe <- cv_out$mspemat[1]
+    #print(mspe)
     
     # print(paste("ncomp:", ncomp, "eta:", eta))
     # print(paste("adj_r2:", adj_r2))
@@ -75,7 +76,7 @@ for (ncomp in ncomp_grid) {
   }
 }
 
-save(ncomp_eta_mn, file = paste('rslt/comp/ncomp_eta_gs_mn_NEW_', lubridate::today(), '.RData', sep = ''))
+#save(ncomp_eta_mn, file = paste('rslt/comp/ncomp_eta_gs_mn_NEW_', lubridate::today(), '.RData', sep = ''))
 
 # get rid of row of 0s
 ncomp_eta_mn <-  ncomp_eta_mn|> 
@@ -83,6 +84,10 @@ ncomp_eta_mn <-  ncomp_eta_mn|>
 
 ncomp_eta_mn |> 
   filter(adj_r2 == max(adj_r2) | mspe == min(mspe))
+
+
+ncomp_eta_mn |> 
+  filter(adj_r2 > 0.99 & mspe < 1)
 
 # highest adj_r2: ncomp = 7, eta = 0.758
 # lowest mspe: ncomp = 8, eta = 0.68

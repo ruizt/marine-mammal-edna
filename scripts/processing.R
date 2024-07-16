@@ -7,10 +7,10 @@ library(zCompositions)
 ## IMPORT READ COUNTS
 
 # read in metadata
-metadata <- read_csv("data/raw/NCOG_sample_log_DNA_meta_2014-2020.csv")
+metadata <- read_csv("data/NCOG_sample_log_DNA_meta_2014-2020.csv")
 
 # read in 18s reads
-edna_in <- read_tsv('data/raw/NCOG_18sV9_asv_count_tax_S.tsv') |>
+edna_in <- read_tsv('data/NCOG_18sV9_asv_count_tax_S.tsv') |>
   mutate(short.id = paste('asv', row_number(), sep = '.'))
 
 # retain taxon names
@@ -183,7 +183,7 @@ save(list = c('metadata',
 ## SCALED SIGHTING DATA --------------------------------------------------------
 
 # import whale sighting data ( y_{i} )
-density_estimates <- read_csv("data/raw/CC_on_effort_scaled_sightings_Ceta_SCB.csv") |>
+density_estimates <- read_csv("data/CC_on_effort_scaled_sightings_Ceta_SCB.csv") |>
   rename_with(tolower) |>
   rename_with(~gsub('_.*', '', .x)) |>
   mutate(cruise = str_replace(cruiseid, "CC", "X20")) |>

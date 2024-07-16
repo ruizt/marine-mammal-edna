@@ -3,8 +3,8 @@ library(magrittr)
 library(modelr)
 library(spls)
 
-load('data/ncog-18s-processed-2024-07-05.RData')
-load('data/ceta-density-processed-2024-07-05.RData')
+load('data/ncog-18s-processed-2024-07-11.RData')
+load('data/ceta-density-processed-2024-07-11.RData')
 
 # combine seasonally adjusted density estimates and seasonally adjusted edna data
 whales <- inner_join(log_density_estimates_adj, edna_clr_adj, by = 'cruise')
@@ -57,14 +57,19 @@ eta_grid <- rev(1 - seq(0.01, 0.95, length = eta_grid_res)^2)
 ncomp_grid <- 1:10
 data_partitions <- crossv_loo(whales)
 obs_grid <- 1:nrow(data_partitions)
+species_grid <- list("bm", "bp", "mn")
+# new ncomp grid to find global maximum for bm
+ncomp_grid_for_bm <- 11:13
 
-# leave one out cross validation, export one RDS file per component number
-lapply(ncomp_grid, function(.ncomp){
+
+# leave one out cross validation, export 9 RDS files per component number
+# 3 files per species, per component number
+lapply(ncomp_grid_for_bm, function(.ncomp){
   cv_out <- lapply(eta_grid, function(.eta){
-    
     loo_out <- lapply(obs_grid, function(.obs){
       .train <- data_partitions$train[.obs][[1]] %>% as.data.frame() 
       .test <- data_partitions$test[.obs][[1]] %>% as.data.frame() 
+      
       
       row_out <- bind_cols(obs = .obs,
                            ncomp = .ncomp,
@@ -80,14 +85,201 @@ lapply(ncomp_grid, function(.ncomp){
     return(loo_out)
     }) %>% Reduce(bind_rows, .)
   
-  filename <- paste('rslt/comp/', today(), '/cv-', .ncomp, 'comp', '.rds', sep = '')
-  write_rds(cv_out, file = filename)
-  print(filename)
+  # output 3 files per species, per ncomp iteration
+  for(species in species_grid){
+    
+  # Model Output file
+  model_output <-  cv_out |> 
+    select(obs, ncomp, eta, starts_with(paste("model.", species, sep = "")))
+  
+  model_file <- paste("rslt/comp/", today(), "/", species, "/cv-", .ncomp, "comp-model.rds", sep = "")
+  
+  # Selected ASVs Output File
+  selected_asvs <- cv_out |> 
+    select(obs, ncomp, eta, starts_with(paste("sel.asv.", species, sep = "")))
+  
+  asv_file <- paste("rslt/comp/", today(), "/", species, "/cv-", .ncomp, "comp-asvs.rds", sep = "")
+  
+  # Metrics Output File
+  model_metrics <- cv_out |> 
+    select(obs, ncomp, eta, starts_with(paste("metrics.", species, sep = "")))
+  
+  metric_file <- paste("rslt/comp/",today(), "/", species, "/cv-", .ncomp, "comp-metrics.rds", sep = "")
+  
+  
+  #filename <- paste('rslt/comp/', today(), '/cv-', .ncomp, 'comp', '.rds', sep = '')
+  #write_rds(cv_out, file = filename)
+  write_rds(model_output, file = model_file)
+  write_rds(selected_asvs, file = asv_file)
+  write_rds(model_metrics, file = metric_file)
+  #print("model file:", model_file)
+  #print("asv file:", asv_file)
+  #print("metric file:", metric_file)
+  }
 })
 
+
+## find eta that maximizes cor(pred, obs) for each species
+
+# BM ------------------------------------------------------------------
+max_cor_bm <- lapply(1:13, function(.ncomp){
+  paste('rslt/comp/2024-07-11/bm/cv-', .ncomp, "comp-metrics.rds", sep = "") |> 
+    read_rds() |> 
+    unnest_wider("metrics.bm") |> 
+    group_by(ncomp, eta) |> 
+    summarize(cor = cor(p + pe, p),
+              mspe = mean(spe),
+              df = mean(df),
+              rsp = mean(rsq)) |> 
+    group_by(ncomp) |> 
+    slice_max(cor)
+})
+max_cor_bm <- bind_rows(max_cor_bm)
+max_cor_bm
+
+# find row where correlation is maximized, then join with selected asv file
+max_bm = max(max_cor_bm$cor)
+
+max_cor_bm |> 
+  filter(cor == max_bm)
+
+# no global maximum, so using local max at k = 5
+# Read in asv file for k = 5 (local max corr)
+bm_asvs_5comp <- read_rds("rslt/comp/2024-07-11/bm/cv-5comp-asvs.rds")
+
+
+# Join files (filter only the asvs for 'best' model)
+bm_selected_asvs <- max_cor_bm |> 
+  filter(ncomp == 5) |> 
+  left_join(bm_asvs_5comp, join_by(ncomp, eta))
+
+# Find stability of each asv (proportion of loocv runs where it appears)
+unnested_bm <- bm_selected_asvs |> 
+  unnest(sel.asv.bm)
+
+asv_counts_bm <- unnested_bm |> 
+  group_by(sel.asv.bm) |> 
+  summarise(n = n(),
+            prop = n()/25,
+            ncomp = ncomp,
+            eta = eta) |> 
+  rename(asv = sel.asv.bm) |> 
+  distinct()
+
+asv_counts_bm |> 
+  filter(prop >= 0.4)
+
+# save results as csv
+save(asv_counts_bp, file = "rslt/comp/2024-07-11/bm/asv-stability-bm.csv")
+
+
+
+# BP --------------------------------------------------
+max_cor_bp <- lapply(ncomp_grid, function(.ncomp){
+  paste('rslt/comp/2024-07-11/bp/cv-', .ncomp, "comp-metrics.rds", sep = "") |> 
+    read_rds() |> 
+    unnest_wider("metrics.bp") |> 
+    group_by(ncomp, eta) |> 
+    summarize(cor = cor(p + pe, p),
+              mspe = mean(spe),
+              df = mean(df),
+              rsp = mean(rsq)) |> 
+    group_by(ncomp) |> 
+    slice_max(cor)
+})
+max_cor_bp <- bind_rows(max_cor_bp)
+max_cor_bp
+
+# Find row where correlation is maximized
+max_bp = max(max_cor_bp$cor)
+
+max_cor_bp |> 
+  filter(cor == max_bp)
+
+# Read in asv file for k = 6 (max corr)
+bp_asvs_6comp <- read_rds("rslt/comp/2024-07-11/bp/cv-6comp-asvs.rds")
+
+
+# Join files (filter only the asvs for 'best' model)
+bp_selected_asvs <- max_cor_bp |> 
+  filter(cor == max_bp) |> 
+  left_join(bp_asvs_6comp, join_by(ncomp, eta))
+
+# Find stability of each asv (proportion of loocv runs where it appears)
+unnested_bp <- bp_selected_asvs |> 
+  unnest(sel.asv.bp)
+
+asv_counts_bp <- unnested_bp |> 
+  group_by(sel.asv.bp) |> 
+  summarise(n = n(),
+            prop = n()/25,
+            ncomp = ncomp,
+            eta = eta) |> 
+  rename(asv = sel.asv.bp) |> 
+  distinct()
+  
+asv_counts_bp |> 
+  filter(prop >= 0.4)
+
+# save results as csv
+save(asv_counts_bp, file = "rslt/comp/2024-07-11/bp/asv-stability-bp.csv")
+
+# MN ------------------------------------------------------------------------
+max_cor_mn <- lapply(ncomp_grid, function(.ncomp){
+  paste('rslt/comp/2024-07-11/mn/cv-', .ncomp, "comp-metrics.rds", sep = "") |> 
+    read_rds() |> 
+    unnest_wider("metrics.mn") |> 
+    group_by(ncomp, eta) |> 
+    summarize(cor = cor(p + pe, p),
+              mspe = mean(spe),
+              df = mean(df),
+              rsp = mean(rsq)) |> 
+    group_by(ncomp) |> 
+    slice_max(cor)
+})
+max_cor_mn <- bind_rows(max_cor_mn)
+max_cor_mn
+
+# find row where correlation is maximized, then join with selected asv file
+max_mn = max(max_cor_mn$cor)
+
+max_cor_mn |> 
+  filter(cor == max_mn)
+
+
+# Read in asv file for k = 6 (max corr)
+mn_asvs_7comp <- read_rds("rslt/comp/2024-07-11/mn/cv-7comp-asvs.rds")
+
+# Join files (filter only the asvs for 'best' model)
+mn_selected_asvs <- max_cor_mn |> 
+  filter(cor == max_mn) |> 
+  left_join(mn_asvs_7comp, join_by(ncomp, eta))
+
+mn_selected_asvs
+# Find stability of each asv (proportion of loocv runs where it appears)
+unnested_mn <- mn_selected_asvs |> 
+  unnest(sel.asv.mn)
+
+asv_counts_mn <- unnested_mn |> 
+  group_by(sel.asv.mn) |> 
+  summarise(n = n(),
+            prop = n()/25,
+            ncomp = ncomp,
+            eta = eta) |> 
+  rename(asv = sel.asv.mn) |> 
+  distinct()
+
+asv_counts_mn |> 
+  filter(prop >= 0.9)
+
+# save results as csv
+save(asv_counts_mn, file = "rslt/comp/2024-07-11/mn/asv-stability-mn.csv")
+
+
+#---------------------------------------------------------------------------------
 # for each species and each K, find eta that maximizes corr(pred, obs)
 max_cors <- lapply(ncomp_grid, function(.ncomp){
-  paste('rslt/comp/2024-07-06/cv-', .ncomp, 'comp', '.rds', sep = '') |>
+  paste('rslt/comp/2024-07-11/cv-', .ncomp, 'comp', '.rds', sep = '') |>
     readRDS() |>
     select(obs, ncomp, eta, starts_with('metrics')) |>
     pivot_longer(starts_with('metrics')) |>
@@ -100,12 +292,11 @@ max_cors <- lapply(ncomp_grid, function(.ncomp){
               df = mean(df),
               rsq = mean(rsq)) |>
     group_by(ncomp, species) |>
-    slice_max(cor)
-}) %>% Reduce(bind_rows, .)
+    slice_max(cor)}) |>  
+  Reduce(bind_rows, .)
 
 write_rds(max_cors, 'rslt/comp/2024-07-06/max-cors.rds')
 max_cors <- read_rds('rslt/comp/2024-07-06/max-cors.rds')
-
 
 # inspect correlations as function of K
 max_cors |>

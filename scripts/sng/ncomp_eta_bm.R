@@ -5,8 +5,8 @@ library(tidyverse)
 library(viridis)
 library(rgl)
 
-load('data/ncog-18s-processed-2024-05-19.RData')
-load('data/ceta-density-processed-2024-05-19.RData')
+load('data/ncog-18s-processed-2024-07-04.RData')
+load('data/ceta-density-processed-2024-07-04.RData')
 
 
 # combine seasonally adjusted density estimates and seasonally adjusted edna data
@@ -77,7 +77,7 @@ for (ncomp in ncomp_grid) {
 }
 
 
-save(ncomp_eta_bm , file = paste('rslt/comp/ncomp_eta_gs_bm_NEW_', lubridate::today(), '.RData', sep = ''))
+#save(ncomp_eta_bm , file = paste('rslt/comp/ncomp_eta_gs_bm_NEW_', lubridate::today(), '.RData', sep = ''))
 
 # get rid of row of 0s
 ncomp_eta_bm <-  ncomp_eta_bm|> 
@@ -85,6 +85,12 @@ ncomp_eta_bm <-  ncomp_eta_bm|>
 
 ncomp_eta_bm |> 
   filter(adj_r2 == max(adj_r2) | mspe == min(mspe))
+
+
+# Maximize r2 and minimize mspe
+ncomp_eta_bm |> 
+  filter( mspe < 0.7)
+
 
 # highest adj_r2: ncomp = 9, eta = 0.278
 # lowest mspe: ncomp = 5, eta = 0.394
