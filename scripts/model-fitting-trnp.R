@@ -184,14 +184,14 @@ metrics |>
 # say, qmin = 10, qmax = 80 groupwise; find q across full range
 metrics |>
   select(species, ncomp, eta, n.asv) |>
-  filter(ncomp <= 8, ncomp >= 3, 
+  filter(ncomp == 8, 
          eta >= 0.65, eta <= 0.88) |>
   group_by(species, ncomp) |>
   summarize(avg.n = mean(n.asv), 
             sd.n = sd(n.asv)) |>
   slice_max(avg.n)
 
-# conservative upper bound on expected no. false positives
+# upper bound on expected no. false positives
 qmax <- 53
 qmax^2/(p*(2*pimax - 1))
 
@@ -199,8 +199,7 @@ qmax^2/(p*(2*pimax - 1))
 sel_freq |> 
   filter(eta >= 0.65,
          eta <= 0.88,
-         ncomp >= 3,
-         ncomp <= 8,
+         ncomp == 8,
          n >= 20) |> 
   group_by(species) |> 
   distinct(asv) |>
