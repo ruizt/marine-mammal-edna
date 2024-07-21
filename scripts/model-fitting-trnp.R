@@ -3,10 +3,10 @@ library(spls)
 library(modelr)
 
 # read in selection frequencies from LOOCV
-sel_freq <- read_rds('rslt/loocv/2024-07-15/selection-frequencies.rds')
+sel_freq <- read_rds('rslt/loocv/2024-07-20/selection-frequencies.rds')
 
 # read in metrics from LOOCV
-metrics <- read_rds('rslt/loocv/2024-07-15/metrics.rds')
+metrics <- read_rds('rslt/loocv/2024-07-20/metrics.rds')
 
 ## SPECIFYING NCOMP/ETA RANGE --------------------------------------------------
 # chosen stability threshold (minimum max selection prob.)
@@ -16,19 +16,10 @@ pimax <- 0.8
 EV <- 5
 
 # total number of candidate ASVs
-p <- 3248
+p <- 6832
 
 # threshold for max average number of selected ASVs
 qmax <- sqrt((2*pimax - 1)*p*EV) 
-
-
-metrics |> 
-  select(species) |> 
-  distinct()
-
-sel_freq |> 
-  select(species) |>  
-  distinct()
 
 ## FILTER EXPLORATION - SPECIES = BP ---------------------------------------------
 
@@ -185,22 +176,24 @@ metrics |>
 metrics |>
   select(species, ncomp, eta, n.asv) |>
   filter(ncomp == 8, 
-         eta >= 0.65, eta <= 0.88) |>
+         eta >= 0.65, eta <= 0.85) |>
   group_by(species, ncomp) |>
   summarize(avg.n = mean(n.asv), 
             sd.n = sd(n.asv)) |>
   slice_max(avg.n)
 
 # upper bound on expected no. false positives
-qmax <- 53
+qmax <- 57
 qmax^2/(p*(2*pimax - 1))
 
 # stable sets
-sel_freq |> 
+stable_sets <- sel_freq |> 
   filter(eta >= 0.65,
          eta <= 0.88,
          ncomp == 8,
          n >= 20) |> 
   group_by(species) |> 
   distinct(asv) |>
-  count()
+  nest(data = asv) |>
+  transmute(stable.set = map(data, unlist))
+
