@@ -3,13 +3,38 @@ library(magrittr)
 library(modelr)
 library(spls)
 
-load('data/ncog-18s-processed-2024-07-05.RData')
-load('data/ceta-density-processed-2024-07-05.RData')
+## DATA INPUTS -----------------------------------------------------------------
 
-# combine seasonally adjusted density estimates and seasonally adjusted edna data
-whales <- inner_join(log_density_estimates_adj, edna_clr_adj, by = 'cruise')
+# load edna and sighting data
+load('data/processed/ncog18sv9-2024-07-20.RData')
+load('data/processed/mm-sightings-2024-07-20.RData')
+
+# combine seasonally adjusted scaled sightings and seasonally adjusted edna data
+whales <- inner_join(edna, sightings, by = 'cruise')
+
+## HYPERPARAMETER SPECIFICATION ------------------------------------------------
+
+# hyperparameter grids
+eta_grid_res <- 50
+eta_grid <- rev(1 - exp(seq(log(0.05), log(0.8), length = eta_grid_res)))
+ncomp_grid <- 1:10
+obs_grid <- 1:25
+species_grid <- c("bm", "bp", "mn")
+
+# data partitions
+data_partitions <- crossv_loo(whales)
+
+# combine eta and observation grids for iteration
+settings <- expand_grid(eta = eta_grid,
+                        obs = obs_grid) |>
+  mutate(setting = row_number()) |>
+  select(setting, eta, obs)
 
 ## LEAVE ONE OUT CROSS VALIDATION ----------------------------------------------
+
+# directory to store files
+dir <- paste('rslt/loocv', today(), sep = '/')
+fs::dir_create(dir)
 
 # function to fit spls model and compute evaluation metrics
 loocv_fn <- function(.train, .test, .var, .parms){
@@ -39,7 +64,7 @@ loocv_fn <- function(.train, .test, .var, .parms){
   # outputs
   out <- list(parms = .parms,
               species = deparse(substitute(.var)),
-              model = fit,
+              # model = fit,
               sel.asv = sel.asv,
               metrics = c(n.asv = df,
                           adj.rsq = rsq,
@@ -51,25 +76,7 @@ loocv_fn <- function(.train, .test, .var, .parms){
 
 # loocv_fn(whales, whales[1, ], 'bm', c(eta = 0.5, ncomp = 3))
 
-# hyperparameter grids
-eta_grid_res <- 50
-eta_grid <- rev(1 - seq(0.01, 0.95, length = eta_grid_res)^2)
-ncomp_grid <- 1:13
-obs_grid <- 1:25
-species_grid <- c("bm", "bp", "mn")
-
-# data partitions
-data_partitions <- crossv_loo(whales)
-
-# combine eta and observation grids for iteration
-settings <- expand_grid(eta = eta_grid,
-                        obs = obs_grid) |>
-  mutate(setting = row_number()) |>
-  select(setting, eta, obs)
-
-dir <- paste('rslt/loocv', today(), sep = '/')
-fs::dir_create(dir)
-
+# execute
 for(.species in species_grid){
   path <- paste(dir, '/_', .species, sep = '')
   fs::dir_create(path)
@@ -81,24 +88,32 @@ for(.species in species_grid){
       train <- data_partitions$train[obs][[1]] %>% as.data.frame() 
       test <- data_partitions$test[obs][[1]] %>% as.data.frame() 
       
-      out <- loocv_fn(train, test, .var = .species, .parms = c(ncomp = .ncomp, eta = eta))
+      out <- loocv_fn(train, 
+                      test, 
+                      .var = .species, 
+                      .parms = c(ncomp = .ncomp, eta = eta))
       paste('eta = ', round(eta, 4), ', obs = ', obs, sep = '') |> print()
       return(out)
     })
     
-    sapply(settings$setting, function(i){c(obs = i, rslt[[i]]$parms, rslt[[i]]$metrics)}) |>
-      t() |> as_tibble() |>
+    sapply(settings$setting, function(i){
+      c(obs = i, rslt[[i]]$parms, rslt[[i]]$metrics)
+    }) |>
+      t() |> 
+      as_tibble() |>
       write_rds(file = paste(path, '/', .ncomp, 'comp-metrics.rds', sep = ''))
     
     lapply(settings$setting, function(i){rslt[[i]]$sel.asv}) |>
       write_rds(file = paste(path, '/', .ncomp, 'comp-selected.rds', sep = ''))
     
-    lapply(settings$setting, function(i){rslt[[i]]$model}) |>
-      write_rds(file = paste(path, '/', .ncomp, 'comp-models.rds', sep = ''))
+    # lapply(settings$setting, function(i){rslt[[i]]$model}) |>
+    #   write_rds(file = paste(path, '/', .ncomp, 'comp-models.rds', sep = ''))
   })
 }
 
-# read in and combine metrics
+## LOOCV SUMMARIES -------------------------------------------------------------
+
+# read in and combine loocv run metrics
 loo_metrics <- lapply(species_grid, function(.species){
   path <- paste(dir, '/_', .species, sep = '')
   out <- lapply(ncomp_grid, function(.ncomp){
@@ -142,5 +157,5 @@ loo_sel_freq <- loo_sel_asv |>
   count() |>
   ungroup()
 
-write_rds(loo_sel_freq, file = paste(dir, 'selection-frequencies.rds', sep = '/'))
-  
+write_rds(loo_sel_freq, 
+          file = paste(dir, 'selection-frequencies.rds', sep = '/'))
