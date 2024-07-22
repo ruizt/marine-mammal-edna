@@ -197,3 +197,58 @@ stable_sets <- sel_freq |>
   nest(data = asv) |>
   transmute(stable.set = map(data, unlist))
 
+# tinkering with fitting models -- it works!
+
+load('data/processed/ncog18sv9-2024-07-20.RData')
+load('data/processed/mm-sightings-2024-07-20.RData')
+whales <- inner_join(sightings, edna, by = 'cruise') 
+
+loocv_fn <- function(.train, .var){
+  .asv <- filter(stable_sets, species == .var) %>% pull(stable.set) %$% .[[1]]
+  names(.asv) <- NULL
+  x.train <- .train |> as.data.frame() |> dplyr::select(all_of(.asv))
+  y.train <- .train |> as.data.frame() |> pull({{.var}})
+  fit <- spls(x.train, y.train,
+              K = 8, eta = 0,
+              scale.x = F, scale.y = F)
+
+  return(fit)
+}
+
+pred_fn <- function(.test, .fit){
+  asv <- rownames(.fit$projection)
+  newdata <- .test |> as.data.frame() |> dplyr::select(all_of(asv))
+  out <- predict(.fit, newx = newdata, type = 'fit')[1, 1]
+  return(out)
+}
+
+loocv <- crossv_loo(whales) |>
+  expand_grid(species = c('bm', 'bp', 'mn')) |>
+  mutate(fit = map2(train, species,
+                    ~loocv_fn(.x, .y)),
+         pred = map2(test, fit, ~pred_fn(.x, .y)),
+         obs = map2(test, species, ~pull(as.data.frame(.x), .y))) |>
+  unnest(c(pred, obs))
+
+loocv |>
+  group_by(species) |>
+  summarize(cor = cor(pred, obs),
+            mspe = mean((pred - obs)^2))
+
+loocv |>
+  mutate(fitted = map(fit, ~predict(.x, type = 'fit')[,1]),
+         train.obs = map2(train, species, ~pull(as.data.frame(.x), .y))) |>
+  select(species, fitted, train.obs) |>
+  mutate(cor = map2(fitted, train.obs, ~cor(.x, .y))) |>
+  unnest(cor) |>
+  group_by(species) |>
+  summarize(mean(cor))
+
+
+metrics |>
+  group_by(ncomp, eta, species) |>
+  summarize(mspe = mean(sq.pred.err),
+            cor = cor(pred, pred + pred.err),
+            df = mean(n.asv)) |>
+  group_by(species) |>
+  slice_max(cor)

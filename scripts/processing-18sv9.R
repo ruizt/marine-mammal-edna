@@ -8,7 +8,7 @@ in_dir <- 'data/_raw/'
 ## IMPORT READ COUNTS ----------------------------------------------------------
 
 # read in metadata
-metadata <- paste(in_dir, "NCOG_sample_log_DNA_meta_2014-2020.csv", sep = '') |> 
+metadata <- paste(in_dir, "NCOG_sample_log_DNA_stvx_meta_2014-2020.csv", sep = '') |> 
   read_csv() |>
   rename_with(tolower) |>
   rename_with(~str_replace_all(.x, '_', '.'))
@@ -22,7 +22,16 @@ edna_in <- paste(in_dir, 'NCOG_18sV9_asv_count_tax_S.tsv', sep = '') |>
 taxa <- edna_in |> 
   dplyr::select(where(is.character), silva_Confidence, pr2_Confidence) |>
   rename_with(tolower) |>
-  rename_with(~str_replace_all(.x, '_', '.'))
+  rename_with(~str_replace_all(.x, '_', '.')) |>
+  separate(silva.taxon, 
+           into = c('d', 'p', 'c', 'o', 'f', 'g'), sep = ';') |>
+  dplyr::select(feature.id, short.id, silva.confidence, d, p, c, o, f, g) |>
+  mutate(across(everything(), ~str_replace(.x, '._', '') |> str_remove_all('_') |> str_trim())) 
+
+# retrieve sample ids of samples to exclude
+exclude_samples <- paste(in_dir, 'exclude_samples.txt', sep = '') |>
+  read_delim(delim = '/n', skip = 3, col_names = 'sample.id') |>
+  pull(sample.id)
 
 # rearrange read counts and cross reference sample ids with metadata 
 ## (data dimensions: 1144 x 50413;  1144 obs, 50408 ASVs)
@@ -31,16 +40,11 @@ edna_raw <- edna_in |>
   rename_with(~str_remove_all(.x, 'X')) |>
   pivot_longer(-short.id, names_to = 'sample.id', values_to = 'read.count') |>
   pivot_wider(names_from = short.id, values_from = read.count) |> 
-  filter(sample.id %in% metadata$Sample.Name) 
-  
-# # inspect samples NOT matching metadata
-# edna_in |>
-#   dplyr::select(-starts_with('silva'), -starts_with('pr2'), -Feature.ID) |>
-#   rename_with(~str_remove_all(.x, 'X')) |>
-#   pivot_longer(-short.id, names_to = 'sample.id', values_to = 'read.count') |>
-#   pivot_wider(names_from = short.id, values_from = read.count) |> 
-#   filter(!(sample.id %in% metadata$Sample.Name)) |>
-#   pull(sample.id)
+  filter(sample.id %in% metadata$sample.name,
+         !str_ends(sample.id, '_S'), 
+         !str_ends(sample.id, '_T'),
+         !(sample.id %in% exclude_samples))
+
 
 ## FILTERING -------------------------------------------------------------------
 
