@@ -2,11 +2,138 @@ library(tidyverse)
 library(spls)
 library(modelr)
 
+## PREDICTION OPTIMAL MODELS ---------------------------------------------------
+
+# model fitting function
+fit_fn <- function(.data, .var, .parms){
+  x <- dplyr::select(.data, starts_with('asv'))
+  y <- pull(.data, {{.var}})
+  fit <- spls(x, y, 
+              K = .parms['ncomp'], eta = .parms['eta'], 
+              scale.x = F, scale.y = F)
+}
+
+# fitting 3 optimal models
+fit_bm <- fit_fn(whales, bm, c(ncomp = 5, eta = 0.86))
+fit_bp <- fit_fn(whales, bp, c(ncomp = 6, eta = 0.967))
+fit_mn <- fit_fn(whales, mn, c(ncomp = 7, eta = 0.611))
+
+## Model Results: BM, ncomp = 5, eta = 0.86
+
+# R-squared
+n <- length(fit_bm$y)
+bm_fitted <- predict(fit_bm, type = 'fit')
+bm_resid <- fit_bm$y - fitted
+bm_r2 <- 1 - (var(resid)/var(fit_bm$y))
+bm_adj_r2 <- 1 - ((1-r2)*(n-1))/(n-fit_bm$K-1)
+
+bm_r2
+bm_adj_r2
+
+# loocv for mspe
+loo_preds <- rep(NA, nrow(fit_bm$x))
+
+for (i in 1:nrow(x)){
+  x_train <- fit_bm$x[-i, ] # removes ith row
+  y_train <- fit_bm$y[-i]  # removes ith element
+  
+  
+  # fit cross validation model
+  fit_cv <- spls(x_train, y_train, K = 5, eta = 0.86, 
+                 scale.x = F, scale.y = F)
+  
+  # predict response variable
+  loo_preds[i] <- predict(fit_cv, newx = x[i, ], type = "fit")
+}
+
+# mspe (mean squared prediction error)
+bm_mspe <- mean((fit_bm$y - loo_preds)^2)
+
+model_results <- data_frame("bm", 5, 0.86, bm_r2[[1]], bm_adj_r2[[1]], bm_mspe)
+
+names(model_results) <- c("species", "ncomp", "eta", "r2", "adj.r2", "mspe")
+
+# Model Results: BP, ncomp = 6, eta = 0.967
+
+# R-squared
+n <- length(fit_bp$y)
+bp_fitted <- predict(fit_bp, type = 'fit')
+bp_resid <- fit_bp$y - fitted
+bp_r2 <- 1 - (var(resid)/var(fit_bp$y))
+bp_adj_r2 <- 1 - ((1-r2)*(n-1))/(n-fit_bp$K-1)
+
+bp_r2
+bp_adj_r2
+
+# loocv for mspe
+loo_preds <- rep(NA, nrow(fit_bp$x))
+
+for (i in 1:nrow(x)){
+  x_train <- fit_bp$x[-i, ] # removes ith row
+  y_train <- fit_bp$y[-i]  # removes ith element
+  
+  
+  # fit cross validation model
+  fit_cv <- spls(x_train, y_train, K = 5, eta = 0.86, 
+                 scale.x = F, scale.y = F)
+  
+  # predict response variable
+  loo_preds[i] <- predict(fit_cv, newx = x[i, ], type = "fit")
+}
+
+# mspe (mean squared prediction error)
+bp_mspe <- mean((fit_bp$y - loo_preds)^2)
+
+model_results <- rbind(model_results, c("bp", 6, 0.967, bp_r2[[1]], bp_adj_r2[[1]], bp_mspe))
+
+# Model Results: MN, ncomp = 7, eta = 0.611
+
+# R-squared
+n <- length(fit_mn$y)
+mn_fitted <- predict(fit_mn, type = 'fit')
+mn_resid <- fit_mn$y - fitted
+mn_r2 <- 1 - (var(resid)/var(fit_mn$y))
+mn_adj_r2 <- 1 - ((1-r2)*(n-1))/(n-fit_mn$K-1)
+
+mn_r2
+mn_adj_r2
+
+# loocv for mspe
+loo_preds <- rep(NA, nrow(fit_bp$x))
+
+for (i in 1:nrow(x)){
+  x_train <- fit_mn$x[-i, ] # removes ith row
+  y_train <- fit_mn$y[-i]  # removes ith element
+  
+  
+  # fit cross validation model
+  fit_cv <- spls(x_train, y_train, K = 5, eta = 0.86, 
+                 scale.x = F, scale.y = F)
+  
+  # predict response variable
+  loo_preds[i] <- predict(fit_cv, newx = x[i, ], type = "fit")
+}
+
+# mspe (mean squared prediction error)
+mn_mspe <- mean((fit_mn$y - loo_preds)^2)
+
+model_results <- rbind(model_results, c("mn", 7, 0.611, mn_r2[[1]], mn_adj_r2[[1]], mn_mspe))
+
+## OPTIMAL MODEL RESULTS
+
+model_results
+
+#-------------------------------------------------------------------------------
+
+
+
+## STABLE SET APPROACH ---------------------------------------------------------
+
 # read in selection frequencies from LOOCV
-sel_freq <- read_rds('rslt/loocv/2024-07-20/selection-frequencies.rds')
+sel_freq <- read_rds('rslt/loocv/2024-07-15/selection-frequencies.rds')
 
 # read in metrics from LOOCV
-metrics <- read_rds('rslt/loocv/2024-07-20/metrics.rds')
+metrics <- read_rds('rslt/loocv/2024-07-15/metrics.rds')
 
 ## SPECIFYING NCOMP/ETA RANGE --------------------------------------------------
 # chosen stability threshold (minimum max selection prob.)
@@ -198,7 +325,6 @@ stable_sets <- sel_freq |>
   transmute(stable.set = map(data, unlist))
 
 # tinkering with fitting models -- it works!
-
 load('data/processed/ncog18sv9-2024-07-20.RData')
 load('data/processed/mm-sightings-2024-07-20.RData')
 whales <- inner_join(sightings, edna, by = 'cruise') 
