@@ -16,7 +16,7 @@ whales <- inner_join(edna, sightings, by = 'cruise')
 
 # hyperparameter grids
 eta_grid_res <- 50
-eta_grid <- rev(1 - exp(seq(log(0.05), log(0.8), length = eta_grid_res)))
+eta_grid <- rev(1 - exp(seq(log(0.05), log(0.7), length = eta_grid_res)))
 ncomp_grid <- 1:10
 obs_grid <- 1:25
 species_grid <- c("bm", "bp", "mn")

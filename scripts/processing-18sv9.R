@@ -1,5 +1,6 @@
 library(tidyverse)
 library(modelr)
+library(magrittr)
 library(fs)
 out_dir <- 'data/processed/'
 in_dir <- 'data/_raw/'
@@ -50,19 +51,6 @@ edna_raw <- edna_in |>
 
 ## FILTERING -------------------------------------------------------------------
 
-# select asv's that appear in at least 1% of samples and at most 99% of samples
-## (data dimensions: 1 x 8875; 8875 ASVs)
-cols_of_interest <- edna_raw |>
-  select(starts_with('asv')) |>
-  as.matrix() |>
-  apply(2, function(.x){mean(.x > 0)}) |>
-  t() |>
-  as_tibble() |>
-  gather(col, prop.nz) |>
-  filter(prop.nz >= 0.01, prop.nz <= 0.99) |> 
-  pull(col)
-
-
 # identify surface and dmc samples
 ## (data dimensions: 956 x 2; 956 samples)
 surface_dmc_samples <- metadata |> 
@@ -79,6 +67,19 @@ surface_dmc_samples <- metadata |>
   mutate(depth.fac = factor(max.chla, labels = c('max.chla', 'surface'))) |>
   select(-where(is.logical), -chlora) |>
   unite(sample.id, c(cruise, line, sta, depth), sep = '_')
+
+# select asv's that appear in at least 1% of samples and at most 99% of samples
+## (data dimensions: 1 x 8875; 8875 ASVs)
+cols_of_interest <- edna_raw |>
+  filter(sample.id %in% pull(surface_dmc_samples, sample.id)) |>
+  select(starts_with('asv')) |>
+  as.matrix() |>
+  apply(2, function(.x){mean(.x > 0)}) |>
+  t() |>
+  as_tibble() |>
+  gather(col, prop.nz) |>
+  filter(prop.nz >= 0.01, prop.nz <= 0.99) |> 
+  pull(col)
 
 # identify samples in which at least 1% of asv's of interest are present
 ## (data dimensions: 1 x 944;  944 obs)
@@ -98,25 +99,8 @@ edna_filtered <- edna_raw |>
   select(sample.id, all_of(cols_of_interest)) |>
   filter(sample.id %in% samples_of_interest)
 
-# # check total number of zero reads
-# ## (90.5% of values will be imputed)
-# edna_filtered |>
-#   gather() |>
-#   summarize(nvals = n(),
-#             num.nz = sum(value != 0),
-#             prop.nz = mean(value != 0))
-# 
-# # check asv presence/absence frequencies across samples after filtering
-# ## (all asvs are present in at least 0.1% of samples)
-# edna_filtered |>
-#   as.matrix() |>
-#   apply(2, function(.x){mean(.x > 0)}) |>
-#   t() |>
-#   as_tibble() |>
-#   gather(col, prop.nz) |>
-#   arrange(prop.nz) |>
-#   summarize(n = sum(prop.nz > 0.001),
-#             prop = n/n())
+# remove asvs present in under 1% of samples after filtering
+edna_filtered %<>% select(where(~mean(.x > 0) > 0.01))
 
 ## IMPUTATION ------------------------------------------------------------------
 
@@ -126,7 +110,7 @@ imputation_out <- edna_filtered |>
   zCompositions::cmultRepl(label = 0, 
                            method = 'GBM', 
                            output = 'prop',
-                           z.warning = 0.999)
+                           z.warning = 0.99)
 
 # bind imputed values to sample info
 ## (data dimensions: 944 x 8876; 944 obs, 8875 ASVs)
@@ -137,13 +121,14 @@ edna_imputed <- edna_filtered |>
   select(sample.id, depth.fac, starts_with('asv'))
 
 # save imputed data
+fs::dir_create(paste(out_dir, '_intermediates/', sep = ''))
 save(edna_imputed, 
      file = paste(out_dir, '_intermediates/ncog18sv9-imputed-', 
                   today(), '.RData', sep = ''))
 
 ## AGGREGATION -----------------------------------------------------------------
 
-load(paste(out_dir, '_intermediates/ncog18sv9-imputed-2024-07-20.RData', sep = ''))
+load(paste(out_dir, '_intermediates/ncog18sv9-imputed-2024-07-25.RData', sep = ''))
 
 # grid search to identify depth averaging weights optimizing alpha diversity
 
@@ -183,8 +168,8 @@ edna <- edna_clr |>
   select(cruise, starts_with('asv'))
 
 # re-process seasonal adjustments for leave one out runs
-.train <- edna_clr |> slice(-1)
-.test <- edna_clr |> slice(1)
+# .train <- edna_clr |> slice(-1)
+# .test <- edna_clr |> slice(1)
 adj_fn <- function(.train, .test = NULL){
   if(is.null(.test)){
   out <- .train |>
