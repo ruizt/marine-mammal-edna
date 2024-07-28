@@ -143,8 +143,84 @@ save(edna_imputed,
 load(paste(out_dir, '_intermediates/ncog18sv9-imputed-2024-07-20.RData', sep = ''))
 
 # grid search to identify depth averaging weights optimizing alpha diversity
+library(vegan)
+# weight function
+binned_weight_fn <- function(depth.range, weight1){
+  return(ifelse(depth.range == "surface", w1, 1 - w1))
+}
+
+# grid search
+gs_results <- data.frame(0,0,0,0,0,0,0,0,0)
+names(gs_results) = c("w1", "w2", "avgDiv", "SD", "Min", "25", "50","75", "Max")
+
+w1.vec = seq(0.05,0.99, by = 0.01)
+
+for (w1 in w1.vec) {
+  
+  w2 = (1 - w1)
+  
+  edna_agg <- edna_imputed |>
+    separate(sample.id, 
+             into = c('cruise', 'line', 'sta', 'depth'),
+             sep = '_') |> 
+    drop_na() |> 
+    mutate(weight = binned_weight_fn(depth.fac, w1)) |>
+    group_by(cruise, line, sta) |>
+    summarize(across(starts_with('asv'), 
+                     ~weighted.mean(log(.x), weight)), ## automatically normalizes weights
+              .groups = 'drop') |>
+    group_by(cruise, line) |>
+    summarize(across(starts_with('asv'), ~mean(.x))) |>
+    group_by(cruise) |>
+    summarize(across(starts_with('asv'), ~mean(.x)))
+  
+  edna_data <- edna_agg |> mutate(exp(pick(-cruise))) 
+  
+  # split into sample info and asvs
+  asv <- edna_data |> 
+    dplyr::select(starts_with('asv'))
+  
+  sampinfo <- edna_data |> 
+    dplyr::select(-starts_with('asv'))
+  
+  # alpha diversity measures
+  alpha_divs <- sampinfo %>%
+    bind_cols(alpha.div.sh = diversity(asv, index = 'shannon')) 
+  
+  alpha_div <- alpha_divs |> 
+    slice(-14) |> 
+    summarise(avgDiv = mean(alpha.div.sh),
+              sd = sd(alpha.div.sh),
+              min = min(alpha.div.sh),,
+              twentyfifth = quantile(alpha.div.sh, .25),
+              fifty = quantile(alpha.div.sh, .50),
+              seventyfifth = quantile(alpha.div.sh, .75),
+              max = max(alpha.div.sh))
+  
+  newRow = c(w1,w2, alpha_div$avgDiv, alpha_div$sd, alpha_div$min, alpha_div$twentyfifth, alpha_div$fifty, alpha_div$seventyfifth, alpha_div$max)
+  
+  print(newRow)
+  
+  gs_results <- rbind(gs_results, setNames(newRow,names(gs_results)))
+  
+}
 
 
+gs_results <- gs_results |> 
+  slice(-1)
+
+gs_results |> 
+  filter(avgDiv == max(gs_results$avgDiv))
+
+# GRID SEARCH RESULTS:
+# Maximum Average Alpha Diversity at surface weight of 0.45 and max Chlorophyll weight of 0.55
+# different from before
+
+gs_results |> 
+  ggplot(aes(y = avgDiv, x = w1)) +
+  geom_line() + 
+  labs(x= "Weight of Surface Measurements", y = "Average Alpha Diversity") + 
+  geom_abline(intercept = 6.235241, slope = 0)
 
 # average first over depth, then over station, then over transect ( x_{ij} )
 # interpretation: average proportion of asv.XX across cruise is ZZ
