@@ -203,12 +203,14 @@ adj_fn <- function(.train, .test = NULL){
 }
 
 # generate data partitions for leave one out cross validation
-loo_partitions <- crossv_loo(edna_clr) |>
+loo_edna <- crossv_loo(edna_clr) |>
   rename(train.raw = train, 
          test.raw = test) |>
   mutate(train = map(train.raw, adj_fn),
-         test = map2(train.raw, test.raw, adj_fn)) |>
-  select(.id, train, test)
+         test = map2(train.raw, test.raw, adj_fn),
+         test.cruise = map(test, ~pull(.x, cruise))) |>
+  select(.id, test.cruise, train, test) |>
+  unnest(c(test.cruise))
 
 ## EXPORT ----------------------------------------------------------------------
 
@@ -224,5 +226,5 @@ asv_taxa <- taxa %>% filter(short.id %in% colnames(edna))
 save(list = c('sample_metadata', 
               'asv_taxa',
               'edna',
-              'loo_partitions'), 
+              'loo_edna'), 
      file = paste(out_dir, 'ncog18sv9-', today(), '.RData', sep = ''))
