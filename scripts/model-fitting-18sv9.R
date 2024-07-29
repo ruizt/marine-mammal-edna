@@ -107,13 +107,35 @@ fit <- whales |>
                                scale = F, center = T)))
 
 # compute fit metrics
-fit_metrics <- fit |>
-  mutate(fitted = map(fit, ~fitted(.x)[, , paste(ncomp, 'comps')]),
-         y = map(data, ~pull(.x, y)),
-         df = map(data, ~ncol(.x) - 1),
-         adj.rsq = map2(y, fitted, ~(1 - ((n - 1)/(n - ncomp - 1))*var(.x - .y)/var(.y)))) |>
-  unnest(c(df, adj.rsq)) |>
-  dplyr::select(species, where(is.numeric))
+ss_means_long <- ss_means |>
+  pivot_longer(-season, names_to = 'species', values_to = 'seasonal.mean') |>
+  mutate(species = str_remove(species, 'log.') |> str_remove('.imp.mean'))
+
+sightings_raw_long <- sightings_raw |>
+  pivot_longer(c(bp, bm, mn), names_to = 'species', values_to = 'ss.obs')
+
+fit_df <- fit |>
+  mutate(y = map(data, ~pull(.x, y)),
+         fitted = map(fit, ~fitted(.x)[, , paste(ncomp, 'comps')]),
+         cruise = pull(whales, cruise) |> list()) |>
+  select(cruise, species, y, fitted) |>
+  unnest(everything()) |>
+  left_join(sightings_raw_long, join_by(species, cruise)) |>
+  left_join(ss_means_long, join_by(season, species)) |>
+  mutate(ss.fit = exp(fitted + seasonal.mean),
+         lr.resid = y - fitted,
+         ss.resid = ss.obs - ss.fit) 
+
+
+fit_metrics <- fit_df |>
+  summarize(adj.rsq.lr = (1 - ((n - 1)/(n - ncomp - 1))*var(lr.resid)/var(y)),
+         adj.rsq.ss = (1 - ((n - 1)/(n - ncomp - 1))*var(ss.resid)/var(ss.obs))) |>
+  left_join(stable_sets, join_by(species)) |>
+  mutate(n.asv = map(stable.set, nrow)) |>
+  unnest(n.asv) |>
+  select(-stable.set)
+
+fit_metrics
 
 ## LEAVE-ONE-OUT PREDICTIONS ---------------------------------------------------
 
@@ -134,9 +156,6 @@ loo_preds <- loo_partitions %>%
   unnest(c(pred, y)) 
 
 # back-transform predictions to original scale
-sightings_raw_long <- sightings_raw |>
-  pivot_longer(c(bp, bm, mn), names_to = 'species', values_to = 'ss.obs')
-
 loo_pred_df <- loo_sightings |> 
   select(test.cruise, test.season, seasonal.means) |>
   unnest(seasonal.means) |>
@@ -169,117 +188,56 @@ pred_metrics <- loo_pred_df |>
   arrange(scale, metric, model)
 
 
-save(list = c('fit', 'loo_preds', 'loo_pred_df', 'fit_metrics', 'pred_metrics'),
+save(list = c('fit', 'loo_preds', 'loo_pred_df', 'fit_df', 'fit_metrics', 'pred_metrics'),
      file = paste(out_dir, 'fitted-models-18sv9-', today(), '.RData', sep = ''))
 
-## FIGURES ---------------------------------------------------------------------
-
-# predictions
-loo_pred_df |>
-  rename(Observation = ss.obs,
-         Prediction = ss.pred) |>
-  pivot_longer(c(Observation, Prediction)) |>
-  arrange(test.cruise) |>
-  ggplot(aes(x = test.cruise, y = value, linetype = name, group = name)) +
-  facet_wrap(~test.species, nrow = 3) +
-  geom_path() +
-  scale_y_sqrt() +
-  theme_bw() +
-  theme(axis.text.x = element_text(angle = 90),
-        panel.grid = element_line(linewidth = 0.1, color = 'black'),
-        panel.grid.minor = element_blank(),
-        panel.grid.major.x = element_blank()) +
-  guides(linetype = guide_legend(title = NULL, position = 'top')) +
-  labs(y = 'Sightings per 1000km', x = 'Cruise')
-
-# model fit
-ss_means_long <- ss_means |>
-  pivot_longer(-season, names_to = 'species', values_to = 'seasonal.mean') |>
-  mutate(species = str_remove(species, 'log.') |> str_remove('.imp.mean'))
-
-fit |>
-  mutate(y = map(data, ~pull(.x, y)),
-         fitted = map(fit, ~fitted(.x)[, , paste(ncomp, 'comps')]),
-         cruise = pull(whales, cruise) |> list()) |>
-  select(cruise, species, y, fitted) |>
-  unnest(everything()) |>
-  left_join(sightings_raw_long, join_by(species, cruise)) |>
-  left_join(ss_means_long, join_by(season, species)) |>
-  mutate(ss.fit = exp(fitted + seasonal.mean)) |>
-  rename(Observation = ss.obs, Fitted = ss.fit) |>
-  pivot_longer(c(Observation, Fitted)) |>
-  arrange(cruise) |>
-  ggplot(aes(x = cruise, y = value, linetype = name, group = name)) +
-  facet_wrap(~species, nrow = 3) +
-  geom_path() +
-  scale_y_sqrt() +
-  theme_bw() +
-  theme(axis.text.x = element_text(angle = 90),
-        panel.grid = element_line(linewidth = 0.1, color = 'black'),
-        panel.grid.minor = element_blank(),
-        panel.grid.major.x = element_blank()) +
-  guides(linetype = guide_legend(title = NULL, position = 'top')) +
-  labs(y = 'Sightings per 1000km', x = 'Cruise')
-
-fit |>
-  mutate(y = map(data, ~pull(.x, y)),
-         fitted = map(fit, ~fitted(.x)[, , paste(ncomp, 'comps')]),
-         cruise = pull(whales, cruise) |> list()) |>
-  select(cruise, species, y, fitted) |>
-  unnest(everything()) |>
-  left_join(sightings_raw_long, join_by(species, cruise)) |>
-  left_join(ss_means_long, join_by(season, species)) |>
-  mutate(ss.fit = exp(fitted + seasonal.mean),
-         ss.resid = ss.obs - ss.fit) |>
-  summarize(adj.rsq = (1 - ((n - 1)/(n - ncomp - 1))*var(ss.resid)/var(ss.obs)))
-
-
-## COMPARE WITH PREDICTION-OPTIMAL SPLS ----------------------------------------
-
-# find prediction optimal spls models from loocv metrics
-loo_best <- metrics |>
-  group_by(ncomp, eta, species) |>
-  summarize(mspe = mean(sq.pred.err),
-            cor = cor(pred, pred + pred.err),
-            df = mean(n.asv)) |>
-  group_by(species) |>
-  slice_min(mspe)
-
-# retrieve prediction optimal hyperparameter configurations
-parms <- loo_best |>
-  dplyr::select(species, ncomp, eta) |>
-  nest(parms = c(ncomp, eta))
-
-# function to fit spls models
-fit_spls_fn <- function(.data, .parms){
-  x <- dplyr::select(.data, -y)
-  y <- pull(.data, y)
-  out <- spls(x, y, K = .parms$ncomp, eta = .parms$eta,
-              scale.x = F, scale.y = F)
-  return(out)
-}
-
-# fit models
-fit_pos <- whales |> 
-  dplyr::select(-cruise) |>
-  pivot_longer(c(bm, bp, mn), names_to = 'species', values_to = 'y') |>
-  group_by(species) |>
-  nest(data = -species) |>
-  left_join(parms) |>
-  mutate(fit = map2(data, parms, fit_spls_fn),
-         df = map(fit, ~nrow(.x$projection)),
-         fitted = map(fit, ~predict(.x, type = 'fit')[, 1]),
-         y = map(data, ~pull(.x, y)),
-         adj.rsq = map2(y, fitted, ~(1 - (24/16)*var(.x - .y)/var(.y)))) 
-
-# compute fit metrics
-loo_best |>
-  mutate(rmse = sqrt(mspe),
-         pred.corr = cor) |>
-  dplyr::select(species, rmse, pred.corr) |>
-  left_join(unnest(fit_pos, c(df, adj.rsq))) |>
-  dplyr::select(species, rmse, df, adj.rsq, pred.corr)
-
-# compare with stability selection
-metrics_ss
+# 
+# ## COMPARE WITH PREDICTION-OPTIMAL SPLS ----------------------------------------
+# 
+# # find prediction optimal spls models from loocv metrics
+# loo_best <- metrics |>
+#   group_by(ncomp, eta, species) |>
+#   summarize(mspe = mean(sq.pred.err),
+#             cor = cor(pred, pred + pred.err),
+#             df = mean(n.asv)) |>
+#   group_by(species) |>
+#   slice_min(mspe)
+# 
+# # retrieve prediction optimal hyperparameter configurations
+# parms <- loo_best |>
+#   dplyr::select(species, ncomp, eta) |>
+#   nest(parms = c(ncomp, eta))
+# 
+# # function to fit spls models
+# fit_spls_fn <- function(.data, .parms){
+#   x <- dplyr::select(.data, -y)
+#   y <- pull(.data, y)
+#   out <- spls(x, y, K = .parms$ncomp, eta = .parms$eta,
+#               scale.x = F, scale.y = F)
+#   return(out)
+# }
+# 
+# # fit models
+# fit_pos <- whales |> 
+#   dplyr::select(-cruise) |>
+#   pivot_longer(c(bm, bp, mn), names_to = 'species', values_to = 'y') |>
+#   group_by(species) |>
+#   nest(data = -species) |>
+#   left_join(parms) |>
+#   mutate(fit = map2(data, parms, fit_spls_fn),
+#          df = map(fit, ~nrow(.x$projection)),
+#          fitted = map(fit, ~predict(.x, type = 'fit')[, 1]),
+#          y = map(data, ~pull(.x, y)),
+#          adj.rsq = map2(y, fitted, ~(1 - (24/16)*var(.x - .y)/var(.y)))) 
+# 
+# # compute fit metrics
+# loo_best |>
+#   mutate(rmse = sqrt(mspe),
+#          pred.corr = cor) |>
+#   dplyr::select(species, rmse, pred.corr) |>
+#   left_join(unnest(fit_pos, c(df, adj.rsq))) |>
+#   dplyr::select(species, rmse, df, adj.rsq, pred.corr)
+# 
+# # compare with stability selection
+# metrics_ss
 
