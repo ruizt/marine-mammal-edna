@@ -1,6 +1,6 @@
 library(tidyverse)
-library(compositions)
-library(zCompositions)
+library(modelr)
+library(magrittr)
 library(fs)
 out_dir <- 'data/processed/'
 in_dir <- 'data/_raw/'
@@ -20,12 +20,12 @@ edna_in <- paste(in_dir, 'NCOG_18sV9_asv_count_tax_S.tsv', sep = '') |>
 
 # retain taxon names
 taxa <- edna_in |> 
-  dplyr::select(where(is.character), silva_Confidence, pr2_Confidence) |>
+  select(where(is.character), silva_Confidence, pr2_Confidence) |>
   rename_with(tolower) |>
   rename_with(~str_replace_all(.x, '_', '.')) |>
   separate(silva.taxon, 
            into = c('d', 'p', 'c', 'o', 'f', 'g'), sep = ';') |>
-  dplyr::select(feature.id, short.id, silva.confidence, d, p, c, o, f, g) |>
+  select(feature.id, short.id, silva.confidence, d, p, c, o, f, g) |>
   mutate(across(everything(), ~str_replace(.x, '._', '') |> str_remove_all('_') |> str_trim())) 
 
 # retrieve sample ids of samples to exclude
@@ -34,24 +34,45 @@ exclude_samples <- paste(in_dir, 'exclude_samples.txt', sep = '') |>
   pull(sample.id)
 
 # rearrange read counts and cross reference sample ids with metadata 
-## (data dimensions: 1144 x 50413;  1144 obs, 50408 ASVs)
+## (data dimensions: 1156 x 50409;  1156 obs, 50408 ASVs)
 edna_raw <- edna_in |>
-  dplyr::select(-starts_with('silva'), -starts_with('pr2'), -Feature.ID) |>
+  select(-starts_with('silva'), -starts_with('pr2'), -Feature.ID) |>
   rename_with(~str_remove_all(.x, 'X')) |>
   pivot_longer(-short.id, names_to = 'sample.id', values_to = 'read.count') |>
   pivot_wider(names_from = short.id, values_from = read.count) |> 
   filter(sample.id %in% metadata$sample.name,
-         !str_ends(sample.id, '_S'), 
-         !str_ends(sample.id, '_T'),
-         !(sample.id %in% exclude_samples))
-
+         !(sample.id %in% exclude_samples)) |>
+  mutate(sterivex = str_ends(sample.id, 'S'),
+         sample.id = str_remove_all(sample.id, '_S')) |>
+  group_by(sample.id) |>
+  slice_max(sterivex) |>
+  select(-sterivex) |>
+  ungroup()
 
 ## FILTERING -------------------------------------------------------------------
 
+# identify surface and dmc samples
+## (data dimensions: 956 x 2; 956 samples)
+surface_dmc_samples <- metadata |> 
+  select(sample.name, chlora) |>
+  separate(sample.name, 
+           into = c('cruise', 'line', 'sta', 'depth', 'misc'),
+           sep = '_') |>
+  filter(is.na(misc)) |>
+  select(-misc) |>
+  group_by(cruise, line, sta) |>
+  mutate(max.chla = chlora == max(chlora),
+         min.depth = as.numeric(depth) == min(as.numeric(depth))) |>
+  filter(max.chla + min.depth == 1) |>
+  mutate(depth.fac = factor(max.chla, labels = c('max.chla', 'surface'))) |>
+  select(-where(is.logical), -chlora) |>
+  unite(sample.id, c(cruise, line, sta, depth), sep = '_')
+
 # select asv's that appear in at least 1% of samples and at most 99% of samples
-## (data dimensions: 1 x 6832; 6832 ASVs)
+## (data dimensions: 1 x 8875; 8875 ASVs)
 cols_of_interest <- edna_raw |>
-  dplyr::select(starts_with('asv')) |>
+  filter(sample.id %in% pull(surface_dmc_samples, sample.id)) |>
+  select(starts_with('asv')) |>
   as.matrix() |>
   apply(2, function(.x){mean(.x > 0)}) |>
   t() |>
@@ -60,87 +81,54 @@ cols_of_interest <- edna_raw |>
   filter(prop.nz >= 0.01, prop.nz <= 0.99) |> 
   pull(col)
 
-
-# identify surface and dmc samples
-## (data dimensions: 956 x 2; 956 samples)
-surface_dmc_samples <- metadata |> 
-  dplyr::select(sample.name, chlora) |>
-  separate(sample.name, 
-           into = c('cruise', 'line', 'sta', 'depth', 'misc'),
-           sep = '_') |>
-  filter(is.na(misc)) |>
-  dplyr::select(-misc) |>
-  group_by(cruise, line, sta) |>
-  mutate(max.chla = chlora == max(chlora),
-         min.depth = as.numeric(depth) == min(as.numeric(depth))) |>
-  filter(max.chla + min.depth == 1) |>
-  mutate(depth.fac = factor(max.chla, labels = c('max.chla', 'surface'))) |>
-  dplyr::select(-where(is.logical), -chlora) |>
-  unite(sample.id, c(cruise, line, sta, depth), sep = '_')
-
 # identify samples in which at least 1% of asv's of interest are present
-## (data dimensions: 1 x 948;  948 obs)
+## (data dimensions: 1 x 944;  944 obs)
 samples_of_interest <- edna_raw |> 
-  dplyr::select(sample.id, all_of(cols_of_interest)) |>
+  select(sample.id, all_of(cols_of_interest)) |>
   filter(sample.id %in% pull(surface_dmc_samples, sample.id)) |>
   mutate(across(where(is.numeric), ~ .x > 0)) |>
   mutate(total = rowMeans(pick(starts_with('asv')))) |>
-  dplyr::select(sample.id, total) |>
+  select(sample.id, total) |>
   filter(total >= 0.01) |>
   pull(sample.id)
 
 
 # implement filtering criteria above
-## (data dimensions: 948 x 6832)
+## (data dimensions: 944 x 8876; 944 obs, 8875 ASVs)
 edna_filtered <- edna_raw |>
-  dplyr::select(sample.id, all_of(cols_of_interest)) |>
+  select(sample.id, all_of(cols_of_interest)) |>
   filter(sample.id %in% samples_of_interest)
 
-# # check total number of zero reads 
-# ## (91.5% of the data will be imputed)
-# edna_filtered |>
-#   gather() |>
-#   summarize(nvals = n(),
-#             num.nz = sum(value != 0),
-#             prop.nz = mean(value != 0))
-# 
-# # check asv presence/absence frequencies across samples after filtering
-# ## (all asvs are present in at least 0.1% of samples)
-# edna_filtered |>
-#   as.matrix() |>
-#   apply(2, function(.x){mean(.x > 0)}) |>
-#   t() |>
-#   as_tibble() |>
-#   gather(col, prop.nz) |>
-#   arrange(prop.nz) |>
-#   summarize(n = sum(prop.nz > 0.001),
-#             prop = n/n())
+# remove asvs present in under 1% of samples after filtering
+edna_filtered %<>% select(where(~mean(.x > 0) > 0.01))
 
 ## IMPUTATION ------------------------------------------------------------------
 
 # impute zeros ( x_{ijkl} )
 imputation_out <- edna_filtered |> 
-  dplyr::select(-sample.id) |>
+  select(-sample.id) |>
   zCompositions::cmultRepl(label = 0, 
                            method = 'GBM', 
                            output = 'prop',
-                           z.warning = 0.999)
+                           z.warning = 0.99)
 
 # bind imputed values to sample info
-## (data dimensions: 948 x 6834;  948 obs, 6832 ASVs)
+## (data dimensions: 944 x 8876; 944 obs, 8875 ASVs)
 edna_imputed <- edna_filtered |>
-  dplyr::select(sample.id) |>
+  select(sample.id) |>
   bind_cols(imputation_out) |>
   left_join(surface_dmc_samples, by = 'sample.id') |>
-  dplyr::select(sample.id, depth.fac, starts_with('asv'))
+  select(sample.id, depth.fac, starts_with('asv'))
 
 # save imputed data
+fs::dir_create(paste(out_dir, '_intermediates/', sep = ''))
 save(edna_imputed, 
-     file = paste(out_dir, '_intermediates/ncog18sv9-imputed-', today(), '.RData', sep = ''))
+     file = paste(out_dir, '_intermediates/ncog18sv9-imputed-', 
+                  today(), '.RData', sep = ''))
 
 ## AGGREGATION -----------------------------------------------------------------
 
-load(paste(out_dir, '_intermediates/ncog18sv9-imputed-2024-07-20.RData', sep = ''))
+load(paste(out_dir, '_intermediates/ncog18sv9-imputed-2024-07-25.RData', sep = ''))
 
 # grid search to identify depth averaging weights optimizing alpha diversity
 library(vegan)
@@ -241,20 +229,64 @@ edna_aggregated <- edna_imputed |>
 
 # clr transformation ( log[z_{ij}] = log[x_{ij}/g_{i}] )
 edna_clr <- edna_aggregated |> 
-  dplyr::select(-cruise) |> 
-  clr() |>
-  as_tibble()
+  select(-cruise) |> 
+  compositions::clr() |>
+  as_tibble() |>
+  bind_cols(select(edna_aggregated, cruise))
 
 # center wrt seasonal (geometric) mean ( log[z_{ij}/g_{z_{j}}(i)] )
-edna <- edna_aggregated |>
-  dplyr::select(cruise) |>
+edna <- edna_clr |>
   mutate(qtr = ym(cruise) |> quarter()) |>
   mutate(qtr = if_else(cruise == '201806', 3, qtr)) |>
-  bind_cols(edna_clr) |>
   group_by(qtr) |>
   mutate(across(starts_with('asv'), ~.x - mean(.x))) |>
   ungroup() |>
-  dplyr::select(cruise, starts_with('asv'))
+  select(cruise, starts_with('asv'))
+
+# re-process seasonal adjustments for leave one out runs
+# .train <- edna_clr |> slice(-1)
+# .test <- edna_clr |> slice(1)
+adj_fn <- function(.train, .test = NULL){
+  if(is.null(.test)){
+  out <- .train |>
+    as.data.frame() |>
+    mutate(qtr = ym(cruise) |> quarter()) |>
+    mutate(qtr = if_else(cruise == '201806', 3, qtr)) |>
+    group_by(qtr) |>
+    mutate(across(starts_with('asv'), ~.x - mean(.x))) |>
+    ungroup() |>
+    select(cruise, starts_with('asv'))
+  }else{
+    avgs <- .train |>
+      as.data.frame() |>
+      mutate(qtr = ym(cruise) |> quarter()) |>
+      mutate(qtr = if_else(cruise == '201806', 3, qtr)) |>
+      group_by(qtr) |>
+      summarize(across(starts_with('asv'), mean)) |>
+      pivot_longer(-qtr, names_to = 'asv', values_to = 'seasonal.mean')
+    
+    out <- .test |>
+      as.data.frame() |>
+      mutate(qtr = ym(cruise) |> quarter()) |>
+      mutate(qtr = if_else(cruise == '201806', 3, qtr)) |>
+      pivot_longer(-c(qtr, cruise), names_to = 'asv', values_to = 'value') |>
+      left_join(avgs, by = c('qtr', 'asv')) |>
+      mutate(adj.value = value - seasonal.mean) |>
+      pivot_wider(id_cols = cruise, values_from = adj.value, names_from = asv)
+  }
+  
+  return(out)
+}
+
+# generate data partitions for leave one out cross validation
+loo_edna <- crossv_loo(edna_clr) |>
+  rename(train.raw = train, 
+         test.raw = test) |>
+  mutate(train = map(train.raw, adj_fn),
+         test = map2(train.raw, test.raw, adj_fn),
+         test.cruise = map(test, ~pull(.x, cruise))) |>
+  select(.id, test.cruise, train, test) |>
+  unnest(c(test.cruise))
 
 ## EXPORT ----------------------------------------------------------------------
 
@@ -269,5 +301,6 @@ asv_taxa <- taxa %>% filter(short.id %in% colnames(edna))
 
 save(list = c('sample_metadata', 
               'asv_taxa',
-              'edna'), 
+              'edna',
+              'loo_edna'), 
      file = paste(out_dir, 'ncog18sv9-', today(), '.RData', sep = ''))
