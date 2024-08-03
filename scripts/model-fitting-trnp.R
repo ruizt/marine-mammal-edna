@@ -130,10 +130,10 @@ model_results
 ## STABLE SET APPROACH ---------------------------------------------------------
 
 # read in selection frequencies from LOOCV
-sel_freq <- read_rds('rslt/loocv/2024-07-15/selection-frequencies.rds')
+sel_freq <- read_rds('rslt/loocv/2024-07-27/selection-frequencies.rds')
 
 # read in metrics from LOOCV
-metrics <- read_rds('rslt/loocv/2024-07-15/metrics.rds')
+metrics <- read_rds('rslt/loocv/2024-07-27/metrics.rds')
 
 ## SPECIFYING NCOMP/ETA RANGE --------------------------------------------------
 # chosen stability threshold (minimum max selection prob.)
@@ -148,95 +148,271 @@ p <- 6832
 # threshold for max average number of selected ASVs
 qmax <- sqrt((2*pimax - 1)*p*EV) 
 
-## FILTER EXPLORATION - SPECIES = BP ---------------------------------------------
+## GRID SEARCH FOR ETA RANGES  -------------------------------------------------
 
-# grid search: ranges of ncomp, eta -> average # of asvs selected
-ncomp_start_grid <- 1:9
-ncomp_stop_grid <- 10:1
-eta_min_grid <- seq(0,0.9, by = 0.1)
-eta_max_grid <- seq(1,0.1, by = -0.1)
+# Modified grid search
+# grid search: FIXED ncomp, eta range -> average # of asvs selected
+ncomp_grid <- 5:8
+eta_min_grid <- seq(0.4,0.88, by = 0.02)
+eta_max_grid <- seq(0.88,0.4, by = -0.02)
+species_grid <- c("bm", "bp", "mn")
 
-num_asvs_eta_ncomp_gs <- function(ncomp_start, ncomp_end, eta_min, eta_max){
+num_asvs_eta_ncomp_gs <- function(ncomp_val, eta_min, eta_max){
   avg_asvs <- metrics |> 
-    filter(species == "bp",
-           ncomp >= ncomp_start,
-           ncomp <= ncomp_end,
+    filter(ncomp == ncomp_val,
            eta >= eta_min,
            eta <= eta_max) |> 
+    group_by(species) |> 
     summarise(avg.n.asv = mean(n.asv),
-              sd.n.asv = sd(n.asv))
+              sd.n.asv = sd(n.asv),
+              .groups = 'drop')
+  
+  avg_asvs <- avg_asvs |> 
+    mutate(ncomp = ncomp_val,
+           eta.min = eta_min,
+           eta.max = eta_max,
+           exp.fp = avg.n.asv^2/(p*(2*pimax - 1)))
+  
+  col.order <- c("species", "ncomp", "eta.min", "eta.max", "avg.n.asv", "sd.n.asv", "exp.fp")
+  
+  avg_asvs <- avg_asvs[,col.order]
   
   return(avg_asvs)
 }
 
-num_asvs_eta_ncomp_gs(3, 8, 0.4, 0.9)
+#num_asvs_eta_ncomp_gs(6,0.6,0.85) 
 
-gs_df <- data.frame(0,0,0,0,0,0)
-names(gs_df) = c("ncomp.min", "ncomp.max", "eta.min","eta.max", "avg.n.csv", 'sd.n.csv')
-for (ns in ncomp_start_grid){
-  for (nf in ncomp_stop_grid){
-    if (ns > nf){
-      next
-    }
-    for (emin in eta_min_grid){
-      for (emax in eta_max_grid){
-        if (emin > emax){
+
+gs_df <- data.frame(species = character(), 
+                    ncomp = numeric(), 
+                    eta.min = numeric(), 
+                    eta.max = numeric(), 
+                    avg.n.asv = numeric(), 
+                    sd.n.asv = numeric(), 
+                    exp.fp = numeric(),
+                    stringsAsFactors = FALSE)
+
+for (n in ncomp_grid) {
+  for (emin in eta_min_grid){
+    for (emax in eta_max_grid){
+      if (emin > emax){
           next
-        }
+      }
+      
+        newrows = num_asvs_eta_ncomp_gs(n,emin,emax)
         
-        avg_asvs = num_asvs_eta_ncomp_gs(ns,nf,emin,emax) |> select(avg.n.asv)
-        sd_asvs = num_asvs_eta_ncomp_gs(ns,nf,emin,emax) |> select(sd.n.asv)
+        print(newrows)
         
-        newrow = c(ns,nf,emin,emax,avg_asvs,sd_asvs)
-        
-        print(newrow)
-        
-        gs_df <- rbind(gs_df, setNames(newrow, names(gs_df)))
+        gs_df <- rbind(gs_df, newrows)
         
       }
-    }
+        
+      }
   }
+ 
+
+#-------------------------------------------------------------------------------
+
+
+# Candidate ranges: wide enough range with expected false positives < 1
+candidate_ranges <- gs_df |> 
+  filter(exp.fp < 1,
+         eta.max - eta.min > 0.1)
+
+# compute stable sets for all candidate ranges (582)
+gs_stable_sets <- data.frame(species = character(), 
+                          ncomp = numeric(), 
+                          eta.min = numeric(), 
+                          eta.max = numeric(), 
+                          avg.n.asv = numeric(), 
+                          sd.n.asv = numeric(), 
+                          exp.fp = numeric(),
+                          stable_sets = list(),
+                          stringsAsFactors = FALSE)
+
+for(i in 1:nrow(candidate_ranges)) {
+  # get row
+  row <- candidate_ranges[i,]
+  
+  # compute stable set
+  ss <- sel_freq |> 
+    filter(eta >= row$eta.min,
+           eta <= row$eta.max,
+           ncomp == row$ncomp,
+           species == row$species, 
+           n >= 20) |> 
+    distinct(asv) |>
+    nest(data = asv) |>
+    transmute(stable.set = map(data, unlist))
+  
+  # add to df
+  newrow <- cbind(row,ss)
+
+  gs_stable_sets <- rbind(gs_stable_sets, newrow)
+  
 }
 
-gs_df <- gs_df |> 
-  slice(-1)
+# STABLE SET EXPLORATION
+# GOAL: FIND OPTIMAL NCOMP FOR EACH SPECIES (stable set that optimizes MSPE)
+# TESTING NCOMP = 5, 6, 7, and 8
+
+# size of stable sets
+gs_stable_sets$ss.size <- sapply(gs_stable_sets$stable.set, length)
 
 
-# Candidate ranges
-candidate_ranges <- gs_df |> 
-  filter(avg.n.csv <= qmax,
-         avg.n.csv > 0)
+## find largest stable set for each species-ncomp combination (with expected FP < 1)
 
-candidate_ranges <- candidate_ranges |> 
-  mutate(ncomp.range = ncomp.max - ncomp.min,
-         eta.range = eta.max - eta.min)
+max_asvs_ss <- gs_stable_sets |> 
+  group_by(species, ncomp) |> 
+  slice_max(ss.size)
 
-candidate_ranges |> 
-  filter(ncomp.range == max(ncomp.range) | eta.range == max(eta.range))
+max_asvs_ss
 
-# notice effect of range on sd, for example...
-candidate_ranges |> 
-  filter(ncomp.range == 9) |>
-  filter(avg.n.csv > 40, avg.n.csv < 70) |>
-  arrange(eta.range)
+# are the stable sets of same size identical?
 
-# just tinkering here ...
-candidate_ranges |> 
-  filter(avg.n.csv < 90,
-         avg.n.csv > 20,
-         eta.max <= 0.9, 
-         eta.min >= 0.4,
-         ncomp.min > 2,
-         ncomp.max == 8,
-         avg.n.csv > 15,
-         sd.n.csv < 50)
+identical(max_asvs_ss$stable.set[[1]], max_asvs_ss$stable.set[[2]])
 
-# recalculate EV for new range
-qmax_new <- candidate_ranges |>
-  filter(ncomp.min == 3, ncomp.max == 8, eta.min == 0.5, eta.max == 0.9) |>
-  pull(avg.n.csv)
+identical(max_asvs_ss$stable.set[[7]], max_asvs_ss$stable.set[[8]])
 
-qmax_new^2/(p*(2*pimax - 1))
+identical(max_asvs_ss$stable.set[[4]], max_asvs_ss$stable.set[[5]])
+
+
+# filter out one stable set per ncomp-species combo
+
+stable_sets <- max_asvs_ss |> 
+  group_by(species, ncomp) |> 
+  slice_min(exp.fp) |> 
+  slice_max(eta.max - eta.min)
+
+# fit all 12 models to compare MSPE
+load('data/processed/ncog18sv9-2024-07-20.RData')
+load('data/processed/mm-sightings-2024-07-20.RData')
+whales <- inner_join(sightings, edna, by = 'cruise') 
+
+
+ss_fit_fn <- function(.data, .var, .ss, .ncomp){
+  stable_asvs <- unlist(.ss, use.names = F)
+  
+  all_asvs <- dplyr::select(.data, starts_with('asv'))
+  
+  x <- all_asvs |> dplyr::select(all_of(stable_asvs))
+  y <- pull(.data, {{.var}})
+  fit <- spls(x, y, 
+              K = .ncomp, eta = 0, 
+              scale.x = F, scale.y = F)
+}
+
+
+model_outputs = data.frame(species = character(), 
+                          ncomp = numeric(),
+                          stable.set = list(),
+                          r2 = numeric(),
+                          adj.r2 = numeric(),
+                          mspe = numeric()  
+                          )
+
+
+for (j in 1:nrow(stable_sets)) {
+  row <- stable_sets[j,]
+  print(row)
+  stable_set = row$stable.set
+  
+  fit <- ss_fit_fn(whales, row$species, stable_set, row$ncomp)
+  
+  
+  # R-squared
+  n <- length(fit$y)
+  fitted <- predict(fit_bm, type = 'fit')
+  resid <- fit_bm$y - fitted
+  r2 <- 1 - (var(resid)/var(fit$y))
+  adj_r2 <- 1 - ((1-r2)*(n-1))/(n-fit$K-1)
+  
+  print(r2)
+  print(adj_r2)
+  
+  
+  # loocv for mspe
+  loo_preds <- rep(NA, nrow(fit$x))
+  
+  for (i in 1:nrow(fit$x)){
+    x_train <- fit$x[-i, ] # removes ith row
+    y_train <- fit$y[-i]  # removes ith element
+    
+    
+    # fit cross validation model
+    fit_cv <- spls(x_train, y_train, K = row$ncomp, eta = 0, 
+                   scale.x = F, scale.y = F)
+    print(fit$x[i,])
+    # predict response variable
+    loo_preds[i] <- predict(fit_cv, newx = fit$x[i, , drop = F], type = "fit")
+  }
+  
+  # mspe (mean squared prediction error)
+  mspe <- mean((fit$y - loo_preds)^2)
+  
+  newrow <- data.frame(species = row$species,
+                       ncomp = row$ncomp,
+                       stable.set = I(list(row$stable.set)),
+                       r2 = r2,
+                       adj.r2 = adj_r2,
+                       mspe = mspe)
+  print(names(newrow))
+  print(names(model_ouputs))
+  
+  model_outputs <- rbind(model_outputs, newrow)
+  
+}
+
+
+model_outputs
+
+# find best ncomp / stable set for each species
+model_outputs |> 
+  group_by(species) |> 
+  slice_min(mspe)
+
+
+# in terms of adjusted r^2
+model_outputs |> 
+  group_by(species) |> 
+  slice_max(adj.r2)
+
+
+# FROM OLD GRID SEARCH
+# candidate_ranges <- gs_df |> 
+#   filter(avg.n.csv <= qmax,
+#          avg.n.csv > 0)
+# 
+# candidate_ranges <- candidate_ranges |> 
+#   mutate(ncomp.range = ncomp.max - ncomp.min,
+#          eta.range = eta.max - eta.min)
+# 
+# candidate_ranges |> 
+#   filter(ncomp.range == max(ncomp.range) | eta.range == max(eta.range))
+# 
+# # notice effect of range on sd, for example...
+# candidate_ranges |> 
+#   filter(ncomp.range == 9) |>
+#   filter(avg.n.csv > 40, avg.n.csv < 70) |>
+#   arrange(eta.range)
+# 
+# # just tinkering here ...
+# candidate_ranges |> 
+#   filter(avg.n.csv < 90,
+#          avg.n.csv > 20,
+#          eta.max <= 0.9, 
+#          eta.min >= 0.4,
+#          ncomp.min > 2,
+#          ncomp.max == 8,
+#          avg.n.csv > 15,
+#          sd.n.csv < 50)
+# 
+# # recalculate EV for new range
+# qmax_new <- candidate_ranges |>
+#   filter(ncomp.min == 3, ncomp.max == 8, eta.min == 0.5, eta.max == 0.9) |>
+#   pull(avg.n.csv)
+# 
+# qmax_new^2/(p*(2*pimax - 1))
 
 ## STABLE SET -------------------------------------------------------------------
 ## INITIAL FILTERING: 1 <= ncomp <= 10 ; 0.4 <= eta <= 1
@@ -323,6 +499,8 @@ stable_sets <- sel_freq |>
   distinct(asv) |>
   nest(data = asv) |>
   transmute(stable.set = map(data, unlist))
+
+
 
 # tinkering with fitting models -- it works!
 load('data/processed/ncog18sv9-2024-07-20.RData')
