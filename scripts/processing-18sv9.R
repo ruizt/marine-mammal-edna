@@ -2,6 +2,8 @@ library(tidyverse)
 library(modelr)
 library(magrittr)
 library(fs)
+library(vegan)
+library(collapse)
 out_dir <- 'data/processed/'
 in_dir <- 'data/_raw/'
   
@@ -26,9 +28,11 @@ taxa <- edna_in |>
   separate(silva.taxon, 
            into = c('d', 'p', 'c', 'o', 'f', 'g'), sep = ';') |>
   select(feature.id, short.id, silva.confidence, d, p, c, o, f, g) |>
-  mutate(across(everything(), ~str_replace(.x, '._', '') |> str_remove_all('_') |> str_trim())) 
+  mutate(across(everything(), 
+                ~str_replace(.x, '._', '') |> str_remove_all('_') |> str_trim())) 
 
 # retrieve sample ids of samples to exclude
+## (drop 16 samples)
 exclude_samples <- paste(in_dir, 'exclude_samples.txt', sep = '') |>
   read_delim(delim = '/n', skip = 3, col_names = 'sample.id') |>
   pull(sample.id)
@@ -69,7 +73,7 @@ surface_dmc_samples <- metadata |>
   unite(sample.id, c(cruise, line, sta, depth), sep = '_')
 
 # select asv's that appear in at least 1% of samples and at most 99% of samples
-## (data dimensions: 1 x 8875; 8875 ASVs)
+## (data dimensions: 1 x 8936; 8936 ASVs)
 cols_of_interest <- edna_raw |>
   filter(sample.id %in% pull(surface_dmc_samples, sample.id)) |>
   select(starts_with('asv')) |>
@@ -82,7 +86,7 @@ cols_of_interest <- edna_raw |>
   pull(col)
 
 # identify samples in which at least 1% of asv's of interest are present
-## (data dimensions: 1 x 944;  944 obs)
+## (data dimensions: 1 x 943;  943 obs)
 samples_of_interest <- edna_raw |> 
   select(sample.id, all_of(cols_of_interest)) |>
   filter(sample.id %in% pull(surface_dmc_samples, sample.id)) |>
@@ -94,136 +98,130 @@ samples_of_interest <- edna_raw |>
 
 
 # implement filtering criteria above
-## (data dimensions: 944 x 8876; 944 obs, 8875 ASVs)
+## (data dimensions: 943 x 8937; 943 obs, 8936 ASVs)
 edna_filtered <- edna_raw |>
   select(sample.id, all_of(cols_of_interest)) |>
   filter(sample.id %in% samples_of_interest)
 
-# remove asvs present in under 1% of samples after filtering
-edna_filtered %<>% select(where(~mean(.x > 0) > 0.01))
+# identify stations with only one observation (i.e. sample at one depth only)
+## (removing 9 samples)
+samples_to_drop <- edna_filtered |>
+  separate(sample.id, 
+           into = c('cruise', 'line', 'sta', 'depth'),
+           sep = '_') |>
+  group_by(cruise, line, sta) |>
+  count() |>
+  filter(n != 2) |>
+  unite(sample.id, c(cruise, line, sta), sep = '_') |>
+  pull(sample.id)
+
+# remove single-depth samples and asvs present in under 1% of remaining samples
+## (data dimensions: 934 x 8933; 934 obs, 8932 ASVs)
+edna_filtered %<>% 
+  filter(!(str_trunc(sample.id, 18, ellipsis = '') %in% samples_to_drop)) |>
+  select(where(~mean(.x > 0) > 0.01))
+
+# determine limit for z.warning: check maximum column sparsity (prop. zeroes)
+z.max <- edna_filtered |> 
+  pivot_longer(starts_with('asv')) |>
+  group_by(name) |>
+  summarize(prop.z = mean(value == 0)) |>
+  pull(prop.z) |>
+  max()
 
 ## IMPUTATION ------------------------------------------------------------------
 
 # impute zeros ( x_{ijkl} )
+## LONG RUNTIME: ~5-10min
 imputation_out <- edna_filtered |> 
   select(-sample.id) |>
   zCompositions::cmultRepl(label = 0, 
                            method = 'GBM', 
                            output = 'prop',
-                           z.warning = 0.99)
+                           z.warning = 1.001*z.max)
 
 # bind imputed values to sample info
-## (data dimensions: 944 x 8876; 944 obs, 8875 ASVs)
+## (data dimensions: 934 x 8934; 934 obs, 8932 ASVs + 1 ID + 1 depth indicator)
 edna_imputed <- edna_filtered |>
   select(sample.id) |>
   bind_cols(imputation_out) |>
   left_join(surface_dmc_samples, by = 'sample.id') |>
   select(sample.id, depth.fac, starts_with('asv'))
 
+
+
 # save imputed data
-fs::dir_create(paste(out_dir, '_intermediates/', sep = ''))
+## REMOVE DIRECTORY FROM VERSION CONTROL BEFORE FINALIZING
+fs::dir_create(paste(out_dir, 'intermediates/', sep = ''))
 save(edna_imputed, 
-     file = paste(out_dir, '_intermediates/ncog18sv9-imputed-', 
+     file = paste(out_dir, 'intermediates/ncog18sv9-imputed-', 
                   today(), '.RData', sep = ''))
 
 ## AGGREGATION -----------------------------------------------------------------
 
-load(paste(out_dir, '_intermediates/ncog18sv9-imputed-2024-07-25.RData', sep = ''))
+# read in imputed data
+load(paste(out_dir, 'intermediates/ncog18sv9-imputed-2024-08-02.RData', sep = ''))
+
+# weight function for depth aggregation
+weight_fn <- function(depth.range, w){
+  return(ifelse(depth.range == "surface", w, 1 - w))
+}
+
+# candidate weights
+w.vec <- seq(0.05,0.99, by = 0.01)
 
 # grid search to identify depth averaging weights optimizing alpha diversity
-library(vegan)
-# weight function
-binned_weight_fn <- function(depth.range, weight1){
-  return(ifelse(depth.range == "surface", w1, 1 - w1))
-}
-
-# grid search
-gs_results <- data.frame(0,0,0,0,0,0,0,0,0)
-names(gs_results) = c("w1", "w2", "avgDiv", "SD", "Min", "25", "50","75", "Max")
-
-w1.vec = seq(0.05,0.99, by = 0.01)
-
-for (w1 in w1.vec) {
+gs.rslt <- sapply(w.vec, function(w){
   
-  w2 = (1 - w1)
-  
-  edna_agg <- edna_imputed |>
+  # weighted aggregation to cruise level (first depth, then station, then line)
+  # then compute average alpha diversity across cruises
+  out <- edna_imputed |>
     separate(sample.id, 
              into = c('cruise', 'line', 'sta', 'depth'),
-             sep = '_') |> 
-    drop_na() |> 
-    mutate(weight = binned_weight_fn(depth.fac, w1)) |>
-    group_by(cruise, line, sta) |>
-    summarize(across(starts_with('asv'), 
-                     ~weighted.mean(log(.x), weight)), ## automatically normalizes weights
-              .groups = 'drop') |>
-    group_by(cruise, line) |>
-    summarize(across(starts_with('asv'), ~mean(.x))) |>
+             sep = '_') |>
     group_by(cruise) |>
-    summarize(across(starts_with('asv'), ~mean(.x)))
+    fmutate(across(.cols = is.numeric, log)) |>
+    mutate(weight = weight_fn(depth.fac, w)) |>
+    fgroup_by(cruise, line, sta) |>
+    fselect(-depth.fac, -depth) |>
+    fmean(weight, keep.w = F) |>
+    fgroup_by(cruise, line) |>
+    fselect(-sta) |>
+    fmean() |>
+    fgroup_by(cruise) |>
+    fselect(-line) |>
+    fmean() |>
+    fmutate(across(.cols = is.numeric, exp)) |>
+    fselect(-cruise) |>
+    diversity(index = 'shannon') |>
+    mean()
   
-  edna_data <- edna_agg |> mutate(exp(pick(-cruise))) 
-  
-  # split into sample info and asvs
-  asv <- edna_data |> 
-    dplyr::select(starts_with('asv'))
-  
-  sampinfo <- edna_data |> 
-    dplyr::select(-starts_with('asv'))
-  
-  # alpha diversity measures
-  alpha_divs <- sampinfo %>%
-    bind_cols(alpha.div.sh = diversity(asv, index = 'shannon')) 
-  
-  alpha_div <- alpha_divs |> 
-    slice(-14) |> 
-    summarise(avgDiv = mean(alpha.div.sh),
-              sd = sd(alpha.div.sh),
-              min = min(alpha.div.sh),,
-              twentyfifth = quantile(alpha.div.sh, .25),
-              fifty = quantile(alpha.div.sh, .50),
-              seventyfifth = quantile(alpha.div.sh, .75),
-              max = max(alpha.div.sh))
-  
-  newRow = c(w1,w2, alpha_div$avgDiv, alpha_div$sd, alpha_div$min, alpha_div$twentyfifth, alpha_div$fifty, alpha_div$seventyfifth, alpha_div$max)
-  
-  print(newRow)
-  
-  gs_results <- rbind(gs_results, setNames(newRow,names(gs_results)))
-  
-}
+  return(out)
+})
 
-
-gs_results <- gs_results |> 
-  slice(-1)
-
-gs_results |> 
-  filter(avgDiv == max(gs_results$avgDiv))
-
-# GRID SEARCH RESULTS:
-# Maximum Average Alpha Diversity at surface weight of 0.45 and max Chlorophyll weight of 0.55
-# different from before
-
-gs_results |> 
-  ggplot(aes(y = avgDiv, x = w1)) +
-  geom_line() + 
-  labs(x= "Weight of Surface Measurements", y = "Average Alpha Diversity") + 
-  geom_abline(intercept = 6.235241, slope = 0)
+# optimal weight
+# (max average alpha diversity at surface weight 0.39, max Chlorophyll weight 0.61
+w.opt <- w.vec[which.max(gs.rslt)]
 
 # average first over depth, then over station, then over transect ( x_{ij} )
 # interpretation: average proportion of asv.XX across cruise is ZZ
 edna_aggregated <- edna_imputed |>
-  mutate(depth.wt = ifelse(depth.fac == "surface", 0.09, 0.91)) |>
-  separate(sample.id, into = c('cruise', 'line', 'sta', 'depth'), sep = '_') |>
-  group_by(cruise, line, sta) |>
-  summarize(across(starts_with('asv'), 
-                   ~weighted.mean(log(.x), depth.wt)), 
-            .groups = 'drop') |>
-  group_by(cruise, line) |>
-  summarize(across(starts_with('asv'), ~mean(.x))) |>
+  separate(sample.id, 
+           into = c('cruise', 'line', 'sta', 'depth'),
+           sep = '_') |>
   group_by(cruise) |>
-  summarize(across(starts_with('asv'), ~mean(.x))) |> 
-  mutate(exp(pick(-cruise)))
+  fmutate(across(.cols = is.numeric, log)) |>
+  mutate(weight = weight_fn(depth.fac, w.opt)) |>
+  fgroup_by(cruise, line, sta) |>
+  fselect(-depth.fac, -depth) |>
+  fmean(weight, keep.w = F) |>
+  fgroup_by(cruise, line) |>
+  fselect(-sta) |>
+  fmean() |>
+  fgroup_by(cruise) |>
+  fselect(-line) |>
+  fmean() |>
+  fmutate(across(.cols = is.numeric, exp)) 
 
 ## CLR AND SEASONAL DE-TRENDING ------------------------------------------------
 
@@ -299,8 +297,9 @@ attr(sample_metadata, 'problems') <- NULL
 # filter asv taxonomy to asvs of interest
 asv_taxa <- taxa %>% filter(short.id %in% colnames(edna))
 
+# write file outputs
 save(list = c('sample_metadata', 
               'asv_taxa',
               'edna',
               'loo_edna'), 
-     file = paste(out_dir, 'ncog18sv9-', today(), '.RData', sep = ''))
+     file = paste(out_dir, 'ncog18sv9.RData', sep = ''))
