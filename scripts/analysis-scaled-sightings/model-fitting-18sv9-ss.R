@@ -7,7 +7,7 @@ library(fs)
 library(collapse)
 data_dir <- 'data/processed/'
 loo_dir <- 'rslt/loocv/18sv9-ss/'
-out_dir <- 'rslt/models/18sv9-ss/'
+out_dir <- 'rslt/models/scaled-sightings/'
 dir_create(out_dir)
 
 ## DATA INPUTS -----------------------------------------------------------------
@@ -253,13 +253,12 @@ pred_metrics <- loo_pred_df |>
             cor.lr = cor(y, pred),
             rmspe.ss = mean((ss.obs - ss.pred)^2) |> sqrt(),
             cor.ss = cor(ss.obs, ss.pred),
-            rmspe.ss.naive = mean((ss.obs - exp(train.seasonal.mean))^2) |> sqrt(),
-            cor.ss.naive = cor(ss.obs, exp(train.seasonal.mean))) |>
+            rmspe.ss.naive = mean((ss.obs - exp(train.seasonal.mean))^2) |> sqrt()) |>
   pivot_longer(-test.species) |>
   pivot_wider(names_from = test.species, values_from = value) |>
   separate(name, into = c('metric', 'scale', 'model')) |>
   mutate(model = replace_na(model, 'pls')) |>
-  arrange(scale, metric, model)
+  arrange(metric, scale, model)
 
 # inspect
 pred_metrics
@@ -271,7 +270,7 @@ save(list = c('fitted_models',
               'fit_df', 
               'fit_metrics', 
               'pred_metrics'),
-     file = paste(out_dir, 'fitted-models-18sv9-ss-', today(), '.RData', sep = ''))
+     file = paste(out_dir, 'fitted-models-18sv9-ss.RData', sep = ''))
 
 
 ## COMPARE WITH PREDICTION-OPTIMAL SPLS ----------------------------------------
