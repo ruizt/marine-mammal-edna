@@ -180,7 +180,7 @@ num_asvs_eta_ncomp_gs <- function(ncomp_val, eta_min, eta_max){
   return(avg_asvs)
 }
 
-#num_asvs_eta_ncomp_gs(6,0.6,0.85) 
+num_asvs_eta_ncomp_gs(6,0.6,0.85)
 
 
 gs_df <- data.frame(species = character(), 
@@ -217,7 +217,7 @@ for (n in ncomp_grid) {
 # Candidate ranges: wide enough range with expected false positives < 1
 candidate_ranges <- gs_df |> 
   filter(exp.fp < 1,
-         eta.max - eta.min > 0.1)
+         eta.max - eta.min > 0.3)
 
 # compute stable sets for all candidate ranges (582)
 gs_stable_sets <- data.frame(species = character(), 
@@ -270,11 +270,11 @@ max_asvs_ss
 
 # are the stable sets of same size identical?
 
-identical(max_asvs_ss$stable.set[[1]], max_asvs_ss$stable.set[[2]])
-
-identical(max_asvs_ss$stable.set[[7]], max_asvs_ss$stable.set[[8]])
+identical(max_asvs_ss$stable.set[[2]], max_asvs_ss$stable.set[[3]])
 
 identical(max_asvs_ss$stable.set[[4]], max_asvs_ss$stable.set[[5]])
+
+identical(max_asvs_ss$stable.set[[6]], max_asvs_ss$stable.set[[7]])
 
 
 # filter out one stable set per ncomp-species combo
@@ -322,8 +322,8 @@ for (j in 1:nrow(stable_sets)) {
   
   # R-squared
   n <- length(fit$y)
-  fitted <- predict(fit_bm, type = 'fit')
-  resid <- fit_bm$y - fitted
+  fitted <- predict(fit, type = 'fit')
+  resid <- fit$y - fitted
   r2 <- 1 - (var(resid)/var(fit$y))
   adj_r2 <- 1 - ((1-r2)*(n-1))/(n-fit$K-1)
   
@@ -357,14 +357,16 @@ for (j in 1:nrow(stable_sets)) {
                        adj.r2 = adj_r2,
                        mspe = mspe)
   print(names(newrow))
-  print(names(model_ouputs))
+  print(names(model_outputs))
   
   model_outputs <- rbind(model_outputs, newrow)
   
 }
 
 
-model_outputs
+model_outputs |>
+  group_by(species) |>
+  arrange(mspe)
 
 # find best ncomp / stable set for each species
 model_outputs |> 

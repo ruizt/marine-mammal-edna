@@ -1,12 +1,12 @@
 library(tidyverse)
 library(lubridate)
 library(patchwork)
-load('rslt/models/fitted-models-18sv9-2024-07-28.RData')
-load('data/processed/ncog18sv9-2024-07-27.RData')
+load('rslt/models/fitted-models-18sv9-2024-08-03.RData')
+load('data/processed/ncog18sv9.RData')
 
 ## TABLES ----------------------------------------------------------------------
 
-fit |>
+fitted_models |>
   mutate(model.species = factor(species, 
                                 levels = c('bm', 'bp', 'mn'),
                                 labels = c('Blue whale', 'Fin whale', 'Humpback whale')),
@@ -14,10 +14,10 @@ fit |>
   select(model.species, asv.id) |>
   unnest(everything()) |>
   left_join(asv_taxa, join_by(asv.id == short.id)) |>
-  group_by(model.species, d, p, o, c) |>
+  group_by(model.species, d, p, o) |>
   count() |>
   arrange(model.species, desc(n)) |>
-  print(n = 100)
+  print(n = 200)
 
 ## FIGURES ---------------------------------------------------------------------
 
@@ -162,6 +162,9 @@ p4 <- pred_pts_df |>
   labs(x = 'Observed value', y = 'Predicted value')
 
 
-p1 + p2 + p4 + p3 + 
+fig <- p1 + p2 + p4 + p3 + 
   plot_layout(ncol = 2, nrow = 2, heights = c(2, 1)) +
   plot_annotation(tag_levels = 'A')
+
+ggsave(filename = 'rslt/_draft/plots/preds-18sv9-ss.png',
+       width = 8, height = 6, units = 'in', dpi = 300)
