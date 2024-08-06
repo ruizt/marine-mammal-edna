@@ -6,7 +6,7 @@ library(spls)
 ## DATA INPUTS -----------------------------------------------------------------
 
 # load edna and sighting data
-load('data/processed/ncog18sv9.RData')
+load('data/processed/ncog18sv4.RData')
 load('data/processed/mm-sightings-2024-07-27.RData')
 
 # combine seasonally adjusted scaled sightings and seasonally adjusted edna data
@@ -39,7 +39,7 @@ settings <- expand_grid(eta = eta_grid,
 ## LEAVE ONE OUT CROSS VALIDATION ----------------------------------------------
 
 # directory to store files
-dir <- 'rslt/loocv/18sv9-ss'
+dir <- 'rslt/loocv/18sv4-ss'
 fs::dir_create(dir)
 
 # function to fit spls model and compute evaluation metrics
