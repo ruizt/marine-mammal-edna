@@ -17,6 +17,8 @@ fitted_models |>
   group_by(model.species, d, p, o) |>
   count() |>
   arrange(model.species, desc(n)) |>
+  group_by(model.species) |>
+  mutate(prop = n/sum(n)) |>
   print(n = 200)
 
 ## FIGURES ---------------------------------------------------------------------
@@ -165,6 +167,8 @@ p4 <- pred_pts_df |>
 fig <- p1 + p2 + p4 + p3 + 
   plot_layout(ncol = 2, nrow = 2, heights = c(2, 1)) +
   plot_annotation(tag_levels = 'A')
+
+fig
 
 ggsave(filename = 'rslt/_draft/plots/preds-18sv9-ss.png',
        width = 8, height = 6, units = 'in', dpi = 300)
