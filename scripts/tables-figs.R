@@ -1,7 +1,7 @@
 library(tidyverse)
 library(lubridate)
 library(patchwork)
-load('rslt/models/fitted-models-18sv9-2024-08-03.RData')
+load('rslt/models/scaled-sightings/fitted-models-18sv9-ss.RData')
 load('data/processed/ncog18sv9.RData')
 
 ## TABLES ----------------------------------------------------------------------
@@ -101,7 +101,7 @@ p1 <- pred_pts_df |>
         panel.grid.minor = element_blank())
 
 
-
+p1
 
 # fit_interp_df <- fit_pts_df |>
 #   nest(data = -species) |>
