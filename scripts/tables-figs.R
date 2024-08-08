@@ -1,25 +1,55 @@
 library(tidyverse)
 library(lubridate)
 library(patchwork)
+
+## ASV TABLES ------------------------------------------------------------------
+out_dir <- 'rslt/tbl/'
+fs::dir_create(out_dir)
+
+
+# candidate asvs from 18sv9
+load('data/processed/ncog18sv9.RData')
+asv_taxa_18sv9 <- asv_taxa 
+
+# candidate asvs from 18sv4
+load('data/processed/ncog18sv4.RData')
+asv_taxa_18sv4 <- asv_taxa
+
+# candidate asvs from 16s
+load('data/processed/ncog16s.RData')
+asv_taxa_16s <- asv_taxa
+
+# write as excel sheets
+sheets <- list("18Sv9" = asv_taxa_18sv9, 
+               "18Sv4" = asv_taxa_18sv4,
+               "16S" = asv_taxa_16s)
+writexl::write_xlsx(sheets, paste(out_dir, 'candidate-asvs.xlsx', sep = ''))
+
+# remove data from environment
+rm(list = setdiff(ls(), 'out_dir'))
+
+
+# selected asvs from 18sv9 & scaled sightings model 
 load('rslt/models/scaled-sightings/fitted-models-18sv9-ss.RData')
 load('data/processed/ncog18sv9.RData')
-
-## TABLES ----------------------------------------------------------------------
-
-fitted_models |>
+sel_asv_18sv9_ss <- fitted_models |>
   mutate(model.species = factor(species, 
                                 levels = c('bm', 'bp', 'mn'),
                                 labels = c('Blue whale', 'Fin whale', 'Humpback whale')),
          asv.id = map(data, ~select(.x, -y) |> colnames())) |>
   select(model.species, asv.id) |>
   unnest(everything()) |>
-  left_join(asv_taxa, join_by(asv.id == short.id)) |>
-  group_by(model.species, d, p, o) |>
-  count() |>
-  arrange(model.species, desc(n)) |>
-  group_by(model.species) |>
-  mutate(prop = n/sum(n)) |>
-  print(n = 200)
+  left_join(asv_taxa, join_by(asv.id == short.id)) 
+
+
+# # counts of phyla of selected asvs
+# sel_asv_18sv9_ss |>
+#   group_by(model.species, d, p) |>
+#   count() |>
+#   arrange(model.species, desc(n)) |>
+#   group_by(model.species) |>
+#   mutate(prop = n/sum(n)) |>
+#   print(n = 200)
 
 ## FIGURES ---------------------------------------------------------------------
 
@@ -169,6 +199,8 @@ fig <- p1 + p2 + p4 + p3 +
   plot_annotation(tag_levels = 'A')
 
 fig
+
+p1
 
 ggsave(filename = 'rslt/_draft/plots/preds-18sv9-ss.png',
        width = 8, height = 6, units = 'in', dpi = 300)
