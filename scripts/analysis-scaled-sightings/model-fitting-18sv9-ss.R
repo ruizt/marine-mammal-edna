@@ -91,36 +91,6 @@ candidate_sets <- metrics |>
 # inspect
 candidate_sets
 
-# # alternatively, fix manually
-# sel_freq |>
-#   filter(eta >= 0.625,
-#          eta <= 0.875,
-#          ncomp == 8,
-#          n >= n.obs*pi.max) |>
-#   group_by(species) |>
-#   distinct(asv) |>
-#   nest(data = asv) |>
-#   transmute(ncomp = 8,
-#             ss = map(data, ~pull(.x, asv))) |>
-#   ungroup()
-
-# # plot to aid with manual selection
-# pal.grad <- colorRampPalette(c('red', 'blue'))
-# pal <- pal.grad(13)
-# metrics |>
-#   select(species, ncomp, eta, n.asv) |>
-#   mutate(eta.bin = cut_interval(eta, n = 8)) |>
-#   group_by(species, ncomp, eta.bin) |>
-#   summarize(avg.n.asv = mean(n.asv),
-#             sd.n.asv = sd(n.asv)) |>
-#   ggplot(aes(x = eta.bin, y = avg.n.asv, color = factor(ncomp))) +
-#   facet_wrap(~species) +
-#   geom_point() +
-#   geom_path(aes(group = ncomp)) +
-#   scale_y_log10() +
-#   scale_color_manual(values = pal) +
-#   theme(axis.text.x = element_text(angle = 90)) 
-
 
 ## DETERMINE NUMBER OF LATENT COMPONENTS ---------------------------------------
 
@@ -265,6 +235,7 @@ pred_metrics
 
 # export
 save(list = c('fitted_models', 
+              'loo_preds',
               'loo_preds_best', 
               'loo_pred_df', 
               'fit_df', 
