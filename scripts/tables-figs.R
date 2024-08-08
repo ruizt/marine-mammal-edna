@@ -19,16 +19,6 @@ asv_taxa_18sv4 <- asv_taxa
 load('data/processed/ncog16s.RData')
 asv_taxa_16s <- asv_taxa
 
-# write as excel sheets
-sheets <- list("18Sv9" = asv_taxa_18sv9, 
-               "18Sv4" = asv_taxa_18sv4,
-               "16S" = asv_taxa_16s)
-writexl::write_xlsx(sheets, paste(out_dir, 'candidate-asvs.xlsx', sep = ''))
-
-# remove data from environment
-rm(list = setdiff(ls(), 'out_dir'))
-
-
 # selected asvs from 18sv9 & scaled sightings model 
 load('rslt/models/scaled-sightings/fitted-models-18sv9-ss.RData')
 load('data/processed/ncog18sv9.RData')
@@ -41,6 +31,42 @@ sel_asv_18sv9_ss <- fitted_models |>
   unnest(everything()) |>
   left_join(asv_taxa, join_by(asv.id == short.id)) 
 
+# selected asvs from 18sv4 & scaled sightings model 
+load('rslt/models/scaled-sightings/fitted-models-18sv4-ss.RData')
+load('data/processed/ncog18sv4.RData')
+sel_asv_18sv4_ss <- fitted_models |>
+  mutate(model.species = factor(species, 
+                                levels = c('bm', 'bp', 'mn'),
+                                labels = c('Blue whale', 'Fin whale', 'Humpback whale')),
+         asv.id = map(data, ~select(.x, -y) |> colnames())) |>
+  select(model.species, asv.id) |>
+  unnest(everything()) |>
+  left_join(asv_taxa, join_by(asv.id == short.id)) 
+
+# selected asvs from 16s & scaled sightings model 
+load('rslt/models/scaled-sightings/fitted-models-16s-ss.RData')
+load('data/processed/ncog16s.RData')
+sel_asv_16s_ss <- fitted_models |>
+  mutate(model.species = factor(species, 
+                                levels = c('bm', 'bp', 'mn'),
+                                labels = c('Blue whale', 'Fin whale', 'Humpback whale')),
+         asv.id = map(data, ~select(.x, -y) |> colnames())) |>
+  select(model.species, asv.id) |>
+  unnest(everything()) |>
+  left_join(asv_taxa, join_by(asv.id == short.id)) 
+
+# write as excel sheets
+sheets <- list("18Sv9-candidates" = asv_taxa_18sv9, 
+               "18Sv4-candidates" = asv_taxa_18sv4,
+               "16S-candidates" = asv_taxa_16s,
+               "18Sv9-selected" = sel_asv_18sv9_ss,
+               "18Sv4-selected" = sel_asv_18sv4_ss,
+               "16S-selected" = sel_asv_16s_ss)
+writexl::write_xlsx(sheets, paste(out_dir, 'asv-tables.xlsx', sep = ''))
+
+
+# remove data from environment
+rm(list = setdiff(ls(), 'out_dir'))
 
 # # counts of phyla of selected asvs
 # sel_asv_18sv9_ss |>
@@ -50,6 +76,19 @@ sel_asv_18sv9_ss <- fitted_models |>
 #   group_by(model.species) |>
 #   mutate(prop = n/sum(n)) |>
 #   print(n = 200)
+# 
+# fit <- fitted_models |>
+#   slice(1) |> pull(fit) %$% .[[1]]
+# 
+# coef(fit)[, , 1]
+# 
+# fitted_models |>
+#   mutate(coef = map(fit, ~coef(.x)[, , 1]),
+#          asv = map(coef, names)) |>
+#   unnest(c(coef, asv)) |>
+#   select(species, coef, asv) |>
+#   group_by(species) |>
+#   arrange(desc(coef))
 
 ## FIGURES ---------------------------------------------------------------------
 
