@@ -475,7 +475,7 @@ metrics |>
   geom_path(aes(group = ncomp)) +
   scale_y_log10() +
   scale_color_manual(values = pal) +
-  theme(axis.text.x = element_text(angle = 90)) 
+  # theme(axis.text.x = element_text(angle = 90)) 
 
 # say, qmin = 10, qmax = 80 groupwise; find q across full range
 metrics |>
