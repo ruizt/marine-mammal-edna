@@ -58,24 +58,7 @@ sightings <- ss_means |>
          mn = log(mn.imp) - log.mn.imp.mean,
          .keep = "none")
 
-# seasonal means from leave-one-out procedure
-loo_ss_means <- ss_imputed |>
-  select(cruise, season, ends_with('imp')) |>
-  rename_with(~str_remove(.x, '.imp')) |>
-  crossv_loo() |>
-  mutate(train = map(train, as.data.frame),
-         test = map(test, as.data.frame),
-         test.cruise = map(test, ~pull(.x, cruise)),
-         test.season = map(test, ~pull(.x, season))) |>
-  unnest(c(train, test.cruise, test.season)) |>
-  group_by(.id, test.cruise, test.season, season) |>
-  summarize(across(c(bp, bm, mn), 
-                   .fns = list(mean = ~mean(log(.x), na.rm = T)),
-                   .names = 'log.{.col}.{.fn}'),
-            .groups = 'drop') |>
-  nest(seasonal.means = c(season, starts_with('log')))
-
-# process data for leave-one-out partitions
+# function to de-trend data for leave-one-out partitions
 detrend_fn <- function(.data, .means){
 left_join(.data, .means, join_by(season)) |>
   mutate(cruise = cruise,
@@ -85,7 +68,25 @@ left_join(.data, .means, join_by(season)) |>
          .keep = "none")
 }
 
-loo_sightings <- ss_imputed |>
+# seasonal means for "outer" leave-one-out procedure
+loo_ss_means_outer <- ss_imputed |>
+  select(cruise, season, ends_with('imp')) |>
+  rename_with(~str_remove(.x, '.imp')) |>
+  crossv_loo() |>
+  mutate(train = map(train, as.data.frame),
+         test = map(test, as.data.frame),
+         test.cruise = map(test, ~pull(.x, cruise)),
+         test.season = map(test, ~pull(.x, season))) |>
+  unnest(c(train, test.cruise, test.season)) |>
+  group_by(test.cruise, test.season, season) |>
+  summarize(across(c(bp, bm, mn), 
+                   .fns = list(mean = ~mean(log(.x), na.rm = T)),
+                   .names = 'log.{.col}.{.fn}'),
+            .groups = 'drop') |>
+  nest(seasonal.means = c(season, starts_with('log')))
+
+# data partitions for "outer" leave one out validation
+loo_sightings_outer <- ss_imputed |>
   select(cruise, season, ends_with('imp')) |>
   rename_with(~str_remove(.x, '.imp')) |>
   crossv_loo() |>
@@ -94,11 +95,69 @@ loo_sightings <- ss_imputed |>
          test.cruise = map(test, ~pull(.x, cruise)),
          test.season = map(test, ~pull(.x, season))) |>
   unnest(c(test.cruise, test.season)) |>
-  left_join(loo_ss_means, join_by(.id, test.cruise, test.season)) |>
+  left_join(loo_ss_means_outer, join_by(test.cruise, test.season)) |>
   mutate(train = map2(train, seasonal.means, detrend_fn),
          test = map2(test, seasonal.means, detrend_fn)) |>
-  select(.id, test.cruise, test.season, seasonal.means, train, test)
+  select(test.cruise, test.season, seasonal.means, train, test)
 
-# export
-save(list = c('sightings_raw', 'sightings', 'ss_means', 'loo_sightings'), 
-     file = paste(out_dir, 'mm-sightings-', today(), '.RData', sep = ''))
+# seasonal means for "inner" leave-one-out partitions
+loo_ss_means_inner <- ss_imputed |>
+  select(cruise, season, ends_with('imp')) |>
+  rename_with(~str_remove(.x, '.imp')) |>
+  crossv_loo(id = 'id.outer') |>
+  rename(test.outer = test) |>
+  mutate(cv.inner = map(train, ~crossv_loo(as.data.frame(.x), id = 'id.inner'))) |>
+  select(-train) |>
+  unnest(cv.inner) |>
+  mutate(train = map(train, as.data.frame),
+         test = map(test, as.data.frame),
+         test.outer = map(test.outer, as.data.frame),
+         test.inner.cruise = map(test, ~pull(.x, cruise)),
+         test.inner.season = map(test, ~pull(.x, season)),
+         test.outer.cruise = map(test.outer, ~pull(.x, cruise))) |>
+  unnest(c(train, test.outer.cruise, 
+           test.inner.cruise, test.inner.season)) |>
+  group_by(test.inner.cruise, test.inner.season,
+           test.outer.cruise, season) |>
+  summarize(across(c(bp, bm, mn), 
+                   .fns = list(mean = ~mean(log(.x), na.rm = T)),
+                   .names = 'log.{.col}.{.fn}'),
+            .groups = 'drop') |>
+  nest(seasonal.means = c(season, starts_with('log'))) |>
+  select(test.outer.cruise, test.inner.cruise, test.inner.season, seasonal.means)
+
+# data partitions for "inner" leave one out validation
+loo_sightings_inner <- ss_imputed |>
+  select(cruise, season, ends_with('imp')) |>
+  rename_with(~str_remove(.x, '.imp')) |>
+  crossv_loo(id = 'id.outer') |>
+  rename(test.outer = test) |>
+  mutate(cv.inner = map(train, ~crossv_loo(as.data.frame(.x), id = 'id.inner'))) |>
+  select(-train) |>
+  unnest(cv.inner) |>
+  mutate(train = map(train, as.data.frame),
+         test = map(test, as.data.frame),
+         test.outer = map(test.outer, as.data.frame),
+         test.inner.cruise = map(test, ~pull(.x, cruise)),
+         test.inner.season = map(test, ~pull(.x, season)),
+         test.outer.cruise = map(test.outer, ~pull(.x, cruise))) |>
+  unnest(c(test.outer.cruise, test.inner.cruise, test.inner.season)) |>
+  left_join(loo_ss_means_inner, 
+            join_by(test.outer.cruise, test.inner.cruise, test.inner.season)) |>
+  mutate(train.inner = map2(train, seasonal.means, detrend_fn),
+         test.inner = map2(test, seasonal.means, detrend_fn)) |>
+  select(test.outer.cruise, test.inner.cruise, test.inner.season, 
+         seasonal.means, train.inner, test.inner)
+
+
+# export processed data
+save(list = c('sightings_raw', 'sightings', 'ss_means'), 
+     file = paste(out_dir, 'mm-sightings.RData', sep = ''))
+
+# export validation partitions
+val_dir <- paste(out_dir, '_cv-partitions/', sep = '')
+fs::dir_create(val_dir)
+save(list = c('loo_sightings_outer'), 
+     file = paste(val_dir, 'mm-sightings-cv-outer.RData', sep = ''))
+save(list = c('loo_sightings_inner'), 
+     file = paste(val_dir, 'mm-sightings-cv-inner.RData', sep = ''))

@@ -152,15 +152,15 @@ edna_imputed <- edna_filtered |>
 
 # save imputed data
 ## REMOVE DIRECTORY FROM VERSION CONTROL BEFORE FINALIZING
-fs::dir_create(paste(out_dir, 'intermediates/', sep = ''))
+fs::dir_create(paste(out_dir, '_processing-intermediates/', sep = ''))
 save(edna_imputed, 
-     file = paste(out_dir, 'intermediates/ncog18sv9-imputed-', 
+     file = paste(out_dir, '_processing-intermediates/ncog18sv9-imputed-', 
                   today(), '.RData', sep = ''))
 
 ## AGGREGATION -----------------------------------------------------------------
 
 # read in imputed data
-load(paste(out_dir, 'intermediates/ncog18sv9-imputed-2024-08-02.RData', sep = ''))
+load(paste(out_dir, '_processing-intermediates/ncog18sv9-imputed-2024-08-02.RData', sep = ''))
 
 # weight function for depth aggregation
 weight_fn <- function(depth.range, w){
@@ -168,10 +168,10 @@ weight_fn <- function(depth.range, w){
 }
 
 # candidate weights
-w.vec <- seq(0.05,0.99, by = 0.01)
+w_vec <- seq(0.05,0.99, by = 0.01)
 
 # grid search to identify depth averaging weights optimizing alpha diversity
-gs.rslt <- sapply(w.vec, function(w){
+gs_rslt <- sapply(w_vec, function(w){
   
   # weighted aggregation to cruise level (first depth, then station, then line)
   # then compute average alpha diversity across cruises
@@ -201,7 +201,7 @@ gs.rslt <- sapply(w.vec, function(w){
 
 # optimal weight
 # (max average alpha diversity at surface weight 0.39, max Chlorophyll weight 0.61
-w.opt <- w.vec[which.max(gs.rslt)]
+w_opt <- w_vec[which.max(gs_rslt)]
 
 # average first over depth, then over station, then over transect ( x_{ij} )
 # interpretation: average proportion of asv.XX across cruise is ZZ
@@ -211,7 +211,7 @@ edna_aggregated <- edna_imputed |>
            sep = '_') |>
   group_by(cruise) |>
   fmutate(across(.cols = is.numeric, log)) |>
-  mutate(weight = weight_fn(depth.fac, w.opt)) |>
+  mutate(weight = weight_fn(depth.fac, w_opt)) |>
   fgroup_by(cruise, line, sta) |>
   fselect(-depth.fac, -depth) |>
   fmean(weight, keep.w = F) |>
@@ -244,47 +244,66 @@ edna <- edna_clr |>
 # re-process seasonal adjustments for leave one out runs
 # .train <- edna_clr |> slice(-1)
 # .test <- edna_clr |> slice(1)
+# .train <- crossv_loo(edna_clr)$train[[1]]
+# .test <- crossv_loo(edna_clr)$test[[1]]
+
 adj_fn <- function(.train, .test = NULL){
   if(is.null(.test)){
   out <- .train |>
     as.data.frame() |>
-    mutate(qtr = ym(cruise) |> quarter()) |>
-    mutate(qtr = if_else(cruise == '201806', 3, qtr)) |>
-    group_by(qtr) |>
-    mutate(across(starts_with('asv'), ~.x - mean(.x))) |>
+    fmutate(qtr = ym(cruise) |> quarter()) |>
+    fmutate(qtr = if_else(cruise == '201806', 3, qtr)) |>
+    fgroup_by(qtr) |>
+    fmutate(across(-c(cruise, qtr), function(.x){.x - mean(.x)})) |>
     ungroup() |>
-    select(cruise, starts_with('asv'))
+    fselect(-qtr)
   }else{
     avgs <- .train |>
       as.data.frame() |>
-      mutate(qtr = ym(cruise) |> quarter()) |>
-      mutate(qtr = if_else(cruise == '201806', 3, qtr)) |>
-      group_by(qtr) |>
-      summarize(across(starts_with('asv'), mean)) |>
+      fmutate(qtr = ym(cruise) |> quarter()) |>
+      fmutate(qtr = if_else(cruise == '201806', 3, qtr)) |>
+      fgroup_by(qtr) |>
+      fsummarize(across(-cruise, fmean)) |>
       pivot_longer(-qtr, names_to = 'asv', values_to = 'seasonal.mean')
     
     out <- .test |>
       as.data.frame() |>
-      mutate(qtr = ym(cruise) |> quarter()) |>
-      mutate(qtr = if_else(cruise == '201806', 3, qtr)) |>
+      fmutate(qtr = ym(cruise) |> quarter()) |>
+      fmutate(qtr = if_else(cruise == '201806', 3, qtr)) |>
       pivot_longer(-c(qtr, cruise), names_to = 'asv', values_to = 'value') |>
       left_join(avgs, by = c('qtr', 'asv')) |>
-      mutate(adj.value = value - seasonal.mean) |>
+      fmutate(adj.value = value - seasonal.mean) |>
       pivot_wider(id_cols = cruise, values_from = adj.value, names_from = asv)
   }
   
   return(out)
 }
 
-# generate data partitions for leave one out cross validation
-loo_edna <- crossv_loo(edna_clr) |>
+# generate data partitions for "outer" leave one out cross validation
+loo_edna_outer <- crossv_loo(edna_clr) |>
   rename(train.raw = train, 
          test.raw = test) |>
   mutate(train = map(train.raw, adj_fn),
          test = map2(train.raw, test.raw, adj_fn),
          test.cruise = map(test, ~pull(.x, cruise))) |>
-  select(.id, test.cruise, train, test) |>
+  select(test.cruise, train, test) |>
   unnest(c(test.cruise))
+
+# generate data partitions for "inner" leave one out cross validation
+loo_edna_inner <- crossv_loo(edna_clr, id = 'id.outer') |>
+  rename(test.outer.raw = test) |>
+  mutate(cv.inner = map(train, ~crossv_loo(as.data.frame(.x), id = 'id.inner'))) |>
+  select(-train) |>
+  unnest(cv.inner) |>
+  rename(test.inner.raw = test,
+         train.raw = train) |>
+  mutate(train.inner = map(train.raw, adj_fn),
+         test.inner = map2(train.raw, test.inner.raw, adj_fn),
+         test.inner.cruise = map(test.inner, ~pull(.x, cruise)),
+         test.outer.cruise = map(test.outer.raw, ~as.data.frame(.x) |> pull(cruise))) |>
+  select(test.outer.cruise, test.inner.cruise, test.inner, train.inner) |>
+  unnest(ends_with('cruise'))
+
 
 ## EXPORT ----------------------------------------------------------------------
 
@@ -297,9 +316,16 @@ attr(sample_metadata, 'problems') <- NULL
 # filter asv taxonomy to asvs of interest
 asv_taxa <- taxa %>% filter(short.id %in% colnames(edna))
 
-# write file outputs
+# export processed data
 save(list = c('sample_metadata', 
               'asv_taxa',
-              'edna',
-              'loo_edna'), 
+              'edna'), 
      file = paste(out_dir, 'ncog18sv9.RData', sep = ''))
+
+# export validation partitions
+val_dir <- paste(out_dir, '_cv-partitions/', sep = '')
+fs::dir_create(val_dir)
+save(list = c('loo_edna_outer'),
+     file = paste(out_dir, '_cv-partitions/ncog18sv9-cv-outer.RData', sep = ''))
+save(list = c('loo_edna_inner'),
+     file = paste(out_dir, '_cv-partitions/ncog18sv9-cv-inner.RData', sep = ''))
