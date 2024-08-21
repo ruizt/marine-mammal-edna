@@ -6,7 +6,7 @@ library(readxl)
 # candidate taxa overlap with documented relationships --------------------------
 
 # load in documented relationships table
-doc.rel <- read.csv("/Users/nicholaspatrick/Desktop/eDNA Project/data/whale-edna-relationships.csv")
+doc.rel <- read.csv(here::here("data/whale-edna-relationships.csv"))
 
 # load asv tables 
 table_names <- getSheetNames("rslt/tbl/asv-tables.xlsx")
@@ -238,7 +238,7 @@ ss_asvs_all |>
   distinct()
 
 
-# things get more interestig at class level
+# things get more interesting at class level
 
 ss_asvs_all |> 
   inner_join(doc.rel, join_by(model.species == Whale.species,
@@ -257,4 +257,140 @@ get_model_asvs("16s", "humpback whales", "ss", "c")
 get_model_asvs("18sv9", "humpback whales", "ss", "c")
 
 
+# ------------------------------------------------------------------------------
+# Proportions Exploration
+# ------------------------------------------------------------------------------
 
+# Define possible markers and whales
+markers <- c("16s", "18sv4", "18sv9")
+whales <- c("blue whales", "fin whales", "humpback whales")
+
+# OBJECTIVE 3 ------------------------------------------------------------------
+# 3) proportion of lit review ASVs that could have been selected that in fact were selected 
+#    (i.e., the number in (2) as a proportion of the number in (1)), for each model
+# OBJECTIVE 3 ------------------------------------------------------------------
+
+# Singular example for 16s humpbacks
+# note: 1 model/lit review match over 47 ncog/lit review matches = 0.0212766
+nrow(get_model_asvs("16s", "humpback whales"))/nrow(get_ncog_asvs("16s"))
+
+
+# Now, summarize proportion for all marker/whale combinations
+
+# Function to calculate proportion of possible lit review ASVs selection for each model
+prop_asv_sel <- function(marker, whale, model = "ss", taxonomic.level = "order") {
+  model_asvs <- get_model_asvs(marker, 
+                               whale, 
+                               model, 
+                               substring(taxonomic.level[1], 1, 1))
+  ncog_asvs <- get_ncog_asvs(marker, 
+                             taxonomic.level)
+  ratio <- nrow(model_asvs) / nrow(ncog_asvs)
+  return(ratio)
+}
+
+# Data frame with proportion for each marker/whale combo
+prop_selected_df <- data.frame(
+  Marker = rep(markers, each = length(whales)),
+  Whale = rep(whales, length(markers)),
+  # Use mapply to apply the function over all marker/whale combinations
+  Proportion = mapply(prop_asv_sel, rep(markers, each = length(whales)), rep(whales, length(markers)))
+)
+
+# Show df (note: only 16s humpback and 189v9 humpback have a non-zero prop)
+prop_selected_df
+
+# OBJECTIVE 4 ------------------------------------------------------------------
+# 4) proportion of ASVs selected in each model that were identified in the lit review
+# OBJECTIVE 4 ------------------------------------------------------------------
+
+# Singular example for 18sv9 humpbacks
+# num ASVs selected in each model (marker/whale combo) included in lit review table
+num_asvs_match <- get_model_asvs("18sv9", "humpback whales", "ss", "o") |> 
+  nrow()
+
+# num ASVs selected for the model (marker/whale combo)
+num_asvs_ss <- ss_asvs_all |> 
+  filter(gene.seq == "18sv9",
+         model.species == "humpback whales") |> 
+  nrow()
+
+# proportion of ASVs selected in 18sv9 humpback model IDed in lit review
+num_asvs_match/num_asvs_ss
+
+
+# Now, summarize proportion for all marker/whale combinations
+# Function to calculate proportion of selected ASVs that were IDed in lit revew
+prop_sel_lit <- function(marker, whale, model = "ss", taxonomic.level = "order",
+                         known = "n") {
+  if (known == "n"){
+    selected_asvs_df = ss_asvs_all
+  }  
+  else {
+    selected_asvs_df = ss_asvs_all_known
+  }
+  num_asvs_match <- get_model_asvs(marker, 
+                                   whale, 
+                                   model, 
+                                   substring(taxonomic.level[1], 1, 1)) |> 
+    nrow()
+  
+  num_asvs_ss <- selected_asvs_df |> 
+    filter(gene.seq == marker,
+           model.species == whale) |> 
+    nrow()
+  
+  ratio <- num_asvs_match/num_asvs_ss
+  return(ratio)
+}
+
+# Data frame with proportion for each marker/whale combo
+prop_asvs_ided_df <- data.frame(
+  Marker = rep(markers, each = length(whales)),
+  Whale = rep(whales, length(markers)),
+  # Use mapply to apply the function over all marker/whale combinations
+  Proportion_IDed = mapply(prop_sel_lit, rep(markers, each = length(whales)), rep(whales, length(markers)))
+)
+
+# Show df (note: only 16s humpback and 189v9 humpback have a non-zero prop)
+prop_asvs_ided_df
+
+# OBJECTIVE 5 ------------------------------------------------------------------
+# 5) proportion of ASVs selected in each model that were not identified in the lit review
+# OBJECTIVE 5 ------------------------------------------------------------------
+
+prop_asvs_ided_df["Proportion_not_IDed"] = 1 - prop_asvs_ided_df["Proportion_IDed"]
+
+prop_asvs_ided_df
+
+# OBJECTIVE 6 ------------------------------------------------------------------
+# 6) 4-5, but after removing unidentified ASVs
+#    (i.e., missing taxonomic classification below domain level)
+# OBJECTIVE 6 ------------------------------------------------------------------
+
+# remove unidentified ASVs from selected model ASVs
+ss_asvs_all_known <- ss_asvs_all |> 
+  filter(!is.na(p), p != "uncultured") 
+
+# Data frame with proportion for each marker/whale combo
+prop_asvs_ided_df <- data.frame(
+  Marker = rep(markers, each = length(whales)),
+  Whale = rep(whales, length(markers)),
+  # Use mapply to apply the function over all marker/whale combinations
+  Proportion_IDed = mapply(prop_sel_lit, 
+                           rep(markers, each = length(whales)), 
+                           rep(whales, length(markers)),
+                           MoreArgs = list(model = "ss", 
+                                           taxonomic.level = "order", 
+                                           known = "y"))
+)
+
+# Show df (note: only 16s humpback and 189v9 humpback have a non-zero prop)
+prop_asvs_ided_df
+
+prop_asvs_ided_df["Proportion_not_IDed"] = 1 - prop_asvs_ided_df["Proportion_IDed"]
+
+prop_asvs_ided_df
+  
+# note:  prop_sel_lit currently works right if num_asvs_match <- get_model_asvs()
+# contains known ASVs, so need to filter out if the ASVs are unknown
