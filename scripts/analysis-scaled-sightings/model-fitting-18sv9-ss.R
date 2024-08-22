@@ -6,7 +6,7 @@ library(magrittr)
 library(fs)
 library(collapse)
 data_dir <- 'data/processed/'
-loo_dir <- 'rslt/loocv/18sv9-ss/'
+loo_dir <- 'rslt/loocv/18sv9-ss/outer/'
 out_dir <- 'rslt/models/scaled-sightings/'
 dir_create(out_dir)
 
@@ -14,7 +14,7 @@ dir_create(out_dir)
 
 # read in and combine 18sv9 data and scaled sightings
 paste(data_dir, 'ncog18sv9.RData', sep = '') |> load()
-paste(data_dir, 'mm-sightings-2024-07-27.RData', sep = '') |> load() 
+paste(data_dir, 'mm-sightings.RData', sep = '') |> load() 
 whales <- inner_join(sightings, edna, by = 'cruise') 
 
 # dimensions
