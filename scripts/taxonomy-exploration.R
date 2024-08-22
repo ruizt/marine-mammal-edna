@@ -112,6 +112,27 @@ get_ncog_asvs <- function(marker, taxonomic.level){
              p,c,o,f,g) |> 
       distinct()
   }
+  else if (tolower(taxonomic.level) == "class" | tolower(taxonomic.level) == "c"){
+    asv_taxa_all |> 
+      filter(gene.seq == tolower(marker)) |> 
+      inner_join(doc.rel, join_by(p == Phylum,
+                                  c == Class)) |> 
+      select(gene.seq,short.id,
+             Whale.species,
+             Connection,
+             p,c,o,f,g) |> 
+      distinct()
+  }
+  else if (tolower(taxonomic.level) == "phylum" | tolower(taxonomic.level) == "p"){
+    asv_taxa_all |> 
+      filter(gene.seq == tolower(marker)) |> 
+      inner_join(doc.rel, join_by(p == Phylum)) |> 
+      select(gene.seq,short.id,
+             Whale.species,
+             Connection,
+             p,c,o,f,g) |> 
+      distinct()
+  }
   else{print("invalid taxonomic level")}
 }
 
@@ -162,19 +183,21 @@ get_model_asvs <- function(marker, whale, fit, taxonomic.level){
     print("invalid species")
   }
   
-  if (tolower(taxonomic.level) == "order" | tolower(taxonomic.level) == "o"){
-  ss_asvs_all |> 
-    filter(gene.seq == tolower(marker),
-           model.species == tolower(whale)) |> 
-    inner_join(doc.rel, join_by(model.species == Whale.species,
-                                p == Phylum,
-                                c == Class,
-                                o == Order)) |> 
-    select(gene.seq,asv.id,
-           model.species,
-           Connection,
-           p,c,o,f,g) |> 
-    distinct()
+  if (tolower(taxonomic.level) == "genus" | tolower(taxonomic.level) == "g"){
+    ss_asvs_all |> 
+      filter(gene.seq == tolower(marker),
+             model.species == tolower(whale)) |> 
+      inner_join(doc.rel, join_by(model.species == Whale.species,
+                                  p == Phylum,
+                                  c == Class,
+                                  o == Order, 
+                                  f == Family,
+                                  g == Genus)) |> 
+      select(gene.seq,asv.id,
+             model.species,
+             Connection,
+             p,c,o,f,g) |> 
+      distinct()
   }
   else if (tolower(taxonomic.level) == "family" | tolower(taxonomic.level) == "f"){
     ss_asvs_all |> 
@@ -191,6 +214,20 @@ get_model_asvs <- function(marker, whale, fit, taxonomic.level){
              p,c,o,f,g) |> 
       distinct()
   }
+  else if (tolower(taxonomic.level) == "order" | tolower(taxonomic.level) == "o"){
+  ss_asvs_all |> 
+    filter(gene.seq == tolower(marker),
+           model.species == tolower(whale)) |> 
+    inner_join(doc.rel, join_by(model.species == Whale.species,
+                                p == Phylum,
+                                c == Class,
+                                o == Order)) |> 
+    select(gene.seq,asv.id,
+           model.species,
+           Connection,
+           p,c,o,f,g) |> 
+    distinct()
+  }
   else if (tolower(taxonomic.level) == "class" | tolower(taxonomic.level) == "c"){
     ss_asvs_all |> 
       filter(gene.seq == tolower(marker),
@@ -204,6 +241,19 @@ get_model_asvs <- function(marker, whale, fit, taxonomic.level){
              p,c,o,f,g) |> 
       distinct()
   }
+  else if (tolower(taxonomic.level) == "phylum" | tolower(taxonomic.level) == "p"){
+    ss_asvs_all |> 
+      filter(gene.seq == tolower(marker),
+             model.species == tolower(whale)) |> 
+      inner_join(doc.rel, join_by(model.species == Whale.species,
+                                  p == Phylum)) |> 
+      select(gene.seq,asv.id,
+             model.species,
+             Connection,
+             p,c,o,f,g) |> 
+      distinct()
+  }
+  
   
 }
 
