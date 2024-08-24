@@ -9,7 +9,7 @@ library(modelr)
 library(spls)
 library(parallel)
 library(rslurm)
-out_dir <- 'rslt/loocv/18sv9-ss/_validation'
+out_dir <- "/Users/truiz01/Documents/projects/2020-2025/marine-mammal-edna/rslt/loocv/18sv9-ss/_validation"
 setwd(out_dir)
 
 ## HYPERPARAMETER SPECIFICATION ------------------------------------------------
@@ -21,6 +21,7 @@ ncomp_grid <- 3:12
 
 # read in combined validation partitions
 loo_partitions <- read_rds('partitions.rds')
+# partition_ix <- 1:100
 
 # index partitions consecutively
 partition_ix <- 1:nrow(loo_partitions)
@@ -28,16 +29,8 @@ partition_ix <- 1:nrow(loo_partitions)
 # form iteration grid (combinations of species and hyperparameter settings)
 iter_grid <- expand_grid(eta = eta_grid, 
               ncomp = ncomp_grid, 
-              species = c('bm', 'bp', 'mn')) |>
+              species = c('bm', 'bp', 'mn')) %>%
   rename_with(~paste('.', .x, sep = ''))
-
-# # for testing
-# .setting <- slice(iter_grid, 1)
-# .eta <- .setting$.eta
-# .ncomp <- .setting$.ncomp
-# .species <- .setting$.species
-partition_ix <- 1:20
-# j <- 1
 
 # function to iterate over grid
 loocv_fn <- function(.eta, .ncomp, .species){
@@ -63,7 +56,7 @@ loocv_fn <- function(.eta, .ncomp, .species){
     p <- ncol(fit$projection)
     df <- nrow(fit$projection)
     rsq <- as.numeric(1 - (n - p)*var(train.resid)/((n - 1)*var(y.train)))
-    sel.asv <- fit$projection |> rownames()
+    sel.asv <- fit$projection %>% rownames()
     
     # squared prediction error
     x.test <- dplyr::select(.partition$test.inner[[1]], starts_with('asv'))
@@ -91,15 +84,19 @@ loocv_fn <- function(.eta, .ncomp, .species){
   return(rslt)
 }
 
+# start <- Sys.time()
 # loocv_fn(.eta, .ncomp, .species)
+# end <- Sys.time()
+# end - start
 
 # for testing
-iter_grid_sub <- iter_grid |> slice(1:100)
-sjob <- slurm_apply(f = loocv_fn, params = iter_grid,
-                    jobname = 'validation-18sv9-ss',
+partition_ix <- 1:20
+iter_grid_sub <- iter_grid %>% slice(1:100)
+sjob <- slurm_apply(f = loocv_fn, params = iter_grid_sub,
+                    jobname = 'vtest',
                     global_objects = c('loo_partitions', 'partition_ix'),
-                    nodes = 10, 
-                    cpus_per_node = 8,
+                    nodes = 2, 
+                    cpus_per_node = 1,
                     submit = F)
 
-rslt <- get_slurm_out(sjob, outtype = 'raw', wait = F)
+# rslt <- get_slurm_out(sjob, outtype = 'raw', wait = F)
