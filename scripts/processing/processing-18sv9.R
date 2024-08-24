@@ -279,8 +279,8 @@ adj_fn <- function(.train, .test = NULL){
   return(out)
 }
 
-# generate data partitions for "outer" leave one out cross validation
-loo_edna_outer <- crossv_loo(edna_clr) |>
+# generate data partitions for leave one out cross validation
+loo_edna <- crossv_loo(edna_clr) |>
   rename(train.raw = train, 
          test.raw = test) |>
   mutate(train = map(train.raw, adj_fn),
@@ -289,8 +289,8 @@ loo_edna_outer <- crossv_loo(edna_clr) |>
   select(test.cruise, train, test) |>
   unnest(c(test.cruise))
 
-# generate data partitions for "inner" leave one out cross validation
-loo_edna_inner <- crossv_loo(edna_clr, id = 'id.outer') |>
+# generate data partitions for nested leave one out cross validation
+loo_edna_nested <- crossv_loo(edna_clr, id = 'id.outer') |>
   rename(test.outer.raw = test) |>
   mutate(cv.inner = map(train, ~crossv_loo(as.data.frame(.x), id = 'id.inner'))) |>
   select(-train) |>
@@ -323,9 +323,7 @@ save(list = c('sample_metadata',
      file = paste(out_dir, 'ncog18sv9.RData', sep = ''))
 
 # export validation partitions
-val_dir <- paste(out_dir, '_cv-partitions/', sep = '')
+val_dir <- paste(out_dir, '_cv/', sep = '')
 fs::dir_create(val_dir)
-save(list = c('loo_edna_outer'),
-     file = paste(out_dir, '_cv-partitions/ncog18sv9-cv-outer.RData', sep = ''))
-save(list = c('loo_edna_inner'),
-     file = paste(out_dir, '_cv-partitions/ncog18sv9-cv-inner.RData', sep = ''))
+save(list = c('loo_edna', 'loo_edna_nested'),
+     file = paste(out_dir, '_cv-partitions/ncog18sv9-partitions.RData', sep = ''))

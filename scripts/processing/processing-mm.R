@@ -69,7 +69,7 @@ left_join(.data, .means, join_by(season)) |>
 }
 
 # seasonal means for "outer" leave-one-out procedure
-loo_ss_means_outer <- ss_imputed |>
+loo_ss_means <- ss_imputed |>
   select(cruise, season, ends_with('imp')) |>
   rename_with(~str_remove(.x, '.imp')) |>
   crossv_loo() |>
@@ -86,7 +86,7 @@ loo_ss_means_outer <- ss_imputed |>
   nest(seasonal.means = c(season, starts_with('log')))
 
 # data partitions for "outer" leave one out validation
-loo_sightings_outer <- ss_imputed |>
+loo_sightings <- ss_imputed |>
   select(cruise, season, ends_with('imp')) |>
   rename_with(~str_remove(.x, '.imp')) |>
   crossv_loo() |>
@@ -101,7 +101,7 @@ loo_sightings_outer <- ss_imputed |>
   select(test.cruise, test.season, seasonal.means, train, test)
 
 # seasonal means for "inner" leave-one-out partitions
-loo_ss_means_inner <- ss_imputed |>
+loo_ss_means_nested <- ss_imputed |>
   select(cruise, season, ends_with('imp')) |>
   rename_with(~str_remove(.x, '.imp')) |>
   crossv_loo(id = 'id.outer') |>
@@ -127,7 +127,7 @@ loo_ss_means_inner <- ss_imputed |>
   select(test.outer.cruise, test.inner.cruise, test.inner.season, seasonal.means)
 
 # data partitions for "inner" leave one out validation
-loo_sightings_inner <- ss_imputed |>
+loo_sightings_nested <- ss_imputed |>
   select(cruise, season, ends_with('imp')) |>
   rename_with(~str_remove(.x, '.imp')) |>
   crossv_loo(id = 'id.outer') |>
@@ -142,7 +142,7 @@ loo_sightings_inner <- ss_imputed |>
          test.inner.season = map(test, ~pull(.x, season)),
          test.outer.cruise = map(test.outer, ~pull(.x, cruise))) |>
   unnest(c(test.outer.cruise, test.inner.cruise, test.inner.season)) |>
-  left_join(loo_ss_means_inner, 
+  left_join(loo_ss_means_nested, 
             join_by(test.outer.cruise, test.inner.cruise, test.inner.season)) |>
   mutate(train.inner = map2(train, seasonal.means, detrend_fn),
          test.inner = map2(test, seasonal.means, detrend_fn)) |>
@@ -155,9 +155,7 @@ save(list = c('sightings_raw', 'sightings', 'ss_means'),
      file = paste(out_dir, 'mm-sightings.RData', sep = ''))
 
 # export validation partitions
-val_dir <- paste(out_dir, '_cv-partitions/', sep = '')
+val_dir <- paste(out_dir, '_cv/', sep = '')
 fs::dir_create(val_dir)
-save(list = c('loo_sightings_outer'), 
-     file = paste(val_dir, 'mm-sightings-cv-outer.RData', sep = ''))
-save(list = c('loo_sightings_inner'), 
-     file = paste(val_dir, 'mm-sightings-cv-inner.RData', sep = ''))
+save(list = c('loo_sightings', 'loo_sightings_nested'), 
+     file = paste(val_dir, 'mm-sightings-partitions.RData', sep = ''))
