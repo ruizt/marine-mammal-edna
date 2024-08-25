@@ -97,8 +97,8 @@ slurm_apply(f = loocv_fn,
             global_objects = c('loo_partitions', 'partition_ix'),
             jobname = 'validation_test',
             submit = F, 
-            sh_template = 'scripts/cluster/submit_sh.txt',
-            r_template = 'scripts/cluster/slurm_run_R.txt')
+            sh_template = '_cluster-config/submit_sh.txt',
+            r_template = '_cluster-config/slurm_run_R.txt')
 
 
 # # chunk_ix <- seq(1, nrow(iter_grid), length = 16) |> round()
