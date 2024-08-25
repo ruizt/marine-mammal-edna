@@ -1,17 +1,13 @@
+library(rslurm)
 library(tibble)
 library(dplyr)
 library(tidyr)
-library(stringr)
-library(purrr)
 library(fs)
 library(readr)
-library(modelr)
 library(spls)
-library(doParallel)
-library(foreach)
-# library(rslurm)
 part_dir <- "rslt/loocv/18sv9-ss/_validation"
-out_dir <- "rslt/loocv/18sv9-ss/_validation/results"
+# out_dir <- "rslt/loocv/18sv9-ss/_validation/results"
+# fs::dir_create(out_dir)
 
 ## HYPERPARAMETER SPECIFICATION ------------------------------------------------
 
@@ -22,15 +18,15 @@ ncomp_grid <- 3:12
 
 # read in combined validation partitions
 loo_partitions <- paste(part_dir, '/partitions.rds', sep = '') |> read_rds()
-# partition_ix <- 1:100
 
 # index partitions consecutively
-partition_ix <- 1:nrow(loo_partitions)
+# partition_ix <- 1:nrow(loo_partitions)
+partition_ix <- 1:600
 
 # form iteration grid (combinations of species and hyperparameter settings)
-iter_grid <- expand_grid(eta = eta_grid, 
-                         ncomp = ncomp_grid, 
-                         species = c('bm', 'bp', 'mn'))
+iter_grid <- expand_grid(.eta = eta_grid, 
+                         .ncomp = ncomp_grid, 
+                         .species = c('bm', 'bp', 'mn'))
 
 # function to iterate over grid
 loocv_fn <- function(.eta, .ncomp, .species){
@@ -56,7 +52,7 @@ loocv_fn <- function(.eta, .ncomp, .species){
     p <- ncol(fit$projection)
     df <- nrow(fit$projection)
     rsq <- as.numeric(1 - (n - p)*var(train.resid)/((n - 1)*var(y.train)))
-    sel.asv <- fit$projection %>% rownames()
+    sel.asv <- fit$projection |> rownames()
     
     # squared prediction error
     x.test <- dplyr::select(.partition$test.inner[[1]], starts_with('asv'))
@@ -80,24 +76,43 @@ loocv_fn <- function(.eta, .ncomp, .species){
     return(out)
   }) 
   
-  out <- rslt %>%
-    Reduce(bind_rows, .)
+  out <- Reduce(bind_rows, rslt)
   
   return(out)
 }
 
-# chunk_ix <- seq(1, nrow(iter_grid), length = 16) |> round()
-# partition_ix <- 1:5
-chunk_ix <- seq(1, 200, length = detectCores() + 1) |> round()
-registerDoParallel(cores=detectCores() + 1)
-foreach(k = 1:(length(chunk_ix) - 1)) %dopar% {
-  rslt <- lapply(chunk_ix[k]:(chunk_ix[k + 1] - 1),
-                  function(i){
-                    loocv_fn(iter_grid$eta[i],
-                             iter_grid$ncomp[i],
-                             iter_grid$species[i])
-                  })
-  out <- Reduce(bind_rows, rslt)
-  # out <- rnorm(100)
-  write_rds(out, paste(out_dir, '/rslt_', k, '.rds', sep = ''))
-}
+# # timing
+# start <- Sys.time()
+# loocv_fn(iter_grid$.eta[1],
+#          iter_grid$.ncomp[1],
+#          iter_grid$.species[1])
+# end <- Sys.time()
+# end - start
+
+# generate scripts to execute on hpc
+slurm_apply(f = loocv_fn, 
+            params = iter_grid[1:10, ], 
+            nodes = 2,
+            cpus_per_node = 2,
+            global_objects = c('loo_partitions', 'partition_ix'),
+            jobname = 'validation_test',
+            submit = F, 
+            sh_template = 'scripts/cluster/submit_sh.txt',
+            r_template = 'scripts/cluster/slurm_run_R.txt')
+
+
+# # chunk_ix <- seq(1, nrow(iter_grid), length = 16) |> round()
+# # partition_ix <- 1:5
+# chunk_ix <- seq(1, 200, length = detectCores() + 1) |> round()
+# registerDoParallel(cores=detectCores() + 1)
+# foreach(k = 1:(length(chunk_ix) - 1)) %dopar% {
+#   rslt <- lapply(chunk_ix[k]:(chunk_ix[k + 1] - 1),
+#                   function(i){
+#                     loocv_fn(iter_grid$eta[i],
+#                              iter_grid$ncomp[i],
+#                              iter_grid$species[i])
+#                   })
+#   out <- Reduce(bind_rows, rslt)
+#   # out <- rnorm(100)
+#   write_rds(out, paste(out_dir, '/rslt_', k, '.rds', sep = ''))
+# }
