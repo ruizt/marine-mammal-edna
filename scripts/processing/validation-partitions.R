@@ -42,7 +42,7 @@ loo_partitions_nested <- inner_join(loo_sightings_nested,
 
 # store partitions
 write_rds(loo_partitions_nested,
-          file = paste(out_dir, '_nested-partitions-18sv9-ss.rds', sep = ''))
+          file = paste(out_dir, 'nested-partitions-18sv9-ss.rds', sep = ''))
 
 
 ## 18Sv4-SS PARTITIONS ---------------------------------------------------------
