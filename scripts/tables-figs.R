@@ -176,11 +176,24 @@ pred_pts_18sv9 <- loo_pred_df |>
          species = factor(test.species, 
                           levels = c('bm', 'bp', 'mn'),
                           labels = c('Blue whales', 'Fin whales', 'Humpback whales'))) |>
-  select(cruise, cruise.ym, cruise.yq, species, ss.obs, ss.pred) |>
+  select(cruise, cruise.ym, cruise.yq, species, ss.obs, ss.pred, ss.pred.q1, ss.pred.q3) |>
   arrange(species, cruise.yq) |>
   rename(observed = ss.obs,
          predicted = ss.pred) |>
   mutate(marker = "18S-V9")
+
+# pred_pts_18sv9 |>
+#   ggplot(aes(x = cruise.ym,
+#              y = observed)) +
+#   facet_wrap(~species, nrow = 3) +
+#   geom_path() +
+#   geom_path(aes(y = predicted), linetype = 2, color = 'blue') +
+#   geom_ribbon(aes(ymin = ss.pred.q1,
+#                   ymax = ss.pred.q3, 
+#                   x = cruise.ym),
+#               inherit.aes = F,
+#               alpha = 0.1,
+#               fill = 'blue')
 
 # predictions from 18sv4
 load('rslt/models/scaled-sightings/fitted-models-18sv4-ss.RData')
@@ -223,14 +236,14 @@ pred_pts_16s <- loo_pred_df |>
 
 
 # combine predictions from each marker
-pred_pts <- bind_rows(pred_pts_16s, pred_pts_18sv4, pred_pts_18sv9) |>
+pred_pts <- bind_rows(pred_pts_18sv9) |>
   mutate(key = paste('Predicted (', marker, ')', sep = '')) |>
   select(-observed, -marker) |>
   rename(value = predicted)
 
 # observations
-obs_pts <- pred_pts_16s |>
-  select(-predicted, -marker) |>
+obs_pts <- pred_pts_18sv9 |>
+  select(-predicted, -marker, -ss.pred.q1, -ss.pred.q3) |>
   rename(value = observed) |>
   mutate(key = 'Observed')
 
@@ -244,8 +257,14 @@ p1 <- bind_rows(pred_pts, obs_pts) |>
              y = value,
              color = key, 
              linetype = key)) +
-  facet_wrap(~species, nrow = 3, scale = 'free_y') +
+  facet_wrap(~species, nrow = 3, scale = 'fixed') +
   geom_path(linewidth = 0.4) +
+  geom_ribbon(inherit.aes = F,
+              aes(x = cruise.ym,
+                  ymin = ss.pred.q1,
+                  ymax = ss.pred.q3,
+                  fill = key),
+              alpha = 0.1) +
   scale_x_date(date_breaks = '1 years', labels = ~year(.x)) +
   scale_color_manual(values = pal) +
   # scale_y_sqrt() +
@@ -253,13 +272,15 @@ p1 <- bind_rows(pred_pts, obs_pts) |>
   # geom_blank(data = pivot_longer(fit_pts_df, c(Observed, Fitted)),
   #            aes(linetype = NULL)) +
   guides(linetype = guide_legend(title = NULL, position = 'top', nrow = 2),
-         color = guide_legend(title = NULL, position = 'top', nrow = 2)) +
+         color = guide_legend(title = NULL, position = 'top', nrow = 2),
+         fill = guide_legend(title = NULL, position = 'top', nrow = 2)) +
   labs(x = 'Year', y = 'Sightings per 1000km', title = NULL) +
   theme(panel.grid = element_line(linewidth = 0.1, color = 'black'),
         panel.grid.minor = element_blank(),
         panel.grid.major.x = element_blank(),
         text = element_text(size = 11))
 
+p1
 # predictions vs observations
 p2 <- bind_rows(pred_pts_16s, pred_pts_18sv4, pred_pts_18sv9) |>
   mutate(marker = str_remove_all(marker, '-'),
@@ -292,10 +313,10 @@ round_z <- function(x, n){sprintf("%.3f", round(x,n))}
 
 # add correlation annotations to pred v. obs plots
 p2_ann <- p2 + geom_label(data = pred_cors, 
-                aes(label = paste('r =', round_z(r, 3))),
-                size = 8,
-                size.unit = 'pt',
-                hjust = 1)
+                          aes(label = paste('r =', round_z(r, 3))),
+                          size = 8,
+                          size.unit = 'pt',
+                          hjust = 1)
 
 # panel layouts
 # fig_long <- p1 + p2_ann +
@@ -467,3 +488,106 @@ ggsave(fig_resid, filename = 'rslt/_draft/plots/resids-ss-diagnostics.png',
        width = 9, height = 4, units = 'in', dpi = 400)
 
 
+## TABLE: SELECTION CONSISTENCY ------------------------------------------------
+
+# read in results for 18sv9-ss
+outer_val_ss <- dir_ls('rslt/loocv/18sv9-ss/_outer-validation-ss/') |>
+  lapply(read_rds) %>%
+  Reduce(bind_rows, .) |>
+  unnest(sel.asv) |>
+  group_by(outer.id, species, eta, ncomp, sel.asv) |>
+  count() |>
+  ungroup() |>
+  filter(n > pi.max*(n.obs - 1)) |>
+  select(outer.id, species, sel.asv) |>
+  group_by(outer.id, species) |>
+  distinct(sel.asv) |>
+  nest(ss = sel.asv) |>
+  mutate(ss = map(ss, ~pull(.x, sel.asv))) |>
+  ungroup()
+
+# function to compute "soft intersection" of sets in <set_list>
+intersect_fn <- function(set_list, thresh){
+  out <- tibble(asv = Reduce(c, set_list)) |> 
+    group_by(asv) |> 
+    count() |>
+    filter(n >= thresh*length(set_list)) |>
+    pull(asv)
+  return(out)
+}
+
+# function to compute no. of elements in union of sets in <set_list>
+union_fn <- function(set_list){
+  out <- Reduce(c, set_list) |> unique()
+  return(out)
+}
+
+# asv-specific stability
+ss_asv_stbl <- outer_val_ss |>
+  group_by(species) |>
+  summarize(int = intersect_fn(ss, 0.8) |> list(),
+            un = union_fn(ss) |> list()) |>
+  mutate(int = map(int, length),
+         un = map(un, length),
+         prop.stable = map2(int, un, ~.x/.y)) |>
+  unnest(everything()) |>
+  rename(intersection = int,
+         union = un,
+         asv.stability = prop.stable) |>
+  mutate(method = 'ss', marker = '18SV9') |>
+  select(method, species, marker, intersection, union, asv.stability)
+
+# # family-specific stability
+# outer_val_ss |>
+#   unnest(ss) |>
+#   left_join(asv_taxa, join_by(ss == short.id)) |>
+#   unite(classification, c(d, p, c, o, g)) |>
+#   select(species, ss, classification, outer.id) |>
+#   group_by(species, outer.id, classification) |>
+#   count() |>
+#   pivot_wider(names_from = 'outer.id', values_from = 'n') |>
+#   pivot_longer(-c(species, classification)) |>
+#   mutate(selected = !is.na(value)) |>
+#   group_by(species, classification) |>
+#   summarize(sel.freq = mean(selected)) |>
+#   summarize(prop.stable = mean(sel.freq > 0.8))
+
+outer_val_spls <- dir_ls('rslt/loocv/18sv9-ss/_outer-validation-spls/') |>
+  lapply(read_rds) %>%
+  Reduce(bind_rows, .) |>
+  select(.id, species, sel.asv)
+
+# asv-specific stability for spls models
+spls_asv_stbl <- best_spls_val |> 
+  group_by(species) |>
+  summarize(int = intersect_fn(sel.asv, 0.8) |> list(),
+            un = union_fn(sel.asv) |> list()) |>
+  mutate(int = map(int, length),
+         un = map(un, length),
+         prop.stable = map2(int, un, ~.x/.y)) |>
+  unnest(everything()) |>
+  rename(intersection = int,
+         union = un,
+         asv.stability = prop.stable) |>
+  mutate(method = 'spls', marker = '18SV9') |>
+  select(method, species, marker, intersection, union, asv.stability)
+
+# # family-specific stability for spls models
+# best_spls_val |>
+#   unnest(sel.asv) |>
+#   select(.id, species, sel.asv) |>
+#   left_join(asv_taxa, join_by(sel.asv == short.id)) |>
+#   unite(classification, c(d, p, c, o, f, g)) |>
+#   group_by(.id, species, classification) |>
+#   count() |>
+#   pivot_wider(names_from = '.id', values_from = 'n') |>
+#   pivot_longer(-c(species, classification), names_to = '.id') |>
+#   mutate(selected = !is.na(value)) |>
+#   group_by(species, classification) |>
+#   summarize(sel.freq = mean(selected)) |>
+#   summarize(prop.stable = mean(sel.freq > 0.8))
+
+outerval_tbl_18sv9ss <- bind_rows(spls_asv_stbl, ss_asv_stbl) |>
+  arrange(species, method)
+
+outerval_tbl_18sv9ss

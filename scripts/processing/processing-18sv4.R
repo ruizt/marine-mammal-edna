@@ -153,15 +153,14 @@ edna_imputed <- edna_filtered |>
 
 # save imputed data
 ## REMOVE DIRECTORY FROM VERSION CONTROL BEFORE FINALIZING
-fs::dir_create(paste(out_dir, 'intermediates/', sep = ''))
+fs::dir_create(paste(out_dir, '_imputed/', sep = ''))
 save(edna_imputed, 
-     file = paste(out_dir, 'intermediates/ncog18sv4-imputed-', 
-                  today(), '.RData', sep = ''))
+     file = paste(out_dir, '_imputed/ncog18sv4-imputed.RData', sep = ''))
 
 ## AGGREGATION -----------------------------------------------------------------
 
 # read in imputed data
-load(paste(out_dir, 'intermediates/ncog18sv4-imputed-2024-08-05.RData', sep = ''))
+load(paste(out_dir, '_imputed/ncog18sv4-imputed.RData', sep = ''))
 
 # weight function for depth aggregation
 weight_fn <- function(depth.range, w){
@@ -288,6 +287,22 @@ loo_edna <- crossv_loo(edna_clr) |>
   select(.id, test.cruise, train, test) |>
   unnest(c(test.cruise))
 
+# # generate data partitions for nested leave one out cross validation
+# loo_edna_nested <- crossv_loo(edna_clr, id = 'id.outer') |>
+#   rename(test.outer.raw = test) |>
+#   mutate(cv.inner = map(train, ~crossv_loo(as.data.frame(.x), id = 'id.inner'))) |>
+#   select(-train) |>
+#   unnest(cv.inner) |>
+#   rename(test.inner.raw = test,
+#          train.raw = train) |>
+#   mutate(train.inner = map(train.raw, adj_fn),
+#          test.inner = map2(train.raw, test.inner.raw, adj_fn),
+#          test.inner.cruise = map(test.inner, ~pull(.x, cruise)),
+#          test.outer.cruise = map(test.outer.raw, ~as.data.frame(.x) |> pull(cruise))) |>
+#   select(test.outer.cruise, test.inner.cruise, test.inner, train.inner) |>
+#   unnest(ends_with('cruise'))
+
+
 ## EXPORT ----------------------------------------------------------------------
 
 # filter metadata to samples of interest
@@ -299,9 +314,14 @@ attr(sample_metadata, 'problems') <- NULL
 # filter asv taxonomy to asvs of interest
 asv_taxa <- taxa %>% filter(short.id %in% colnames(edna))
 
-# write file outputs
+# export processed data
 save(list = c('sample_metadata', 
               'asv_taxa',
-              'edna',
-              'loo_edna'), 
+              'edna'), 
      file = paste(out_dir, 'ncog18sv4.RData', sep = ''))
+
+# export validation partitions
+cv_dir <- paste(out_dir, '_cv/', sep = '')
+fs::dir_create(cv_dir)
+save(list = c('loo_edna'),
+     file = paste(cv_dir, 'ncog18sv4-partitions.RData', sep = ''))
