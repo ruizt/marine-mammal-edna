@@ -318,7 +318,7 @@ loo_edna <- lapply(1:nrow(loo_raw), function(j){
   Reduce(bind_rows, .)
 
 # export validation partitions
-cv_dir <- paste(out_dir, '_cv/', sep = '')
+cv_dir <- paste(out_dir, '_partitions/', sep = '')
 fs::dir_create(cv_dir)
 save(list = c('loo_edna'),
      file = paste(cv_dir, 'ncog18sv9-partitions.RData', sep = ''))
@@ -335,15 +335,18 @@ loo_nested_raw <- crossv_loo(edna_clr, id = 'id.outer') |>
          train.raw = train) |>
   select(test.outer.raw, test.inner.raw, train.raw)
 
+j <- 1
 # adjust for seasonal averages
 loo_edna_nested <- lapply(1:nrow(loo_nested_raw), function(j){
   .partition <- slice(loo_nested_raw, j)
   .train <- adj_fn(.partition$train.raw[[1]])
+  .test <- adj_fn(.partition$train.raw[[1]], .partition$test.inner.raw[[1]])
   .outer <- .partition$test.outer.raw[[1]] |> as_tibble() |> pull(cruise)
   .inner <- .partition$test.inner.raw[[1]] |> as_tibble() |> pull(cruise)
   
   out <- tibble(outer.id = .outer,
                 inner.id = .inner,
+                test = .test |> list(),
                 train = .train |> list())
   print(j)
   return(out)

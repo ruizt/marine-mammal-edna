@@ -86,6 +86,16 @@ loo_ss_means <- loo_raw |>
             .groups = 'drop') |>
   nest(seasonal.means = c(season, starts_with('log')))
 
+# function to de-trend data for leave-one-out partitions
+detrend_fn <- function(.data, .means){
+  left_join(.data, .means, join_by(season)) |>
+    mutate(cruise = cruise,
+           bp = log(bp) - log.bp.mean,
+           bm = log(bm) - log.bm.mean,
+           mn = log(mn) - log.mn.mean,
+           .keep = "none")
+}
+
 # adjust for seasonal averages
 loo_sightings <- loo_raw |>
   left_join(loo_ss_means, join_by(test.id, test.season)) |>
@@ -94,7 +104,7 @@ loo_sightings <- loo_raw |>
   select(test.id, test.season, seasonal.means, train, test)
 
 # export validation partitions
-cv_dir <- paste(out_dir, '_cv/', sep = '')
+cv_dir <- paste(out_dir, '_partitions/', sep = '')
 fs::dir_create(cv_dir)
 save(list = 'loo_sightings', 
      file = paste(cv_dir, 'mm-sightings-partitions.RData', sep = ''))
@@ -112,10 +122,11 @@ loo_nested_raw <- ss_imputed |>
   select(-train) |>
   unnest(cv.inner) |>
   mutate(train.raw = map(train, as.data.frame),
+         test.raw = map(test, as.data.frame),
          outer.id = map(test.outer, ~as_tibble(.x) |> pull(cruise)),
          inner.id = map(test, ~as_tibble(.x) |> pull(cruise))) |>
   unnest(ends_with('.id')) |>
-  select(outer.id, inner.id, train.raw)
+  select(outer.id, inner.id, train.raw, test.raw)
 
 # compute seasonal means from training partitions
 loo_means_nested <- loo_nested_raw |>
@@ -127,15 +138,26 @@ loo_means_nested <- loo_nested_raw |>
             .groups = 'drop') |>
   nest(seasonal.means = c(season, starts_with('log')))
 
+# function to de-trend data for leave-one-out partitions
+detrend_fn <- function(.data, .means){
+  left_join(.data, .means, join_by(season)) |>
+    mutate(cruise = cruise,
+           bp = log(bp) - log.bp.mean,
+           bm = log(bm) - log.bm.mean,
+           mn = log(mn) - log.mn.mean,
+           .keep = "none")
+}
+
 # adjust for seasonal averages
 loo_sightings_nested <- loo_nested_raw |>
   left_join(loo_means_nested, 
             join_by(inner.id, outer.id)) |>
-  mutate(train = map2(train.raw, seasonal.means, detrend_fn)) |>
-  select(-train.raw, -seasonal.means)
+  mutate(train = map2(train.raw, seasonal.means, detrend_fn), 
+         test = map2(test.raw, seasonal.means, detrend_fn)) |>
+  select(-train.raw, -test.raw)
 
 # export validation partitions
-cv_dir <- paste(out_dir, '_cv/', sep = '')
+cv_dir <- paste(out_dir, '_partitions/', sep = '')
 fs::dir_create(cv_dir)
 save(list = 'loo_sightings_nested', 
      file = paste(cv_dir, 'mm-sightings-nested-partitions.RData', sep = ''))

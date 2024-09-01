@@ -23,7 +23,7 @@ n.obs <- nrow(whales)
 
 # hyperparameter grids
 eta_grid_res <- 50
-eta_grid <- rev(1 - exp(seq(log(0.075), log(0.6), length = eta_grid_res)))
+eta_grid <- rev(1 - exp(seq(log(0.075), log(0.55), length = eta_grid_res)))
 ncomp_grid <- 3:12
 
 ## SELECTION ON LEAVE ONE OUT PARTITIONS ---------------------------------------
@@ -39,11 +39,13 @@ model_grid <- expand_grid(species = c('bm', 'bp', 'mn'),
                           ncomp = ncomp_grid,
                           eta = eta_grid)
 
+# # for testing
+# j <- 1
+# .species <- model_grid$species[1]
+# .eta <- model_grid$eta[1]
+# .ncomp <- model_grid$ncomp[1]
+
 # function to fit spls model and extract selected asvs
-j <- 1
-.species <- model_grid$species[1]
-.eta <- model_grid$eta[1]
-.ncomp <- model_grid$ncomp[1]
 fit_fn <- function(.species, .eta, .ncomp){
   
   out <- lapply(1:nrow(loo_partitions), function(j){
@@ -67,12 +69,12 @@ fit_fn <- function(.species, .eta, .ncomp){
     out <- tibble(species = .species,
                   eta = .eta,
                   ncomp = .ncomp,
-                  obs.id = loo_partitions$test.cruise[j],
+                  obs.id = loo_partitions$test.id[j],
                   sel.asv = list(sel.asv))
     paste('species = ', .species, 
           ', eta = ', round(.eta, 4), 
           ', ncomp = ', .ncomp, 
-          ', partition ', loo_partitions$test.cruise[j],
+          ', partition ', loo_partitions$test.id[j],
           sep = '') |>
       print()
     return(out)
@@ -82,12 +84,12 @@ fit_fn <- function(.species, .eta, .ncomp){
   return(out)
 }
 
-paste(out_dir, 'rslt-loo/', sep = '_') |> dir_create()
+paste(out_dir, 'loo-selection/', sep = '_') |> dir_create()
 for(i in 1:nrow(model_grid)){
   fit_fn(.species = model_grid$species[i],
          .eta = model_grid$eta[i],
          .ncomp = model_grid$ncomp[i]) |>
-    write_rds(file = paste(out_dir, 'rslt-loo/', 
+    write_rds(file = paste(out_dir, 'loo-selection/', 
                            model_grid$species[i], 
                            model_grid$ncomp[i], 
                            round(model_grid$eta[i], 4), 
@@ -97,7 +99,7 @@ for(i in 1:nrow(model_grid)){
 ## CONSTRUCT CANDIDATE STABLE SETS ---------------------------------------------
 
 # retreive selected asvs from procedure above
-sel_asvs <- paste(out_dir, '_rslt-loo/', sep = '') |>
+sel_asvs <- paste(out_dir, '_loo-selection/', sep = '') |>
   dir_ls() |>
   lapply(read_rds) %>%
   Reduce(bind_rows, .)
@@ -117,7 +119,7 @@ EV.max <- 0.5
 
 # limits for average number of selected asvs
 q.max <- sqrt((2*pi.max - 1)*p*EV.max)
-q.min <- 10
+q.min <- 15
 
 # generate intervals spanning eta grid (sparsity hyperparameter)
 eta_intervals <- expand_grid(eta.min.ix = seq(1, length(eta_grid), by = 2),
@@ -164,7 +166,7 @@ candidate_sets <- lapply(1:nrow(candidate_ranges), function(j){
   group_by(species, ncomp, ss) |>
   slice_min(eta.max - eta.min) |>
   ungroup() |>
-  filter(map(ss, length) > ncomp)
+  filter(map(ss, length) > q.min)
 
 # inspect
 candidate_sets
@@ -203,7 +205,7 @@ loo_preds <- lapply(1:nrow(candidate_sets), function(i){
     # outputs
     out <- .candidate |>
       select(species, ncomp, eta.min, eta.max) |>
-      bind_cols(obs.id = .partition$test.cruise,
+      bind_cols(obs.id = .partition$test.id,
                 obs.season = .partition$test.season,
                 obs.lr = y.test,
                 pred.lr = .pred)
@@ -222,7 +224,7 @@ sightings_raw_long <- sightings_raw |>
 # seasonal means from training data in leave one out partitions
 paste(data_dir, '_cv/mm-sightings-partitions.RData', sep = '') |> load()
 ss_means_long <- loo_sightings |> 
-  select(test.cruise, test.season, seasonal.means) |>
+  select(test.id, test.season, seasonal.means) |>
   unnest(seasonal.means) |>
   filter(test.season == season) |>
   pivot_longer(starts_with('log'), 
@@ -238,7 +240,7 @@ loo_pred_df <- loo_preds |>
   left_join(ss_means_long, 
             join_by(species,
                     obs.season == test.season, 
-                    obs.id == test.cruise)) |>
+                    obs.id == test.id)) |>
   mutate(obs.ss.imp = exp(obs.lr + seasonal.mean),
          pred.ss = exp(pred.lr + seasonal.mean)) 
 
@@ -251,32 +253,33 @@ best_settings <- loo_pred_df |>
             cor.ss = cor(obs.ss, pred.ss)) |>
   ungroup() |>
   group_by(species) |>
-  slice_min(rmspe.ss)
+  slice_min(rmspe.ss) |>
+  ungroup()
 
 # inspect
 best_settings
 
-# plot (x-y)
-loo_pred_df |>
-  inner_join(best_settings, join_by(species, ncomp, eta.min, eta.max)) |>
-  select(species, obs.id, obs.ss, pred.ss) |>
-  ggplot(aes(x = obs.ss, y = pred.ss)) +
-  facet_wrap(~species) +
-  geom_point() +
-  geom_abline(intercept = 0, slope = 1) +
-  scale_x_log10() +
-  scale_y_log10()
-
-# plot (series)
-loo_pred_df |>
-  inner_join(best_settings, join_by(species, ncomp, eta.min, eta.max)) |>
-  select(species, obs.id, obs.ss, pred.ss) |>
-  mutate(cruise.ym = ym(obs.id)) |>
-  pivot_longer(c(obs.ss, pred.ss)) |>
-  arrange(species, cruise.ym) |>
-  ggplot(aes(x = cruise.ym, y = value, linetype = name)) +
-  facet_wrap(~species, ncol = 1) +
-  geom_path()
+# # plot (x-y)
+# loo_pred_df |>
+#   inner_join(best_settings, join_by(species, ncomp, eta.min, eta.max)) |>
+#   select(species, obs.id, obs.ss, pred.ss) |>
+#   ggplot(aes(x = obs.ss, y = pred.ss)) +
+#   facet_wrap(~species) +
+#   geom_point() +
+#   geom_abline(intercept = 0, slope = 1) +
+#   scale_x_log10() +
+#   scale_y_log10()
+# 
+# # plot (series)
+# loo_pred_df |>
+#   inner_join(best_settings, join_by(species, ncomp, eta.min, eta.max)) |>
+#   select(species, obs.id, obs.ss, pred.ss) |>
+#   mutate(cruise.ym = ym(obs.id)) |>
+#   pivot_longer(c(obs.ss, pred.ss)) |>
+#   arrange(species, cruise.ym) |>
+#   ggplot(aes(x = cruise.ym, y = value, linetype = name)) +
+#   facet_wrap(~species, ncol = 1) +
+#   geom_path()
 
 # recover stable sets
 best_ss <- candidate_sets |>
@@ -285,114 +288,12 @@ best_ss <- candidate_sets |>
 # inspect
 best_ss
 
-## ASSESS STABLE SET CONSISTENCY -----------------------------------------------
-
-# generate sets of bootstrap samples from each leave-one-out training partition
-nboot_val <- 100
-set.seed(82724)
-val_bsamples <- loo_partitions |>
-  select(test.cruise, train) |>
-  mutate(bsamples = map(train, ~bootstrap(.x, n = nboot_val))) |>
-  select(test.cruise, bsamples) |>
-  unnest(bsamples)
-
-# recover hyperparameter settings used to construct optimal stable sets
-best_ss_model_grid <- best_ss |>
+# retrieve leave one out predictions for optimal stable set
+best_loo_preds <- best_settings |>
   select(species, ncomp, eta.min, eta.max) |>
-  expand_grid(eta = eta_grid) |>
-  filter(eta <= eta.max, eta >= eta.min) |>
-  select(species, ncomp, eta)
+  inner_join(loo_pred_df) 
 
-# function to fit spls model and extract selected asvs
-val_fit_fn <- function(.species, .eta, .ncomp){
-  
-  out <- lapply(1:nrow(val_bsamples), function(j){
-    
-    # retreive training bootstrap sample
-    .train <- val_bsamples$strap[j][[1]] |> as_tibble()
-    
-    # separate predictors and response
-    x.train <- .train |> as.data.frame() |> select(starts_with('asv'))
-    y.train <- .train |> as.data.frame() |> pull(.species)
-    
-    # fit spls model with specified parameters
-    fit <- spls(x.train, y.train, 
-                K = .ncomp, eta = .eta, 
-                scale.x = F, scale.y = F)
-    
-    # selected variables
-    sel.asv <- fit$projection |> rownames()
-    
-    # outputs
-    out <- tibble(species = .species,
-                  eta = .eta,
-                  ncomp = .ncomp,
-                  boot.id = val_bsamples$.id[j],
-                  obs.id = val_bsamples$test.cruise[j],
-                  sel.asv = list(sel.asv))
-    paste('species = ', .species, 
-          ', eta = ', round(.eta, 4), 
-          ', ncomp = ', .ncomp, 
-          ', boostrap sample ', j,
-          sep = '') |>
-      print()
-    return(out)
-  }) %>%
-    Reduce(bind_rows, .)
-  
-  return(out)
-}
+## EXPORT STABLE SET AND LEAVE ONE OUT PREDICTIONS -----------------------------
 
-# fit spls models to each bootstrap sample
-paste(out_dir, 'validation-loo/', sep = '_') |> dir_create()
-for(i in 1:nrow(best_ss_model_grid)){
-  val_fit_fn(.species = best_ss_model_grid$species[i],
-             .eta = best_ss_model_grid$eta[i],
-             .ncomp = best_ss_model_grid$ncomp[i]) |>
-    write_rds(file = paste(out_dir, 'validation-loo/', 
-                           best_ss_model_grid$species[i], 
-                           best_ss_model_grid$ncomp[i], 
-                           round(best_ss_model_grid$eta[i], 4), 
-                           '.rds', sep = '_'))
-}
-
-# read in results
-val_rslt <- paste(out_dir, 'validation-loo/', sep = '_') |> 
-  dir_ls() |>
-  lapply(read_rds) %>%
-  Reduce(bind_rows, .)
-
-# function to compute "soft intersection" of sets in <set_list>
-intersect_fn <- function(set_list, thresh){
-  out <- tibble(asv = Reduce(c, set_list)) |> 
-    group_by(asv) |> 
-    count() |>
-    filter(n >= thresh*length(set_list)) |>
-    pull(asv)
-  return(out)
-}
-
-# function to compute no. of elements in union of sets in <set_list>
-union_fn <- function(set_list){
-  out <- Reduce(c, set_list) |> unique()
-  return(out)
-}
-
-# compute stable sets
-val_rslt |>
-  unnest(sel.asv) |>
-  group_by(species, obs.id, eta, sel.asv) |> 
-  count() |>
-  ungroup() |>
-  fsubset(n > pi.max*nboot_val) |>
-  select(species, obs.id, sel.asv) |>
-  group_by(species, obs.id) |>
-  nest(sel.asv = sel.asv) |>
-  mutate(sel.asv = map(sel.asv, ~pull(.x, sel.asv))) |>
-  group_by(species) |>
-  summarize(int = intersect_fn(sel.asv, thresh = 0.7) |> list(),
-            un = union_fn(sel.asv) |> list()) |>
-  mutate(j.index = map2(int, un, ~length(.x)/length(.y))) |>
-  unnest(j.index)
-
-
+write_rds(best_loo_preds, file = paste(out_dir, 'loo-preds.rds', sep = ''))
+write_rds(best_ss, file = paste(out_dir, 'stable-sets.rds', sep = ''))

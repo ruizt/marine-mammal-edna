@@ -11,8 +11,8 @@ dir_create(out_dir)
 ## 18Sv9-SS PARTITIONS ---------------------------------------------------------
 
 # read in edna and sighting partitions
-load('data/processed/_cv/ncog18sv9-partitions.RData')
-load('data/processed/_cv/mm-sightings-partitions.RData')
+load('data/processed/_partitions/ncog18sv9-partitions.RData')
+load('data/processed/_partitions/mm-sightings-partitions.RData')
 
 # combine regular (non-nested) validation partitions
 loo_partitions <- left_join(loo_sightings, 
@@ -21,15 +21,15 @@ loo_partitions <- left_join(loo_sightings,
                             suffix = c('.mm', '.edna')) |>
   mutate(train = map2(train.mm, train.edna, ~inner_join(.x, .y, join_by('cruise'))),
          test = map2(test.mm, test.edna, ~inner_join(.x, .y, join_by('cruise')))) |>
-  select(test.id, test.season, train, test)
+  select(test.id, test.season, train, test, seasonal.means)
 
 # store
 write_rds(loo_partitions, 
           file = paste(out_dir, 'partitions-18sv9-ss.rds', sep = ''))
 
 # read in nested partitions
-load('data/processed/_cv/ncog18sv9-nested-partitions.RData')
-load('data/processed/_cv/mm-sightings-nested-partitions.RData')
+load('data/processed/_partitions/ncog18sv9-nested-partitions.RData')
+load('data/processed/_partitions/mm-sightings-nested-partitions.RData')
 
 # combine nested validation partitions
 loo_partitions_nested <- inner_join(loo_sightings_nested,
@@ -37,8 +37,10 @@ loo_partitions_nested <- inner_join(loo_sightings_nested,
                                     join_by(outer.id, inner.id),
                                     suffix = c('.mm', '.edna')) |>
   mutate(train = map2(train.mm, train.edna,
-                      ~join(.x, .y, on = 'cruise', how = 'inner'))) |>
-  select(outer.id, inner.id, train)
+                      ~join(.x, .y, on = 'cruise', how = 'inner')),
+         test = map2(test.mm, test.edna, 
+                     ~join(.x, .y, on = 'cruise', how = 'inner'))) |>
+  select(outer.id, inner.id, train, test, seasonal.means)
 
 # store partitions
 write_rds(loo_partitions_nested,

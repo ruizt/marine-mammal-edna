@@ -105,10 +105,10 @@ sel_freq <- sel_asvs |>
   ungroup()
 
 # stability threshold (minimax selection prob.)
-pi.max <- 0.7
+pi.max <- 0.8
 
 # upper bound on expected no. false positives
-EV.max <- 4
+EV.max <- 1
 
 # limits for average number of selected asvs
 q.max <- sqrt((2*pi.max - 1)*p*EV.max)
@@ -204,7 +204,7 @@ loo_preds <- lapply(1:nrow(candidate_sets), function(i){
     # outputs
     out <- .candidate |>
       select(species, ncomp, eta.min, eta.max) |>
-      bind_cols(obs.id = .partition$test.cruise,
+      bind_cols(obs.id = .partition$test.id,
                 obs.season = .partition$test.season,
                 obs.lr = y.test,
                 pred.lr = .pred)
@@ -223,7 +223,7 @@ sightings_raw_long <- sightings_raw |>
 # seasonal means from training data in leave one out partitions
 paste(data_dir, '_cv/mm-sightings-partitions.RData', sep = '') |> load()
 ss_means_long <- loo_sightings |> 
-  select(test.cruise, test.season, seasonal.means) |>
+  select(test.id, test.season, seasonal.means) |>
   unnest(seasonal.means) |>
   filter(test.season == season) |>
   pivot_longer(starts_with('log'), 
@@ -239,7 +239,7 @@ loo_pred_df <- loo_preds |>
   left_join(ss_means_long, 
             join_by(species,
                     obs.season == test.season, 
-                    obs.id == test.cruise)) |>
+                    obs.id == test.id)) |>
   mutate(obs.ss.imp = exp(obs.lr + seasonal.mean),
          pred.ss = exp(pred.lr + seasonal.mean)) 
 
@@ -292,9 +292,9 @@ best_ss |> select(ss)
 nboot_val <- 50
 set.seed(82724)
 val_bsamples <- loo_partitions |>
-  select(test.cruise, train) |>
+  select(test.id, train) |>
   mutate(bsamples = map(train, ~bootstrap(.x, n = nboot_val))) |>
-  select(test.cruise, bsamples) |>
+  select(test.id, bsamples) |>
   unnest(bsamples)
 
 # recover hyperparameter settings used to construct optimal stable sets
@@ -329,7 +329,7 @@ val_fit_fn <- function(.species, .eta, .ncomp){
                   eta = .eta,
                   ncomp = .ncomp,
                   boot.id = val_bsamples$.id[j],
-                  obs.id = val_bsamples$test.cruise[j],
+                  obs.id = val_bsamples$test.id[j],
                   sel.asv = list(sel.asv))
     paste('species = ', .species, 
           ', eta = ', round(.eta, 4), 
