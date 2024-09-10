@@ -152,15 +152,14 @@ edna_imputed <- edna_filtered |>
 
 # save imputed data
 ## REMOVE DIRECTORY FROM VERSION CONTROL BEFORE FINALIZING
-fs::dir_create(paste(out_dir, '_processing-intermediates/', sep = ''))
+fs::dir_create(paste(out_dir, '_imputed/', sep = ''))
 save(edna_imputed, 
-     file = paste(out_dir, '_processing-intermediates/ncog18sv9-imputed-', 
-                  today(), '.RData', sep = ''))
+     file = paste(out_dir, '_imputed/ncog18sv9-imputed.RData', sep = ''))
 
 ## AGGREGATION -----------------------------------------------------------------
 
 # read in imputed data
-load(paste(out_dir, '_processing-intermediates/ncog18sv9-imputed-2024-08-02.RData', sep = ''))
+load(paste(out_dir, '_imputed/ncog18sv9-imputed.RData', sep = ''))
 
 # weight function for depth aggregation
 weight_fn <- function(depth.range, w){
@@ -241,74 +240,9 @@ edna <- edna_clr |>
   ungroup() |>
   select(cruise, starts_with('asv'))
 
-# re-process seasonal adjustments for leave one out runs
-# .train <- edna_clr |> slice(-1)
-# .test <- edna_clr |> slice(1)
-# .train <- crossv_loo(edna_clr)$train[[1]]
-# .test <- crossv_loo(edna_clr)$test[[1]]
-
-adj_fn <- function(.train, .test = NULL){
-  if(is.null(.test)){
-  out <- .train |>
-    as.data.frame() |>
-    fmutate(qtr = ym(cruise) |> quarter()) |>
-    fmutate(qtr = if_else(cruise == '201806', 3, qtr)) |>
-    fgroup_by(qtr) |>
-    fmutate(across(-c(cruise, qtr), function(.x){.x - mean(.x)})) |>
-    ungroup() |>
-    fselect(-qtr)
-  }else{
-    avgs <- .train |>
-      as.data.frame() |>
-      fmutate(qtr = ym(cruise) |> quarter()) |>
-      fmutate(qtr = if_else(cruise == '201806', 3, qtr)) |>
-      fgroup_by(qtr) |>
-      fsummarize(across(-cruise, fmean)) |>
-      pivot_longer(-qtr, names_to = 'asv', values_to = 'seasonal.mean')
-    
-    out <- .test |>
-      as.data.frame() |>
-      fmutate(qtr = ym(cruise) |> quarter()) |>
-      fmutate(qtr = if_else(cruise == '201806', 3, qtr)) |>
-      pivot_longer(-c(qtr, cruise), names_to = 'asv', values_to = 'value') |>
-      left_join(avgs, by = c('qtr', 'asv')) |>
-      fmutate(adj.value = value - seasonal.mean) |>
-      pivot_wider(id_cols = cruise, values_from = adj.value, names_from = asv)
-  }
-  
-  return(out)
-}
-
-# generate data partitions for leave one out cross validation
-loo_edna <- crossv_loo(edna_clr) |>
-  rename(train.raw = train, 
-         test.raw = test) |>
-  mutate(train = map(train.raw, adj_fn),
-         test = map2(train.raw, test.raw, adj_fn),
-         test.cruise = map(test, ~pull(.x, cruise))) |>
-  select(test.cruise, train, test) |>
-  unnest(c(test.cruise))
-
-# generate data partitions for nested leave one out cross validation
-loo_edna_nested <- crossv_loo(edna_clr, id = 'id.outer') |>
-  rename(test.outer.raw = test) |>
-  mutate(cv.inner = map(train, ~crossv_loo(as.data.frame(.x), id = 'id.inner'))) |>
-  select(-train) |>
-  unnest(cv.inner) |>
-  rename(test.inner.raw = test,
-         train.raw = train) |>
-  mutate(train.inner = map(train.raw, adj_fn),
-         test.inner = map2(train.raw, test.inner.raw, adj_fn),
-         test.inner.cruise = map(test.inner, ~pull(.x, cruise)),
-         test.outer.cruise = map(test.outer.raw, ~as.data.frame(.x) |> pull(cruise))) |>
-  select(test.outer.cruise, test.inner.cruise, test.inner, train.inner) |>
-  unnest(ends_with('cruise'))
-
-
-## EXPORT ----------------------------------------------------------------------
-
 # filter metadata to samples of interest
-sample_metadata <- metadata %>% filter(sample.name %in% samples_of_interest) |>
+sample_metadata <- metadata %>% 
+  filter(sample.name %in% samples_of_interest) |>
   rename(sample.id = sample.name)
 attr(sample_metadata, 'spec') <- NULL
 attr(sample_metadata, 'problems') <- NULL
@@ -322,8 +256,103 @@ save(list = c('sample_metadata',
               'edna'), 
      file = paste(out_dir, 'ncog18sv9.RData', sep = ''))
 
+## LEAVE ONE OUT PARTITIONS ----------------------------------------------------
+
+# generate leave one out partitions
+loo_raw <- crossv_loo(edna_clr) |>
+  rename(train.raw = train, 
+         test.raw = test) 
+
+# re-process seasonal adjustments for leave one out partitions
+adj_fn <- function(.train, .test = NULL){
+  
+  if(is.null(.test)){ # for processing training data
+    
+    # subtract seasonal averages columnwise (on log scale)
+    out <- .train |>
+      as.data.frame() |>
+      fmutate(qtr = ym(cruise) |> quarter()) |>
+      fmutate(qtr = if_else(cruise == '201806', 3, qtr)) |>
+      fgroup_by(qtr) |>
+      fmutate(across(-c(cruise, qtr), function(.x){.x - mean(.x)})) |>
+      ungroup() |>
+      fselect(-qtr)
+    
+  }else{ # for processing test data
+    
+    # get seasonal averages from training data
+    avgs <- .train |>
+      as.data.frame() |>
+      fmutate(qtr = ym(cruise) |> quarter()) |>
+      fmutate(qtr = if_else(cruise == '201806', 3, qtr)) |>
+      fgroup_by(qtr) |>
+      fsummarize(across(-cruise, fmean)) |>
+      pivot_longer(-qtr, names_to = 'asv', values_to = 'seasonal.mean')
+    
+    # subtract training seasonal averages columnwise from test data (on log scale)
+    out <- .test |>
+      as.data.frame() |>
+      fmutate(qtr = ym(cruise) |> quarter()) |>
+      fmutate(qtr = if_else(cruise == '201806', 3, qtr)) |>
+      pivot_longer(-c(qtr, cruise), names_to = 'asv', values_to = 'value') |>
+      left_join(avgs, by = c('qtr', 'asv')) |>
+      fmutate(adj.value = value - seasonal.mean) |>
+      pivot_wider(id_cols = cruise, values_from = adj.value, names_from = asv)
+  }
+  
+  return(out)
+}
+
+# adjust for seasonal averages by partition
+loo_edna <- lapply(1:nrow(loo_raw), function(j){
+  .partition <- slice(loo_raw, j)
+  .train <- adj_fn(.partition$train.raw[[1]])
+  .test <- adj_fn(.partition$train.raw[[1]], .partition$test.raw[[1]])
+  
+  out <- tibble(test.id = .test$cruise,
+                test = .test |> list(), 
+                train = .train |> list())
+  print(j)
+  return(out)
+}) %>%
+  Reduce(bind_rows, .)
+
 # export validation partitions
-val_dir <- paste(out_dir, '_cv/', sep = '')
-fs::dir_create(val_dir)
-save(list = c('loo_edna', 'loo_edna_nested'),
-     file = paste(out_dir, '_cv-partitions/ncog18sv9-partitions.RData', sep = ''))
+cv_dir <- paste(out_dir, '_partitions/', sep = '')
+fs::dir_create(cv_dir)
+save(list = c('loo_edna'),
+     file = paste(cv_dir, 'ncog18sv9-partitions.RData', sep = ''))
+
+## NESTED LEAVE ONE OUT PARTITIONS ---------------------------------------------
+
+# generate data partitions for nested leave one out cross validation
+loo_nested_raw <- crossv_loo(edna_clr, id = 'id.outer') |>
+  rename(test.outer.raw = test) |>
+  mutate(cv.inner = map(train, ~crossv_loo(as.data.frame(.x), id = 'id.inner'))) |>
+  select(-train) |>
+  unnest(cv.inner) |>
+  rename(test.inner.raw = test,
+         train.raw = train) |>
+  select(test.outer.raw, test.inner.raw, train.raw)
+
+j <- 1
+# adjust for seasonal averages
+loo_edna_nested <- lapply(1:nrow(loo_nested_raw), function(j){
+  .partition <- slice(loo_nested_raw, j)
+  .train <- adj_fn(.partition$train.raw[[1]])
+  .test <- adj_fn(.partition$train.raw[[1]], .partition$test.inner.raw[[1]])
+  .outer <- .partition$test.outer.raw[[1]] |> as_tibble() |> pull(cruise)
+  .inner <- .partition$test.inner.raw[[1]] |> as_tibble() |> pull(cruise)
+  
+  out <- tibble(outer.id = .outer,
+                inner.id = .inner,
+                test = .test |> list(),
+                train = .train |> list())
+  print(j)
+  return(out)
+}) %>%
+  Reduce(bind_rows, .)
+
+# export processed data
+save(list = c('loo_edna_nested'),
+     file = paste(cv_dir, 'ncog18sv9-nested-partitions.RData', sep = ''))
