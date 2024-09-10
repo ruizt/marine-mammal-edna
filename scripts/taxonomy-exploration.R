@@ -1,7 +1,7 @@
 library(tidyverse)
 library(openxlsx)
 library(readxl)
-
+library(here)
 
 # candidate taxa overlap with documented relationships --------------------------
 
@@ -175,7 +175,7 @@ get_ncog_asvs("18sv9", "order")
 # FUNCTION: get_model_asvs()------------------------------------------------------------------------
 # note: fit parameter is not used as of now
 
-get_model_asvs <- function(marker, whale, fit, taxonomic.level){
+get_model_asvs <- function(marker, whale, taxonomic.level){
   if (!(tolower(marker) %in% c("16s", "18sv4", "18sv9"))){
     print("invalid marker")
   }
@@ -258,8 +258,8 @@ get_model_asvs <- function(marker, whale, fit, taxonomic.level){
 }
 
 # only two at order level (across all markers/species)
-get_model_asvs("16s", "humpback whales", "ss", "o")
-get_model_asvs("18sv9", "humpback whales", "ss", "o")
+get_model_asvs("16s", "humpback whales", "o")
+get_model_asvs("18sv9", "humpback whales", "o")
 
 
 ss_asvs_all |> 
@@ -302,10 +302,9 @@ ss_asvs_all |>
 
 
 # this is all matches at class level
-get_model_asvs("16s", "blue whales", "ss", "c")
-get_model_asvs("16s", "humpback whales", "ss", "c")
-get_model_asvs("18sv9", "humpback whales", "ss", "c")
-
+get_model_asvs("16s", "blue whales",  "c")
+get_model_asvs("16s", "humpback whales", "c")
+get_model_asvs("18sv9", "humpback whales",  "c")
 
 # ------------------------------------------------------------------------------
 # Proportions Exploration
@@ -322,16 +321,15 @@ whales <- c("blue whales", "fin whales", "humpback whales")
 
 # Singular example for 16s humpbacks
 # note: 1 model/lit review match over 47 ncog/lit review matches = 0.0212766
-nrow(get_model_asvs("16s", "humpback whales"))/nrow(get_ncog_asvs("16s"))
+nrow(get_model_asvs("16s", "humpback whales", "p"))/nrow(get_ncog_asvs("16s", "p"))
 
 
 # Now, summarize proportion for all marker/whale combinations
 
 # Function to calculate proportion of possible lit review ASVs selection for each model
-prop_asv_sel <- function(marker, whale, model = "ss", taxonomic.level = "order") {
+prop_asv_sel <- function(marker, whale, taxonomic.level = "order") {
   model_asvs <- get_model_asvs(marker, 
-                               whale, 
-                               model, 
+                               whale,
                                substring(taxonomic.level[1], 1, 1))
   ncog_asvs <- get_ncog_asvs(marker, 
                              taxonomic.level)
@@ -444,3 +442,4 @@ prop_asvs_ided_df
   
 # note:  prop_sel_lit currently works right if num_asvs_match <- get_model_asvs()
 # contains known ASVs, so need to filter out if the ASVs are unknown
+
