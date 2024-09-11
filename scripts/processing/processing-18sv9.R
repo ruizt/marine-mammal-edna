@@ -335,7 +335,6 @@ loo_nested_raw <- crossv_loo(edna_clr, id = 'id.outer') |>
          train.raw = train) |>
   select(test.outer.raw, test.inner.raw, train.raw)
 
-j <- 1
 # adjust for seasonal averages
 loo_edna_nested <- lapply(1:nrow(loo_nested_raw), function(j){
   .partition <- slice(loo_nested_raw, j)

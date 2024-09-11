@@ -49,5 +49,76 @@ write_rds(loo_partitions_nested,
 
 ## 18Sv4-SS PARTITIONS ---------------------------------------------------------
 
+# read in edna and sighting partitions
+load('data/processed/_partitions/ncog18sv4-partitions.RData')
+load('data/processed/_partitions/mm-sightings-partitions.RData')
+
+# combine regular (non-nested) validation partitions
+loo_partitions <- left_join(loo_sightings, 
+                            loo_edna, 
+                            join_by(test.id), 
+                            suffix = c('.mm', '.edna')) |>
+  mutate(train = map2(train.mm, train.edna, ~inner_join(.x, .y, join_by('cruise'))),
+         test = map2(test.mm, test.edna, ~inner_join(.x, .y, join_by('cruise')))) |>
+  select(test.id, test.season, train, test, seasonal.means)
+
+# store
+write_rds(loo_partitions, 
+          file = paste(out_dir, 'partitions-18sv4-ss.rds', sep = ''))
+
+# read in nested partitions
+load('data/processed/_partitions/ncog18sv4-nested-partitions.RData')
+load('data/processed/_partitions/mm-sightings-nested-partitions.RData')
+
+# combine nested validation partitions
+loo_partitions_nested <- inner_join(loo_sightings_nested,
+                                    loo_edna_nested,
+                                    join_by(outer.id, inner.id),
+                                    suffix = c('.mm', '.edna')) |>
+  mutate(train = map2(train.mm, train.edna,
+                      ~join(.x, .y, on = 'cruise', how = 'inner')),
+         test = map2(test.mm, test.edna, 
+                     ~join(.x, .y, on = 'cruise', how = 'inner'))) |>
+  select(outer.id, inner.id, train, test, seasonal.means)
+
+# store partitions
+write_rds(loo_partitions_nested,
+          file = paste(out_dir, 'nested-partitions-18sv4-ss.rds', sep = ''))
 
 ## 16S-SS PARTITIONS ---------------------------------------------------------
+
+# read in edna and sighting partitions
+load('data/processed/_partitions/ncog16s-partitions.RData')
+load('data/processed/_partitions/mm-sightings-partitions.RData')
+
+# combine regular (non-nested) validation partitions
+loo_partitions <- left_join(loo_sightings, 
+                            loo_edna, 
+                            join_by(test.id), 
+                            suffix = c('.mm', '.edna')) |>
+  mutate(train = map2(train.mm, train.edna, ~inner_join(.x, .y, join_by('cruise'))),
+         test = map2(test.mm, test.edna, ~inner_join(.x, .y, join_by('cruise')))) |>
+  select(test.id, test.season, train, test, seasonal.means)
+
+# store
+write_rds(loo_partitions, 
+          file = paste(out_dir, 'partitions-16s-ss.rds', sep = ''))
+
+# read in nested partitions
+load('data/processed/_partitions/ncog16s-nested-partitions.RData')
+load('data/processed/_partitions/mm-sightings-nested-partitions.RData')
+
+# combine nested validation partitions
+loo_partitions_nested <- inner_join(loo_sightings_nested,
+                                    loo_edna_nested,
+                                    join_by(outer.id, inner.id),
+                                    suffix = c('.mm', '.edna')) |>
+  mutate(train = map2(train.mm, train.edna,
+                      ~join(.x, .y, on = 'cruise', how = 'inner')),
+         test = map2(test.mm, test.edna, 
+                     ~join(.x, .y, on = 'cruise', how = 'inner'))) |>
+  select(outer.id, inner.id, train, test, seasonal.means)
+
+# store partitions
+write_rds(loo_partitions_nested,
+          file = paste(out_dir, 'nested-partitions-16s-ss.rds', sep = ''))

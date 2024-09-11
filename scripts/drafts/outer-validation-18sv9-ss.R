@@ -86,7 +86,7 @@ fit_fn <- function(.species, .eta, .ncomp){
 }
 
 # fit each model on every nested partition
-## LONG RUNTIME: 8-10hr
+## LONG RUNTIME: 24hr
 for(i in 1:nrow(model_grid)){
   fit_fn(.species = model_grid$species[i],
          .eta = model_grid$eta[i],
@@ -197,7 +197,7 @@ candidate_sets <- paste(out_dir, 'candidate-sets.rds', sep = '') |> read_rds()
 
 # i <- j <- 1
 # logratio predictions on inner held out observations for each candidate
-## LONG RUNTIME: ~10min
+## LONG RUNTIME: ~30min
 nested_loo_preds <- lapply(1:nrow(candidate_sets), function(i){
   
   # extract candidate stable set
@@ -225,7 +225,7 @@ nested_loo_preds <- lapply(1:nrow(candidate_sets), function(i){
                  scale = F, center = T)
   
     # compute prediction
-    .pred <- predict(.fit, x.test, type = 'response', ncomp = .candidate$ncomp)[, , 1]
+    .pred <- predict(.fit, x.test, type = 'response')[, , paste(.candidate$ncomp, 'comps')]
     
     # outputs
     out <- .candidate |>
@@ -278,13 +278,16 @@ best_settings <- loo_pred_df |>
   ungroup() |>
   group_by(outer.id, species) |>
   slice_min(inner.rmspe) |>
-  ungroup() |>
+  group_by(outer.id, species, inner.rmspe) |>
+  slice_min(eta.max - eta.min) |>
   arrange(species, outer.id) |>
   print(n = 100)
 
 # retrieve stable sets
 best_sets <- candidate_sets |>
-  inner_join(best_settings)
+  inner_join(best_settings) |>
+  arrange(species, outer.id) |>
+  print(n = 100)
 
 # export
 write_rds(best_sets, file = paste(out_dir, 'best-sets.rds', sep = ''))
@@ -346,7 +349,7 @@ preds_outer <- lapply(1:nrow(best_sets), function(i){
   .fit <- plsr(y ~ ., data = .train, ncomp = .ss$ncomp, scale = F, center = T)
   
   # compute prediction on outer test partition
-  .pred <- predict(.fit, x.test, ncomp = .ss$ncomp)[, , 1]
+  .pred <- predict(.fit, x.test)[, , paste(.ss$ncomp, 'comps')]
   
   # outputs
   out <- .ss |>
@@ -392,3 +395,10 @@ preds_outer_df |>
             avg.inner.cor = mean(inner.cor),
             avg.inner.rmspe = mean(inner.rmspe))
 
+
+preds_outer_df |>
+  filter(species == 'bm', outer.id != '201404') |>
+  summarize(cor = cor(pred.ss, obs.ss))
+  ggplot(aes(x = ym(outer.id), y = obs.ss)) +
+  geom_path() +
+  geom_path(aes(y = pred.ss), color = 'blue')
