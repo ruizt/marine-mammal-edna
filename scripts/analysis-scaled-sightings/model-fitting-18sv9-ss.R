@@ -90,4 +90,4 @@ save(list = c('whales',
               'fitted_models',
               'fit_df',
               'model_metrics'),
-     file = paste(out_dir, 'fitted-models-18sv9-ss.RData'))
+     file = paste(out_dir, 'fitted-models-18sv9.RData'))
