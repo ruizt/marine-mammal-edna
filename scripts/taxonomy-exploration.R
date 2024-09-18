@@ -116,7 +116,8 @@ get_ncog_asvs <- function(marker, taxonomic.level){
     asv_taxa_all |> 
       filter(gene.seq == tolower(marker)) |> 
       inner_join(doc.rel, join_by(p == Phylum,
-                                  c == Class)) |> 
+                                  c == Class),
+                 relationship = "many-to-many") |> 
       select(gene.seq,short.id,
              Whale.species,
              Connection,
@@ -126,7 +127,8 @@ get_ncog_asvs <- function(marker, taxonomic.level){
   else if (tolower(taxonomic.level) == "phylum" | tolower(taxonomic.level) == "p"){
     asv_taxa_all |> 
       filter(gene.seq == tolower(marker)) |> 
-      inner_join(doc.rel, join_by(p == Phylum)) |> 
+      inner_join(doc.rel, join_by(p == Phylum),
+                 relationship = "many-to-many") |> 
       select(gene.seq,short.id,
              Whale.species,
              Connection,
@@ -354,7 +356,7 @@ prop_selected_df
 
 # Singular example for 18sv9 humpbacks
 # num ASVs selected in each model (marker/whale combo) included in lit review table
-num_asvs_match <- get_model_asvs("18sv9", "humpback whales", "ss", "o") |> 
+num_asvs_match <- get_model_asvs("18sv9", "humpback whales", "o") |> 
   nrow()
 
 # num ASVs selected for the model (marker/whale combo)
@@ -369,7 +371,7 @@ num_asvs_match/num_asvs_ss
 
 # Now, summarize proportion for all marker/whale combinations
 # Function to calculate proportion of selected ASVs that were IDed in lit revew
-prop_sel_lit <- function(marker, whale, model = "ss", taxonomic.level = "order",
+prop_sel_lit <- function(marker, whale, taxonomic.level = "order",
                          known = "n") {
   if (known == "n"){
     selected_asvs_df = ss_asvs_all
@@ -379,7 +381,6 @@ prop_sel_lit <- function(marker, whale, model = "ss", taxonomic.level = "order",
   }
   num_asvs_match <- get_model_asvs(marker, 
                                    whale, 
-                                   model, 
                                    substring(taxonomic.level[1], 1, 1)) |> 
     nrow()
   
@@ -428,8 +429,7 @@ prop_asvs_ided_df <- data.frame(
   Proportion_IDed = mapply(prop_sel_lit, 
                            rep(markers, each = length(whales)), 
                            rep(whales, length(markers)),
-                           MoreArgs = list(model = "ss", 
-                                           taxonomic.level = "order", 
+                           MoreArgs = list(taxonomic.level = "order", 
                                            known = "y"))
 )
 
@@ -442,4 +442,76 @@ prop_asvs_ided_df
   
 # note:  prop_sel_lit currently works right if num_asvs_match <- get_model_asvs()
 # contains known ASVs, so need to filter out if the ASVs are unknown
+
+
+# ------------------------------------------------------------------------------
+# Function to generate counts and overlap proportion summary by taxa level
+# - Input: Taxonomic level
+# - Output: A summary table with 7 columns
+#     1) Gene Sequence (16s, 18sv4, 18sv9)
+#     2) Whale Species (blue, fin, humpback)
+#     3) Count of unique occurrences of the selected taxa level in the model
+#     4) Count of unique occurrences of the selected taxa level in the lit. review
+#     5) Overlap of unique taxa occurrences between models and lit review (n)
+#     6) Proportion of taxa overlap in lit. review
+#     7) Proportion of taxa overlap in selected model
+# ------------------------------------------------------------------------------
+
+get_summary_table <- function(taxonomic.level = "o"){
+  
+  # Check if the column exists in the dataframe
+  if (!(taxonomic.level %in% names(ss_asvs_all))) {
+    stop("Error: Valid taxonomic levels are 'd', 'p', 'c', 'o', 'f', 'g'.")
+  }
+  
+  taxonomic.level = as.name(taxonomic.level)
+  
+  # 1) lit count (n) - need to split by whale species
+  lit_count <- rbind(get_ncog_asvs("16s", taxonomic.level), 
+                     get_ncog_asvs("18sv4", taxonomic.level), 
+                     get_ncog_asvs("18sv9", taxonomic.level)) |> 
+    group_by(Whale.species, gene.seq) |> 
+    summarise(count = n_distinct(!!taxonomic.level),
+              .groups = "keep")
+  
+  # 2) model count (n)
+  model_count <- ss_asvs_all |> 
+    group_by(gene.seq,
+             model.species) |> 
+    summarise(count = n_distinct(!!taxonomic.level),
+              .groups = "keep")
+  
+  # Join the 2 tables of model and lit. review count
+  merged_df <- model_count %>%
+    left_join(lit_count, by = c("gene.seq" = "gene.seq", "model.species" = "Whale.species"))
+  
+  overlap_prop_table <- merged_df |> 
+    # rename count columns
+    rename(model.count = count.x, lit.count = count.y) |> 
+    mutate(
+      # replace NA's with 0's
+      across(c(model.count, lit.count), ~ replace_na(., 0)),
+      
+      # 3) Taxa overlap (n)
+      overlap = pmap_int(list(gene.seq, model.species),
+                         ~ nrow(get_model_asvs(..1, ..2, "o"))),
+      
+      # 4) [Taxa overlap (n)] / [Lit count (n)]
+      prop.lit.overlap = overlap/lit.count,
+      
+      # 5) [Taxa overlap (n)] / [Model count (n)]
+      prop.model.overlap = overlap/model.count
+    )
+  
+  overlap_prop_table
+  
+}
+
+# Summary table for Order
+get_summary_table()
+
+# Summary table for Class
+get_summary_table(taxonomic.level = "c")
+
+
 
