@@ -6,6 +6,7 @@ library(pls)
 library(collapse)
 library(magrittr)
 data_dir <- 'data/processed/'
+stbl_dir <- 'rslt/stability-selection/16s-ss/'
 out_dir <- 'rslt/nested-validation/16s-ss/'
 dir_create(out_dir)
 paste(out_dir, 'inner-spls-fits/', sep = '_') |> dir_create()
@@ -27,22 +28,19 @@ partitions_nested <- paste(data_dir,
                            sep = '') |> 
   read_rds()
 
-## HYPERPARAMETER SPECIFICATION ------------------------------------------------
+# import optimal settings from stability selection
+stable_sets <- paste(stbl_dir, 'stable-sets.rds', sep = '') |> read_rds()
 
-# hyperparameter grids
-eta_grid_res <- 55
-eta_grid <- rev(1 - exp(seq(log(0.075), log(0.6), length = eta_grid_res)))
-ncomp_grid <- 6
+# retrieve relevant portion of model grid
+model_grid <- paste(stbl_dir, 'model-grid.rds', sep = '') |> 
+  read_rds() |>
+  left_join(stable_sets, join_by(species), suffix = c('', '.opt')) |>
+  filter(ncomp == ncomp.opt,
+         eta <= eta.max,
+         eta >= eta.min) |>
+  select(species, ncomp, eta)
 
 ## FIT MODELS TO INNER PARTITIONS ----------------------------------------------
-
-# models to fit
-model_grid <- expand_grid(species = c('bm', 'bp', 'mn'),
-                          ncomp = ncomp_grid,
-                          eta = eta_grid)
-
-# export
-write_rds(model_grid, file = paste(out_dir, 'model-grid.rds', sep = ''))
 
 # check no. models to fit
 nrow(partitions_nested)*nrow(model_grid)
@@ -89,7 +87,7 @@ fit_fn <- function(.species, .eta, .ncomp){
 }
 
 # fit each model on every nested partition
-## LONG RUNTIME: 5.5hr
+## LONG RUNTIME: 
 for(i in 1:nrow(model_grid)){
   fit_fn(.species = model_grid$species[i],
          .eta = model_grid$eta[i],
@@ -116,177 +114,20 @@ sel_freq <- sel_asvs |>
   count() |>
   ungroup()
 
-# compute average number of asvs selected across inner partitions for each configuration
-avg_n_asv <- sel_asvs |>
-  mutate(n.asv = map(asv, length)) |>
-  unnest(n.asv) |>
-  select(species, ncomp, eta, outer.id, n.asv) |>
-  fgroup_by(outer.id, species, ncomp, eta) |>
-  fselect(n.asv) |>
-  fmean()
-
 # stability threshold (minimax selection prob.)
 pi.max <- 0.8
 
-# upper bound on expected no. false positives
-EV.max <- 1
-
-# limits for average number of selected asvs
-q.max <- sqrt((2*pi.max - 1)*p*EV.max)
-q.min <- 15
-
-# generate intervals spanning eta grid (sparsity hyperparameter)
-eta_intervals <- expand_grid(eta.min.ix = seq(1, length(eta_grid), by = 2),
-                             eta.max.ix = rev(eta.min.ix)) |>
-  filter(eta.max.ix - eta.min.ix > 4) |>
-  mutate(eta.max = eta_grid[eta.max.ix],
-         eta.min = eta_grid[eta.min.ix])
-
-# identify hyperparameter ranges maintaining specified EVmax for all outer partitions
-candidate_ranges <- avg_n_asv |>
-  nest(model.rslt = -eta) |>
-  mutate(interval = list(eta_intervals)) |>
-  unnest(cols = interval) |>
-  filter(eta >= eta.min, eta <= eta.max) |>
-  unnest(cols = model.rslt) |>
-  fgroup_by(outer.id, species, ncomp, eta.min, eta.max) |>
-  fsummarize(q = fmean(n.asv),
-             sd = fsd(n.asv)) |>
-  filter(q < q.max, q > q.min, sd/q < 1)  |>
-  select(outer.id, species, ncomp, eta.min, eta.max, q) |>
-  group_by(species, ncomp, eta.min, eta.max) |>
-  count() |>
-  filter(n == 25) |>
-  expand_grid(outer.id = partitions_nested$outer.id |> unique()) |>
-  select(outer.id, species, ncomp, eta.min, eta.max)
-
-# compute stable sets from each candidate parameter configuration
-## LONG RUNTIME ~10min
-candidate_sets_list <- lapply(1:nrow(candidate_ranges), function(j){
-  .parms <- slice(candidate_ranges, j)
-  out <- sel_freq |> 
-    fsubset(outer.id == .parms$outer.id &
-              eta >= .parms$eta.min &
-              eta <= .parms$eta.max &
-              ncomp == .parms$ncomp &
-              n >= 24*pi.max &
-              species == .parms$species) |>
-    pull(asv) |>
-    unique()
-  print(j)
-  return(out)
-}) 
-
-# identify unique candidate sets at least twice as large as the number of components
-candidate_settings <- candidate_sets_list %>%
-  mutate(candidate_ranges, ss = .) |>
-  pivot_wider(names_from = outer.id, values_from = ss) |>
-  group_by(across(-c(eta.min, eta.max))) |>
-  slice_min(eta.max - eta.min) |>
-  ungroup() |>
-  mutate(across(starts_with('20'), ~map(.x, length))) |>
-  unnest(everything()) |>
-  rowwise() |>
-  mutate(min.size = min(c_across(where(is.integer)))) |>
-  filter(min.size >= 2*ncomp) |>
-  select(species, ncomp, eta.min, eta.max)
-
-# store as data frame
-candidate_sets <- candidate_sets_list %>%
-  mutate(candidate_ranges, ss = .) |>
-  inner_join(candidate_settings, join_by(species, ncomp, eta.min, eta.max))
-
-# export result
-write_rds(candidate_sets, 
-          file = paste(out_dir, 'candidate-sets.rds', sep = ''))
-
-## PREDICTIONS ON OUTER PARTITIONS ---------------------------------------------
-
-# read in candidate sets estimated from inner partitions
-candidate_sets <- paste(out_dir, 'candidate-sets.rds', sep = '') |> read_rds()
-
-# read in nonnested leave one out partitions
-partitions <- paste(data_dir, 
-                    '_combined-partitions/partitions-16s-ss.rds', 
-                    sep = '') |> 
-  read_rds()
-
-# fit models on outer training partitions and compute predictions
-preds_outer <- lapply(1:nrow(candidate_sets), function(i){
-  
-  # select stable set
-  .ss <- slice(candidate_sets, i)
-  
-  # extract corresponding outer partition
-  .partition <- partitions |> filter(test.id == .ss$outer.id)
-  
-  # extract training data and column filter to stable set asvs
-  x.train <- .partition$train[[1]] |> select(any_of(.ss$ss[[1]]))
-  y.train <- .partition$train[[1]] |> pull(.ss$species)
-  .train <- bind_cols(y = y.train, x.train)
-  
-  # extract test data and column filter to stable set asvs
-  x.test <- .partition$test[[1]] |> select(any_of(.ss$ss[[1]]))
-  y.test <- .partition$test[[1]] |> pull(.ss$species)
-  
-  # fit pls model on training data
-  .fit <- plsr(y ~ ., data = .train, ncomp = .ss$ncomp, scale = F, center = T)
-  
-  # compute prediction on outer test partition
-  .pred <- predict(.fit, x.test)[, , paste(.ss$ncomp, 'comps')]
-  
-  # outputs
-  out <- .ss |>
-    bind_cols(obs.lr = y.test,
-              pred.lr = .pred)
-  
-  print(i)
-  return(out)
-}) %>%
-  Reduce(bind_rows, .)
-
-# rearrange raw scaled sighting data for join with fitted values
-sightings_raw_long <- sightings_raw |>
-  pivot_longer(c(bp, bm, mn), names_to = 'species', values_to = 'obs.ss')
-
-# seasonal means from outer partitions
-ss_means_long_outer <- partitions |>
-  select(test.id, seasonal.means) |>
-  left_join(select(sightings_raw, cruise, season), 
-            join_by(test.id == cruise)) |>
-  rename(outer.season = season) |>
-  unnest(seasonal.means) |>
-  filter(outer.season == season) |>
-  pivot_longer(starts_with('log'), 
-               names_to = 'species',
-               values_to = 'seasonal.mean') |>
-  mutate(species = str_remove(species, 'log.') |> str_remove('.mean')) |>
-  select(-season) 
-
-# back-transform predictions to original scale
-preds_outer_df <- preds_outer |>
-  left_join(ss_means_long_outer, 
-            join_by(species, outer.id == test.id)) |>
-  left_join(sightings_raw_long,
-            join_by(species, outer.id == cruise)) |>
-  mutate(obs.ss.imp = exp(obs.lr + seasonal.mean),
-         pred.ss = exp(pred.lr + seasonal.mean)) 
+# compute stable sets for each outer partition
+validation_stable_sets <- sel_freq |>
+  filter(n >= pi.max*24) |>
+  select(outer.id, species, asv) |>
+  nest(asv = asv) |>
+  mutate(asv = map(asv, ~pull(.x, asv))) |>
+  arrange(species, outer.id) 
 
 # export
-write_rds(preds_outer_df, file = paste(out_dir, 'loo-preds-outer.rds', sep = ''))
-
-# compute prediction metrics and choose best settings
-best_settings <- preds_outer_df |>
-  group_by(species, ncomp, eta.min, eta.max) |>
-  summarize(outer.cor = cor(obs.ss, pred.ss),
-            outer.rmspe = sqrt(mean((obs.ss - pred.ss)^2))) |>
-  ungroup() |>
-  group_by(species) |>
-  slice_min(outer.rmspe) |>
-  ungroup()
-
-# export
-write_rds(best_settings, file = paste(out_dir, 'best-settings.rds', sep = ''))
+write_rds(validation_stable_sets, 
+          file = paste(out_dir, 'validation-stable-sets.rda', sep = ''))
 
 # ## ASSESS STABLE SET CONSISTENCY -----------------------------------------------
 # 

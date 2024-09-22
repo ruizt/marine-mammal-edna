@@ -6,7 +6,7 @@ library(spls)
 library(pls)
 library(collapse)
 data_dir <- 'data/processed/'
-val_dir <- 'rslt/nested-validation/18sv4-ss/'
+# val_dir <- 'rslt/nested-validation/18sv4-ss/'
 out_dir <- 'rslt/stability-selection/18sv4-ss/'
 dir_create(out_dir)
 
@@ -27,17 +27,25 @@ loo_partitions <- paste(data_dir,
                         sep = '') |> 
   read_rds()
 
-# best hyperparameter settings from nested validation
-best_settings <- paste(val_dir, 'best-settings.rds', sep = '') |> read_rds()
+## HYPERPARAMETER SPECIFICATION ------------------------------------------------
 
-## FIT MODELS TO TRAINING PARTITIONS -------------------------------------------
+# hyperparameter grids
+eta_grid_res <- 55
+eta_grid <- rev(1 - exp(seq(log(0.075), log(0.6), length = eta_grid_res)))
+ncomp_grid <- 4:12
 
 # models to fit
-model_grid <- paste(val_dir, 'model-grid.rds', sep = '') |>
-  read_rds() |>
-  left_join(best_settings, join_by(species, ncomp)) |>
-  filter(eta >= eta.min, eta <= eta.max) |>
-  select(species, ncomp, eta)
+model_grid <- expand_grid(species = c('bm', 'bp', 'mn'),
+                          ncomp = ncomp_grid,
+                          eta = eta_grid)
+
+# number of models to fit
+nrow(model_grid)*nrow(loo_partitions)
+
+# export
+write_rds(model_grid, file = paste(out_dir, 'model-grid.rds', sep = ''))
+
+## FIT MODELS TO TRAINING PARTITIONS -------------------------------------------
 
 # # for testing
 # j <- 1
@@ -84,6 +92,8 @@ fit_fn <- function(.species, .eta, .ncomp){
   return(out)
 }
 
+# fit every model specified by model grid to every data partition
+## LONG RUNTIME ~1hr
 paste(out_dir, 'spls-fits/', sep = '_') |> dir_create()
 for(i in 1:nrow(model_grid)){
   fit_fn(.species = model_grid$species[i],
@@ -98,34 +108,91 @@ for(i in 1:nrow(model_grid)){
 
 ## CONSTRUCT STABLE SETS -------------------------------------------------------
 
-# stability threshold (minimax selection prob.)
-pi.max <- 0.8
-
 # retreive selected asvs from procedure above
 sel_asvs <- paste(out_dir, '_spls-fits/', sep = '') |>
   dir_ls() |>
   lapply(read_rds) %>%
   Reduce(bind_rows, .)
 
-# compute stable sets
-stable_sets <- sel_asvs |>
+# compute selection frequencies across partitions for each model configuration
+sel_freq <- sel_asvs |>
   unnest(sel.asv) |>
   group_by(species, eta, ncomp, sel.asv) |>
   count() |>
+  ungroup()
+
+# compute average number of asvs selected across partitions for each configuration
+avg_n_asv <- sel_asvs |>
+  mutate(n.asv = map(sel.asv, length)) |>
+  unnest(n.asv) |>
+  select(species, ncomp, eta, obs.id, n.asv) |>
+  fgroup_by(species, ncomp, eta) |>
+  fselect(n.asv) |>
+  fmean()
+
+# stability threshold (minimax selection prob.)
+pi.max <- 0.8
+
+# upper bound on expected no. false positives
+EV.max <- 1
+
+# limits for average number of selected asvs
+q.max <- sqrt((2*pi.max - 1)*p*EV.max)
+q.min <- 15
+
+# generate intervals spanning eta grid (sparsity hyperparameter)
+eta_intervals <- expand_grid(eta.min.ix = seq(1, length(eta_grid), by = 2),
+                             eta.max.ix = rev(eta.min.ix)) |>
+  filter(eta.max.ix - eta.min.ix > 4) |>
+  mutate(eta.max = eta_grid[eta.max.ix],
+         eta.min = eta_grid[eta.min.ix])
+
+# identify hyperparameter ranges maintaining specified EVmax for all partitions
+candidate_ranges <- avg_n_asv |>
+  nest(model.rslt = -eta) |>
+  mutate(interval = list(eta_intervals)) |>
+  unnest(cols = interval) |>
+  filter(eta >= eta.min, eta <= eta.max) |>
+  unnest(cols = model.rslt) |>
+  fgroup_by(species, ncomp, eta.min, eta.max) |>
+  fsummarize(q = fmean(n.asv),
+             sd = fsd(n.asv)) |>
+  filter(q < q.max, q > q.min, sd/q < 1)  |>
+  select(species, ncomp, eta.min, eta.max)
+
+# compute stable sets from each candidate parameter configuration
+candidate_sets_list <- lapply(1:nrow(candidate_ranges), function(j){
+  .parms <- slice(candidate_ranges, j)
+  out <- sel_freq |> 
+    fsubset(eta >= .parms$eta.min &
+              eta <= .parms$eta.max &
+              ncomp == .parms$ncomp &
+              n >= n.obs*pi.max &
+              species == .parms$species) |>
+    pull(sel.asv) |>
+    unique()
+  print(j)
+  return(out)
+}) 
+
+# identify unique candidate sets at least twice as large as the number of components
+candidate_sets <- candidate_sets_list %>%
+  mutate(candidate_ranges, ss = .) |>
+  group_by(across(-c(eta.min, eta.max))) |>
+  slice_min(eta.max - eta.min) |>
   ungroup() |>
-  filter(n >= pi.max*n.obs) |>
-  distinct(species, ncomp, sel.asv) |>
-  nest(ss = sel.asv) |>
-  mutate(ss = map(ss, ~pull(.x, sel.asv)))
+  mutate(n.asv = map(ss, length)) |>
+  filter(n.asv >= 2*ncomp) |>
+  select(species, ncomp, eta.min, eta.max, ss)
+
 
 ## LEAVE ONE OUT PROCEDURE TO PICK PREDICTION-OPTIMAL CANDIDATE ----------------
 
 # generate logratio predictions on held out observations for each stable set
-## LONG RUNTIME: ~5min
-loo_preds <- lapply(1:nrow(stable_sets), function(i){
+loo_preds <- lapply(1:nrow(candidate_sets), function(i){
   
   # extract stable set
-  .ss <- slice(stable_sets, i)
+  .ss <- slice(candidate_sets, i)
   
   # fit pls model to every partition using specified stable set
   out <- lapply(1:nrow(loo_partitions), function(j){
@@ -151,7 +218,6 @@ loo_preds <- lapply(1:nrow(stable_sets), function(i){
     
     # outputs
     out <- .ss |>
-      select(species) |>
       bind_cols(obs.id = .partition$test.id,
                 obs.season = .partition$test.season,
                 obs.lr = y.test,
@@ -191,8 +257,21 @@ loo_pred_df <- loo_preds |>
   mutate(obs.ss.imp = exp(obs.lr + seasonal.mean),
          pred.ss = exp(pred.lr + seasonal.mean)) 
 
+# choose prediction-optimal candidate for each species
+stable_sets <- loo_pred_df |>
+  group_by(species, ncomp, eta.min, eta.max, ss) |>
+  summarize(rmspe.ss = (obs.ss - pred.ss)^2 |> mean() |> sqrt(),
+            rmspe.lr = (obs.lr - pred.lr)^2 |> mean() |> sqrt(),
+            cor.ss = cor(obs.ss, pred.ss),
+            cor.lr = cor(obs.lr, pred.lr)) |>
+  group_by(species) |>
+  slice_min(rmspe.ss)
+
+# # extract predictions from optimal candidates
+# best_loo_preds <- inner_join(stable_sets, loo_pred_df)
+# 
 # # plot (x-y)
-# loo_pred_df |>
+# best_loo_preds |>
 #   select(species, obs.id, obs.ss, pred.ss) |>
 #   ggplot(aes(x = obs.ss, y = pred.ss)) +
 #   facet_wrap(~species) +
@@ -202,7 +281,7 @@ loo_pred_df <- loo_preds |>
 #   scale_y_log10()
 # 
 # # plot (series)
-# loo_pred_df |>
+# best_loo_preds |>
 #   select(species, obs.id, obs.ss, pred.ss) |>
 #   mutate(cruise.ym = ym(obs.id)) |>
 #   pivot_longer(c(obs.ss, pred.ss)) |>
@@ -252,7 +331,7 @@ boot_fn <- function(.species, .ncomp, .asv, .reps){
 }
 
 # fit stable set models to 1k bootstrap samples for each partition
-## LONG RUNTIME: ~15min
+## LONG RUNTIME: ~5min
 paste(out_dir, '_bootstrap-preds/', sep = '') |> dir_create()
 for(j in 1:3){
   boot_fn(.species = stable_sets$species[j],
@@ -294,13 +373,14 @@ pred_quantiles <- loo_sightings |>
 
 # join with leave one out predictions
 pred_df <- loo_pred_df |>
+  inner_join(stable_sets) |>
   left_join(pred_quantiles, 
             join_by(obs.id == test.id, 
                     obs.season == test.season, 
                     species == test.species)) |>
   select(species, starts_with('obs'), starts_with('pred'), -ends_with('.imp')) 
 
-## EXPORT STABLE SET AND LEAVE ONE OUT PREDICTIONS -----------------------------
+## EXPORT STABLE SETS AND LEAVE ONE OUT PREDICTIONS ----------------------------
 
 write_rds(pred_df, file = paste(out_dir, 'loo-preds.rds', sep = ''))
 write_rds(stable_sets, file = paste(out_dir, 'stable-sets.rds', sep = ''))
