@@ -127,7 +127,7 @@ validation_stable_sets <- sel_freq |>
 
 # export
 write_rds(validation_stable_sets, 
-          file = paste(out_dir, 'validation-stable-sets.rda', sep = ''))
+          file = paste(out_dir, 'validation-stable-sets.rds', sep = ''))
 
 # ## ASSESS STABLE SET CONSISTENCY -----------------------------------------------
 # 
