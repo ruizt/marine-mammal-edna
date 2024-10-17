@@ -123,37 +123,9 @@ validation_stable_sets <- sel_freq |>
   select(outer.id, species, asv) |>
   nest(asv = asv) |>
   mutate(asv = map(asv, ~pull(.x, asv))) |>
-  arrange(species, outer.id) 
+  arrange(species, outer.id) |>
+  mutate(asv = map(asv, unique))
 
 # export
 write_rds(validation_stable_sets, 
           file = paste(out_dir, 'validation-stable-sets.rds', sep = ''))
-
-# ## ASSESS STABLE SET CONSISTENCY -----------------------------------------------
-# 
-# # function to compute "soft intersection" of sets in <set_list>
-# intersect_fn <- function(set_list, thresh){
-#   out <- tibble(asv = Reduce(c, set_list)) |> 
-#     group_by(asv) |> 
-#     count() |>
-#     filter(n >= thresh*length(set_list)) |>
-#     pull(asv)
-#   return(out)
-# }
-# 
-# # function to compute no. of elements in union of sets in <set_list>
-# union_fn <- function(set_list){
-#   out <- Reduce(c, set_list) |> unique()
-#   return(out)
-# }
-# 
-# # general consistency across all candidate sets considered
-# inner_join(candidate_sets, best_settings) |>
-#   select(species, ss)  |>
-#   group_by(species) |>
-#   summarize(int = intersect_fn(ss, 0.5) |> list(),
-#             un = union_fn(ss) |> list()) |>
-#   mutate(j.index = map2(int, un, ~length(.x)/length(.y))) |>
-#   unnest(j.index) 
-
-
