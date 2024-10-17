@@ -64,46 +64,14 @@ pred_metrics <- paste(stbl_dir, '18sv9-ss/loo-preds.rds', sep = '') |>
             rmspe.ss = (pred.ss - obs.ss)^2 |> mean() |> sqrt(),
             rmspe.lr = (pred.lr - obs.lr)^2 |> mean() |> sqrt())
 
-# predictions from nested validation from 18sv9 model
-settings <- paste(val_dir, '18sv9-ss/best-settings.rds', sep = '') |> 
-  read_rds() |>
-  select(species, eta.min, eta.max)
-outer_metrics <- paste(val_dir, '18sv9-ss/loo-preds-outer.rds', sep = '') |> 
-  read_rds() |>
-  nest(data = -c(species, eta.min, eta.max)) |>
-  inner_join(settings, join_by(species, eta.min, eta.max)) |>
-  unnest(data) |>
-  group_by(species) |>
-  summarize(cor.ss.outer = cor(pred.ss, obs.ss),
-            cor.lr.outer = cor(pred.lr, obs.lr),
-            rmspe.ss.outer = (pred.ss - obs.ss)^2 |> mean() |> sqrt(),
-            rmspe.lr.outer = (pred.lr - obs.lr)^2 |> mean() |> sqrt())
-
-# naive predictions using seasonal means
-mean_pred_metrics <- loo_sightings |>
-  unnest(seasonal.means) |>
-  filter(season == test.season) |>
-  unnest(test) |>
-  rename_with(~str_remove_all(.x, 'log.')) |>
-  pivot_longer(c(ends_with('.mean'), 'bp', 'bm', 'mn')) |>
-  separate(name, into = c('species', 'type')) |>
-  mutate(type = replace_na(type, 'obs')) |>
-  pivot_wider(names_from = 'type', values_from = 'value') |>
-  rename(obs.lr = obs, pred.lr = mean) |>
-  mutate(obs.ss = exp(obs.lr),
-         pred.ss = exp(pred.lr)) |>
-  group_by(species) |>
-  summarize(rmspe.ss.mean = (pred.ss - obs.ss)^2 |> mean() |> sqrt(),
-            rmspe.lr.mean = (pred.lr - obs.lr)^2 |> mean() |> sqrt())
-
 # consistency of selection procedure
-selection_consistency <- paste(val_dir, '18sv9-ss/candidate-sets.rds', sep = '') |> 
+selection_consistency <- paste(val_dir, '18sv9-ss/validation-stable-sets.rds', sep = '') |>
   read_rds() |>
-  inner_join(settings) |>
-  select(species, ss)  |>
+  mutate(asv = map(asv, unique)) |>
+  select(species, asv)  |>
   group_by(species) |>
-  summarize(int = intersect_fn(ss, 0.5) |> list(),
-            un = union_fn(ss) |> list()) |>
+  summarize(int = intersect_fn(asv, 0.5) |> list(),
+            un = union_fn(asv) |> list()) |>
   mutate(j.index = map2(int, un, ~length(.x)/length(.y))) |>
   mutate(int = map(int, length),
          un = map(un, length)) |>
@@ -114,8 +82,6 @@ model_summary_18sv9 <- model_metrics |>
   mutate(marker = '18sv9') |>
   select(species, marker, n.asv, adj.rsq.lr, adj.rsq.ss) |>
   left_join(pred_metrics) |>
-  left_join(mean_pred_metrics) |>
-  left_join(outer_metrics) |>
   left_join(selection_consistency)
 
 # selected asvs from 18sv4 model
@@ -143,46 +109,13 @@ pred_metrics <- paste(stbl_dir, '18sv4-ss/loo-preds.rds', sep = '') |>
             rmspe.ss = (pred.ss - obs.ss)^2 |> mean() |> sqrt(),
             rmspe.lr = (pred.lr - obs.lr)^2 |> mean() |> sqrt())
 
-# predictions from nested validation from 18sv4 model
-settings <- paste(val_dir, '18sv4-ss/best-settings.rds', sep = '') |> 
-  read_rds() |>
-  select(species, eta.min, eta.max)
-outer_metrics <- paste(val_dir, '18sv4-ss/loo-preds-outer.rds', sep = '') |> 
-  read_rds() |>
-  nest(data = -c(species, eta.min, eta.max)) |>
-  inner_join(settings, join_by(species, eta.min, eta.max)) |>
-  unnest(data) |>
-  group_by(species) |>
-  summarize(cor.ss.outer = cor(pred.ss, obs.ss),
-            cor.lr.outer = cor(pred.lr, obs.lr),
-            rmspe.ss.outer = (pred.ss - obs.ss)^2 |> mean() |> sqrt(),
-            rmspe.lr.outer = (pred.lr - obs.lr)^2 |> mean() |> sqrt())
-
-# naive predictions using seasonal means
-mean_pred_metrics <- loo_sightings |>
-  unnest(seasonal.means) |>
-  filter(season == test.season) |>
-  unnest(test) |>
-  rename_with(~str_remove_all(.x, 'log.')) |>
-  pivot_longer(c(ends_with('.mean'), 'bp', 'bm', 'mn')) |>
-  separate(name, into = c('species', 'type')) |>
-  mutate(type = replace_na(type, 'obs')) |>
-  pivot_wider(names_from = 'type', values_from = 'value') |>
-  rename(obs.lr = obs, pred.lr = mean) |>
-  mutate(obs.ss = exp(obs.lr),
-         pred.ss = exp(pred.lr)) |>
-  group_by(species) |>
-  summarize(rmspe.ss.mean = (pred.ss - obs.ss)^2 |> mean() |> sqrt(),
-            rmspe.lr.mean = (pred.lr - obs.lr)^2 |> mean() |> sqrt())
-
 # consistency of selection procedure
-selection_consistency <- paste(val_dir, '18sv4-ss/candidate-sets.rds', sep = '') |> 
+selection_consistency <- paste(val_dir, '18sv4-ss/validation-stable-sets.rds', sep = '') |> 
   read_rds() |>
-  inner_join(settings) |>
-  select(species, ss)  |>
+  select(species, asv)  |>
   group_by(species) |>
-  summarize(int = intersect_fn(ss, 0.5) |> list(),
-            un = union_fn(ss) |> list()) |>
+  summarize(int = intersect_fn(asv, 0.5) |> list(),
+            un = union_fn(asv) |> list()) |>
   mutate(j.index = map2(int, un, ~length(.x)/length(.y))) |>
   mutate(int = map(int, length),
          un = map(un, length)) |>
@@ -193,8 +126,6 @@ model_summary_18sv4 <- model_metrics |>
   mutate(marker = '18sv4') |>
   select(species, marker, n.asv, adj.rsq.lr, adj.rsq.ss) |>
   left_join(pred_metrics) |>
-  left_join(mean_pred_metrics) |>
-  left_join(outer_metrics) |>
   left_join(selection_consistency)
 
 # selected asvs from 18sv4 model
@@ -222,46 +153,13 @@ pred_metrics <- paste(stbl_dir, '16s-ss/loo-preds.rds', sep = '') |>
             rmspe.ss = (pred.ss - obs.ss)^2 |> mean() |> sqrt(),
             rmspe.lr = (pred.lr - obs.lr)^2 |> mean() |> sqrt())
 
-# predictions from nested validation from 16s model
-settings <- paste(val_dir, '16s-ss/best-settings.rds', sep = '') |> 
-  read_rds() |>
-  select(species, eta.min, eta.max)
-outer_metrics <- paste(val_dir, '16s-ss/loo-preds-outer.rds', sep = '') |> 
-  read_rds() |>
-  nest(data = -c(species, eta.min, eta.max)) |>
-  inner_join(settings, join_by(species, eta.min, eta.max)) |>
-  unnest(data) |>
-  group_by(species) |>
-  summarize(cor.ss.outer = cor(pred.ss, obs.ss),
-            cor.lr.outer = cor(pred.lr, obs.lr),
-            rmspe.ss.outer = (pred.ss - obs.ss)^2 |> mean() |> sqrt(),
-            rmspe.lr.outer = (pred.lr - obs.lr)^2 |> mean() |> sqrt())
-
-# naive predictions using seasonal means
-mean_pred_metrics <- loo_sightings |>
-  unnest(seasonal.means) |>
-  filter(season == test.season) |>
-  unnest(test) |>
-  rename_with(~str_remove_all(.x, 'log.')) |>
-  pivot_longer(c(ends_with('.mean'), 'bp', 'bm', 'mn')) |>
-  separate(name, into = c('species', 'type')) |>
-  mutate(type = replace_na(type, 'obs')) |>
-  pivot_wider(names_from = 'type', values_from = 'value') |>
-  rename(obs.lr = obs, pred.lr = mean) |>
-  mutate(obs.ss = exp(obs.lr),
-         pred.ss = exp(pred.lr)) |>
-  group_by(species) |>
-  summarize(rmspe.ss.mean = (pred.ss - obs.ss)^2 |> mean() |> sqrt(),
-            rmspe.lr.mean = (pred.lr - obs.lr)^2 |> mean() |> sqrt())
-
 # consistency of selection procedure
-selection_consistency <- paste(val_dir, '16s-ss/candidate-sets.rds', sep = '') |> 
+selection_consistency <- paste(val_dir, '16s-ss/validation-stable-sets.rds', sep = '') |> 
   read_rds() |>
-  inner_join(settings) |>
-  select(species, ss)  |>
+  select(species, asv)  |>
   group_by(species) |>
-  summarize(int = intersect_fn(ss, 0.5) |> list(),
-            un = union_fn(ss) |> list()) |>
+  summarize(int = intersect_fn(asv, 0.5) |> list(),
+            un = union_fn(asv) |> list()) |>
   mutate(j.index = map2(int, un, ~length(.x)/length(.y))) |>
   mutate(int = map(int, length),
          un = map(un, length)) |>
@@ -272,8 +170,6 @@ model_summary_16s <- model_metrics |>
   mutate(marker = '16s') |>
   select(species, marker, n.asv, adj.rsq.lr, adj.rsq.ss) |>
   left_join(pred_metrics) |>
-  left_join(mean_pred_metrics) |>
-  left_join(outer_metrics) |>
   left_join(selection_consistency)
 
 # join all model summaries

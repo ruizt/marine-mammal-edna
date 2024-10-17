@@ -87,7 +87,7 @@ fit_fn <- function(.species, .eta, .ncomp){
 }
 
 # fit each model on every nested partition
-## LONG RUNTIME: 
+## LONG RUNTIME
 for(i in 1:nrow(model_grid)){
   fit_fn(.species = model_grid$species[i],
          .eta = model_grid$eta[i],
