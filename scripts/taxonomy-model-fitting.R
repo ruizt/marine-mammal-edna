@@ -1,5 +1,7 @@
 library(tidyverse)
 library(spls)
+library(readxl)
+library(openxlsx)
 
 # Data processing --------------------------------------------------------------
 
@@ -7,10 +9,10 @@ library(spls)
 doc.rel <- read.csv(here::here("data/whale-edna-relationships.csv"))
 
 # load asv tables 
-table_names <- getSheetNames("rslt/tbl/asv-tables.xlsx")
+table_names <- getSheetNames("rslt/tbl/summary-tables.xlsx")
 
 all_sheets <- lapply(table_names, function(sheet) {
-  read_excel("rslt/tbl/asv-tables.xlsx", sheet = sheet)
+  read_excel("rslt/tbl/summary-tables.xlsx", sheet = sheet)
 })
 
 # candidate asvs
@@ -61,7 +63,7 @@ ss_asvs_all <- rbind(ss_asvs_16s,
                      ss_asvs_18sv9)
 
 ss_asvs_all <- ss_asvs_all |> 
-  mutate(model.species = paste(tolower(model.species), "s", sep = ""))
+  mutate(species = paste(tolower(species), "s", sep = ""))
 
 ss_asvs_all
 
@@ -74,28 +76,28 @@ ss_asvs_all
 
 # all of the asvs 
 ss_asvs_all |> 
-  inner_join(doc.rel, join_by(model.species == Whale.species,
+  inner_join(doc.rel, join_by(species == Whale.species,
                               p == Phylum,
                               c == Class)) |> 
-  select(gene.seq,asv.id,
-         model.species,
+  select(gene.seq,asv,
+         species,
          Connection,
          p,c,o,f,g) |> 
-  distinct() #|> group_by(model.species) |> count()
+  distinct() #|> group_by(species) |> count()
 
 
 # 16s ASVs to fit the model on
 asvs_16s <- ss_asvs_all |> 
   filter(gene.seq == "16s") |> 
-  inner_join(doc.rel, join_by(model.species == Whale.species,
+  inner_join(doc.rel, join_by(species == Whale.species,
                               p == Phylum,
                               c == Class)) |> 
-  select(gene.seq,asv.id,
-         model.species,
+  select(gene.seq,asv,
+         species,
          Connection,
          p,c,o,f,g) |> 
-  mutate(model.species = case_when(model.species == "blue whales" ~ "bm",
-                                   model.species == "humpback whales" ~ "mn")) |> 
+  mutate(species = case_when(species == "blue whales" ~ "bm",
+                             species == "humpback whales" ~ "mn")) |> 
   distinct()
 
 
@@ -120,7 +122,7 @@ whales <- inner_join(sightings, edna_16s, by = 'cruise')
 
 # MODEL FITTING GRID SEARCH FOR NCOMP
 species_grid <- c("bm","mn") # blue whales and humpbacks only
-ncomp_grid <- 1:10
+ncomp_grid <- 1:9
 n <- 25
 
 ss_taxonomy_results <- data.frame(
@@ -135,17 +137,19 @@ ss_taxonomy_results <- data.frame(
 )
 
 for(ncomp in ncomp_grid){
-  for(species in species_grid){
+  for(.species in species_grid){
     # select relevant features
     species_asvs <- asvs_16s |> 
-      filter(model.species == species)
+      filter(species == .species)
+    
+    print(species_asvs)
     
     p = species_asvs |> count()
     
     x <- whales |> 
-      select(all_of(species_asvs$asv.id)) 
+      select(all_of(species_asvs$asv)) 
     # target column
-    y <- whales |> select(species) |> pull()
+    y <- whales |> select(.species) |> pull()
     
     # fit model
     fit <- spls(x, y , eta = 0, K = ncomp)
@@ -157,14 +161,14 @@ for(ncomp in ncomp_grid){
     adj_r2 <- 1 - ((1-r2)*(n-1))/(n-ncomp-1)
     
     #loocv for mspe (this is why spls package is being used)
-    bp_cv_results <- cv.spls(x, y, fold = 25, eta = 0, K = ncomp)
+    bp_cv_results <- cv.spls(x, y, fold = 25, eta = 0, K = ncomp, plot.it = F)
     
     mspe <- bp_cv_results$mspemat[[1]]
     
     new_row <- data.frame(
       Marker = "16s",
       Model = "pls",
-      Species = species,
+      Species = .species,
       P = p,
       Ncomp = ncomp,
       R2 = r2,
@@ -190,10 +194,10 @@ best_ss_models <- ss_taxonomy_results |>
 
 # BM MODEL
 bm_16s_asvs_ss <- asvs_16s |> 
-  filter(model.species == "bm")
+  filter(species == "bm")
 
 bm_16s_ss <- whales |> 
-  select(bm, all_of(bm_16s_asvs_ss$asv.id))
+  select(bm, all_of(bm_16s_asvs_ss$asv))
 
 
 
@@ -225,10 +229,10 @@ bm_ss
 
 # MN MODEL 
 mn_16s_asvs_ss <- asvs_16s |> 
-  filter(model.species == "mn")
+  filter(species == "mn")
 
 mn_16s_ss <- whales |> 
-  select(mn, all_of(mn_16s_asvs_ss$asv.id))
+  select(mn, all_of(mn_16s_asvs_ss$asv))
 
 mn.fit <- lm(mn ~ ., data = mn_16s_ss)
 
@@ -359,7 +363,7 @@ for(ncomp in ncomp_grid){
     adj_r2 <- 1 - ((1-r2)*(n-1))/(n-ncomp-1)
     
     #loocv for mspe (this is why spls package is being used)
-    bp_cv_results <- cv.spls(x, y, fold = 25, eta = 0, K = ncomp)
+    bp_cv_results <- cv.spls(x, y, fold = 25, eta = 0, K = ncomp, plot.it = F)
     
     mspe <- bp_cv_results$mspemat[[1]]
     
@@ -410,10 +414,10 @@ whales
 
 ## BM MODEL --------------------------------------------------------------------
 bm_18sv9_asvs <- asvs_18sv9 |> 
-    filter(Whale.species == "blue whales")
-  
+  filter(Whale.species == "blue whales")
+
 bm_18sv9 <- whales |> 
-    select(bm, all_of(bm_18sv9_asvs$short.id))
+  select(bm, all_of(bm_18sv9_asvs$short.id))
 
 whales
 
@@ -432,7 +436,7 @@ for (i in 1:nrow(bm_18sv9)) {
   bm.fit <- lm(bm ~ ., data = loo)
   
   prediction <- predict(bm.fit, newdata = bm_18sv9[i, , drop = FALSE])
-
+  
   squared_errors[i] <- (bm_18sv9$bm[i] - prediction)^2
 }
 
@@ -535,8 +539,14 @@ candidate_asv_results <- rbind(best_16s_models,row1,row2,row3,)
 
 candidate_asv_results
 
+
 # stable set asv models
 
 ss_asv_results <- rbind(best_ss_models, bm_ss, mn_ss)
 
 ss_asv_results
+
+
+# Save results for later
+saveRDS(candidate_asv_results, "rslt/tbl/candidate-asv-model-res.rds")
+saveRDS(ss_asv_results, "rslt/tbl/stable-set-asv-model-res.rds")
