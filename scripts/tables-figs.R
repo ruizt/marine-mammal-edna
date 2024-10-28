@@ -55,6 +55,8 @@ sel_asv_18sv9 <- fitted_models |>
          coef.lr = coef) |>
   left_join(asv_taxa, join_by(asv == short.id))
 
+
+
 # prediction metrics from 18sv9 model
 pred_metrics <- paste(stbl_dir, '18sv9-ss/loo-preds.rds', sep = '') |> 
   read_rds() |>
@@ -64,7 +66,173 @@ pred_metrics <- paste(stbl_dir, '18sv9-ss/loo-preds.rds', sep = '') |>
             rmspe.ss = (pred.ss - obs.ss)^2 |> mean() |> sqrt(),
             rmspe.lr = (pred.lr - obs.lr)^2 |> mean() |> sqrt())
 
-# consistency of selection procedure
+# merge validation stable sets with asv taxa
+# why when run 71-73 theres 3 rows per outr.id?
+validation_stable_sets_18sv9 <- paste(val_dir, '18sv9-ss/validation-stable-sets.rds', sep = '') |>
+  read_rds() |>
+  mutate(asv = map(asv, unique)) |> 
+  unnest(asv)
+
+# dataframe to pass into intersect/union functions
+validation_ss_taxa_18sv9 <- validation_stable_sets_18sv9 |> 
+  left_join(asv_taxa_18sv9, join_by(asv == short.id))
+
+# Check counts are the same
+validation_ss_taxa_18sv9 |> group_by(outer.id) |> count()
+
+validation_stable_sets_18sv9 |> group_by(outer.id) |> count()
+
+# CODE CHUNK FOR TESTING
+# validation_ss_taxa |>
+#   group_by(species, outer.id, d,p,c) |>
+#   drop_na() |>
+#   unique() |>
+#   group_by(outer.id, species) |>
+#   summarize(class.list = list(c)) |>
+#   mutate(class.list = map(class.list, unique)) |>
+#   group_by(species) |>
+#   summarise(intersect = list(union_fn(class.list)))
+
+
+# Function: find intersection based on taxonomic levels
+# input: dataset containing validation id, species, asv, and taxonomic info
+# output: 1 row per species containing intersection based on taxonomic level
+
+intersect_fn_taxa <- function(data, tax.level, thresh){
+  
+  if(tolower(tax.level) == "c" | tolower(tax.level) == "class"){
+    
+    res <- data |> 
+      group_by(species, outer.id, d,p,c) |> 
+      drop_na() |> 
+      unique() |> 
+      group_by(outer.id, species) |> 
+      summarize(class.list = list(c)) |> 
+      mutate(class.list = map(class.list, unique)) |> 
+      group_by(species) |> 
+      summarise(intersect = list(intersect_fn(class.list, thresh)))
+  }
+  else if(tolower(tax.level) == "o" | tolower(tax.level) == "order"){
+    res <- data |> 
+      group_by(species, outer.id, d,p,c,o) |> 
+      drop_na() |> 
+      unique() |> 
+      group_by(outer.id, species) |> 
+      summarize(order.list = list(o)) |> 
+      mutate(order.list = map(order.list, unique)) |> 
+      group_by(species) |> 
+      summarise(intersect = list(intersect_fn(order.list, thresh)))
+  }
+  else if(tolower(tax.level) == "f" | tolower(tax.level) == "family"){
+    res <- data |> 
+      group_by(species, outer.id, d,p,c,o,f) |> 
+      drop_na() |> 
+      unique() |> 
+      group_by(outer.id, species) |> 
+      summarize(family.list = list(f)) |> 
+      mutate(family.list = map(family.list, unique)) |> 
+      group_by(species) |> 
+      summarise(intersect = list(intersect_fn(family.list, thresh)))
+  }
+  else{return("invalid taxonomic level")}
+  
+  return(res)
+}
+
+# test function
+intersect_fn_taxa(validation_ss_taxa_18sv9, "c", 0.5)
+
+intersect_fn_taxa(validation_ss_taxa_18sv9, "o", 0.5)
+
+intersect_fn_taxa(validation_ss_taxa_18sv9, "f", 0.5)
+
+# Function: find union based on taxonomic level
+# input: dataset containing validation id, species, asv, and taxonomic info
+# output: 1 row per species containing intersection based on taxonomic level
+
+union_fn_taxa <- function(data, tax.level){
+  
+  if(tolower(tax.level) == "c" | tolower(tax.level) == "class"){
+    
+    res <- data |> 
+      group_by(species, outer.id, d,p,c) |> 
+      drop_na() |> 
+      unique() |> 
+      group_by(outer.id, species) |> 
+      summarize(class.list = list(c)) |> 
+      mutate(class.list = map(class.list, unique)) |> 
+      group_by(species) |> 
+      summarise(union = list(union_fn(class.list)))
+  }
+  else if(tolower(tax.level) == "o" | tolower(tax.level) == "order"){
+    res <- data |> 
+      group_by(species, outer.id, d,p,c,o) |> 
+      drop_na() |> 
+      unique() |> 
+      group_by(outer.id, species) |> 
+      summarize(order.list = list(o)) |> 
+      mutate(order.list = map(order.list, unique)) |> 
+      group_by(species) |> 
+      summarise(union = list(union_fn(order.list)))
+  }
+  else if(tolower(tax.level) == "f" | tolower(tax.level) == "family"){
+    res <- data |> 
+      group_by(species, outer.id, d,p,c,o,f) |> 
+      drop_na() |> 
+      unique() |> 
+      group_by(outer.id, species) |> 
+      summarize(family.list = list(f)) |> 
+      mutate(family.list = map(family.list, unique)) |> 
+      group_by(species) |> 
+      summarise(union = list(union_fn(family.list)))
+  }
+  else{return("invalid taxonomic level")}
+  
+  return(res)
+}
+
+# test function
+union_fn_taxa(validation_ss_taxa_18sv9, "c")
+
+union_fn_taxa(validation_ss_taxa_18sv9, "o")
+
+union_fn_taxa(validation_ss_taxa_18sv9, "f")
+
+# Join all intersections (threshold = 0.5)
+class_int_18sv9 <- intersect_fn_taxa(validation_ss_taxa_18sv9, "c", 0.5) |> 
+  mutate(taxonomic.level = "class")
+
+order_int_18sv9 <- intersect_fn_taxa(validation_ss_taxa_18sv9, "o", 0.5) |> 
+  mutate(taxonomic.level = "order")
+
+family_int_18sv9 <- intersect_fn_taxa(validation_ss_taxa_18sv9, "f", 0.5) |> 
+  mutate(taxonomic.level = "family")
+
+# final table with all intersections by species and taxonomic level
+intersection_18sv9_tax <- rbind(class_int_18sv9, order_int_18sv9, family_int_18sv9)
+
+# Join all unions
+class_un_18sv9 <- union_fn_taxa(validation_ss_taxa_18sv9, "c") |> 
+  mutate(taxonomic.level = "class")
+
+order_un_18sv9 <- union_fn_taxa(validation_ss_taxa_18sv9, "o") |> 
+  mutate(taxonomic.level = "order")
+
+family_un_18sv9 <- union_fn_taxa(validation_ss_taxa_18sv9, "f") |> 
+  mutate(taxonomic.level = "family")
+
+# final table with all unions by species and taxonomic level
+union_18sv9_tax <- rbind(class_un_18sv9, order_un_18sv9, family_un_18sv9)
+
+
+# Final table containing j index for each species at class, order, and family level
+j_index_18sv9 <- intersection_18sv9_tax |> 
+  inner_join(union_18sv9_tax, join_by(species, taxonomic.level)) |> 
+  mutate(n.intersect = sapply(intersect, length),
+         n.union = sapply(union, length),
+         j.index = n.intersect/n.union)
+
+# consistency of selection procedure at asv level
 selection_consistency <- paste(val_dir, '18sv9-ss/validation-stable-sets.rds', sep = '') |>
   read_rds() |>
   mutate(asv = map(asv, unique)) |>
@@ -109,6 +277,69 @@ pred_metrics <- paste(stbl_dir, '18sv4-ss/loo-preds.rds', sep = '') |>
             rmspe.ss = (pred.ss - obs.ss)^2 |> mean() |> sqrt(),
             rmspe.lr = (pred.lr - obs.lr)^2 |> mean() |> sqrt())
 
+# merge validation stable sets with asv taxa
+validation_stable_sets_18sv4 <- paste(val_dir, '18sv4-ss/validation-stable-sets.rds', sep = '') |>
+  read_rds() |>
+  mutate(asv = map(asv, unique)) |> 
+  unnest(asv)
+
+# dataframe to pass into intersect/union functions
+validation_ss_taxa_18sv4 <- validation_stable_sets_18sv4 |> 
+  left_join(asv_taxa_18sv4, join_by(asv == short.id))
+
+# Check counts are the same
+validation_ss_taxa_18sv4 |> group_by(outer.id) |> count()
+
+validation_stable_sets_18sv4 |> group_by(outer.id) |> count()
+
+# test intersect function
+intersect_fn_taxa(validation_ss_taxa_18sv4, "c", 0.5)
+
+intersect_fn_taxa(validation_ss_taxa_18sv4, "o", 0.5)
+
+intersect_fn_taxa(validation_ss_taxa_18sv4, "f", 0.5)
+
+# test union function
+union_fn_taxa(validation_ss_taxa_18sv4, "c")
+
+union_fn_taxa(validation_ss_taxa_18sv4, "o")
+
+union_fn_taxa(validation_ss_taxa_18sv4, "f")
+
+# Join all intersections (threshold = 0.5)
+class_int_18sv4 <- intersect_fn_taxa(validation_ss_taxa_18sv4, "c", 0.5) |> 
+  mutate(taxonomic.level = "class")
+
+order_int_18sv4 <- intersect_fn_taxa(validation_ss_taxa_18sv4, "o", 0.5) |> 
+  mutate(taxonomic.level = "order")
+
+family_int_18sv4 <- intersect_fn_taxa(validation_ss_taxa_18sv4, "f", 0.5) |> 
+  mutate(taxonomic.level = "family")
+
+# final table with all intersections by species and taxonomic level
+intersection_18sv4_tax <- rbind(class_int_18sv4, order_int_18sv4, family_int_18sv4)
+
+# Join all unions
+class_un_18sv4 <- union_fn_taxa(validation_ss_taxa_18sv4, "c") |> 
+  mutate(taxonomic.level = "class")
+
+order_un_18sv4 <- union_fn_taxa(validation_ss_taxa_18sv4, "o") |> 
+  mutate(taxonomic.level = "order")
+
+family_un_18sv4 <- union_fn_taxa(validation_ss_taxa_18sv4, "f") |> 
+  mutate(taxonomic.level = "family")
+
+# final table with all unions by species and taxonomic level
+union_18sv4_tax <- rbind(class_un_18sv4, order_un_18sv4, family_un_18sv4)
+
+
+# Final table containing j index for each species at class, order, and family level
+j_index_18sv4 <- intersection_18sv4_tax |> 
+  inner_join(union_18sv4_tax, join_by(species, taxonomic.level)) |> 
+  mutate(n.intersect = sapply(intersect, length),
+         n.union = sapply(union, length),
+         j.index = n.intersect/n.union)
+
 # consistency of selection procedure
 selection_consistency <- paste(val_dir, '18sv4-ss/validation-stable-sets.rds', sep = '') |> 
   read_rds() |>
@@ -152,6 +383,70 @@ pred_metrics <- paste(stbl_dir, '16s-ss/loo-preds.rds', sep = '') |>
             cor.lr = cor(pred.lr, obs.lr),
             rmspe.ss = (pred.ss - obs.ss)^2 |> mean() |> sqrt(),
             rmspe.lr = (pred.lr - obs.lr)^2 |> mean() |> sqrt())
+
+
+# merge validation stable sets with asv taxa
+validation_stable_sets_16s <- paste(val_dir, '16s-ss/validation-stable-sets.rds', sep = '') |>
+  read_rds() |>
+  mutate(asv = map(asv, unique)) |> 
+  unnest(asv)
+
+# dataframe to pass into intersect/union functions
+validation_ss_taxa_16s <- validation_stable_sets_16s |> 
+  left_join(asv_taxa_16s, join_by(asv == short.id))
+
+# Check counts are the same
+validation_ss_taxa_16s |> group_by(outer.id) |> count()
+
+validation_stable_sets_16s |> group_by(outer.id) |> count()
+
+# test intersect function
+intersect_fn_taxa(validation_ss_taxa_16s, "c", 0.5)
+
+intersect_fn_taxa(validation_ss_taxa_16s, "o", 0.5)
+
+intersect_fn_taxa(validation_ss_taxa_16s, "f", 0.5)
+
+# test union function
+union_fn_taxa(validation_ss_taxa_16s, "c")
+
+union_fn_taxa(validation_ss_taxa_16s, "o")
+
+union_fn_taxa(validation_ss_taxa_16s, "f")
+
+# Join all intersections (threshold = 0.5)
+class_int_16s <- intersect_fn_taxa(validation_ss_taxa_16s, "c", 0.5) |> 
+  mutate(taxonomic.level = "class")
+
+order_int_16s <- intersect_fn_taxa(validation_ss_taxa_16s, "o", 0.5) |> 
+  mutate(taxonomic.level = "order")
+
+family_int_16s <- intersect_fn_taxa(validation_ss_taxa_16s, "f", 0.5) |> 
+  mutate(taxonomic.level = "family")
+
+# final table with all intersections by species and taxonomic level
+intersection_16s_tax <- rbind(class_int_16s, order_int_16s, family_int_16s)
+
+# Join all unions
+class_un_16s <- union_fn_taxa(validation_ss_taxa_16s, "c") |> 
+  mutate(taxonomic.level = "class")
+
+order_un_16s <- union_fn_taxa(validation_ss_taxa_16s, "o") |> 
+  mutate(taxonomic.level = "order")
+
+family_un_16s <- union_fn_taxa(validation_ss_taxa_16s, "f") |> 
+  mutate(taxonomic.level = "family")
+
+# final table with all unions by species and taxonomic level
+union_16s_tax <- rbind(class_un_16s, order_un_16s, family_un_16s)
+
+
+# Final table containing j index for each species at class, order, and family level
+j_index_16s <- intersection_16s_tax |> 
+  inner_join(union_16s_tax, join_by(species, taxonomic.level)) |> 
+  mutate(n.intersect = sapply(intersect, length),
+         n.union = sapply(union, length),
+         j.index = n.intersect/n.union)
 
 # consistency of selection procedure
 selection_consistency <- paste(val_dir, '16s-ss/validation-stable-sets.rds', sep = '') |> 
