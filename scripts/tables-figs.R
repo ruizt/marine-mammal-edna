@@ -246,7 +246,14 @@ selection_consistency <- paste(val_dir, '18sv9-ss/validation-stable-sets.rds', s
   mutate(j.index = map2(int, un, ~length(.x)/length(.y))) |>
   mutate(int = map(int, length),
          un = map(un, length)) |>
-  unnest(everything())
+  unnest(everything()) |> 
+  rename(n.intersect = int,
+         n.union = un) |> 
+  mutate(taxonomic.level = "asv",
+         intersect = NA,
+         union = NA)
+
+j_index_18sv9 <- rbind(j_index_18sv9, selection_consistency)
 
 # join metrics
 model_summary_18sv9 <- model_metrics |>
@@ -353,7 +360,14 @@ selection_consistency <- paste(val_dir, '18sv4-ss/validation-stable-sets.rds', s
   mutate(j.index = map2(int, un, ~length(.x)/length(.y))) |>
   mutate(int = map(int, length),
          un = map(un, length)) |>
-  unnest(everything())
+  unnest(everything())  |> 
+  rename(n.intersect = int,
+         n.union = un) |> 
+  mutate(taxonomic.level = "asv",
+         intersect = NA,
+         union = NA)
+
+j_index_18sv4 <- rbind(j_index_18sv4, selection_consistency)
 
 # join metrics
 model_summary_18sv4 <- model_metrics |>
@@ -461,7 +475,14 @@ selection_consistency <- paste(val_dir, '16s-ss/validation-stable-sets.rds', sep
   mutate(j.index = map2(int, un, ~length(.x)/length(.y))) |>
   mutate(int = map(int, length),
          un = map(un, length)) |>
-  unnest(everything())
+  unnest(everything())  |> 
+  rename(n.intersect = int,
+         n.union = un) |> 
+  mutate(taxonomic.level = "asv",
+         intersect = NA,
+         union = NA)
+
+j_index_16s <- rbind(j_index_16s, selection_consistency)
 
 # join metrics
 model_summary_16s <- model_metrics |>
@@ -473,6 +494,36 @@ model_summary_16s <- model_metrics |>
 # join all model summaries
 model_summaries <- bind_rows(model_summary_16s, model_summary_18sv4, model_summary_18sv9)
 
+# Read in candidate set & stable set asv model results
+candidate_model_results <- read_rds('rslt/tbl/candidate-asv-model-res.rds')
+ss_model_results <- read_rds('rslt/tbl/stable-set-asv-model-res.rds')
+
+# Read in lit review overlap tables
+class_overlap <- read_rds('rslt/tbl/overlap-table-class.rds')
+order_overlap <- read_rds('rslt/tbl/overlap-table-order.rds')
+
+# create final j index table
+j_index_16s <- j_index_16s |> 
+  mutate(gene.seq = "16s")
+
+j_index_18sv4 <- j_index_18sv4 |> 
+  mutate(gene.seq = "18sv4")
+
+j_index_18sv9 <- j_index_18sv9 |> 
+  mutate(gene.seq = "18sv9")
+
+j_index_final <- rbind(j_index_16s,j_index_18sv4, j_index_18sv9)
+
+j_index_final <- j_index_final |> 
+  select(species, taxonomic.level, gene.seq, j.index) |> 
+  pivot_wider(names_from = taxonomic.level,
+              values_from = j.index) |> 
+  arrange(species, gene.seq) |> 
+  rename(j.class = class,
+         j.order= order,
+         j.family = family,
+         j.asv = asv)
+
 # write as excel sheets
 sheets <- list("18Sv9-candidates" = asv_taxa_18sv9, 
                "18Sv4-candidates" = asv_taxa_18sv4,
@@ -480,8 +531,13 @@ sheets <- list("18Sv9-candidates" = asv_taxa_18sv9,
                "18Sv9-selected" = sel_asv_18sv9,
                "18Sv4-selected" = sel_asv_18sv4,
                "16S-selected" = sel_asv_16s,
-               "model-metrics" = model_summaries)
-writexl::write_xlsx(sheets, paste(out_dir, 'summary-tables.xlsx', sep = ''))
+               "model-metrics" = model_summaries,
+               "candidate-asv-overlap-results" = candidate_model_results,
+               "ss-asv-overlap-results" = ss_model_results,
+               "class-overlap-lit-review" = class_overlap,
+               "order-overlap-lit-review" = order_overlap,
+               "j-index" = j_index_final)
+writexl::write_xlsx(sheets, paste(tbl_out_dir, 'summary-tables.xlsx', sep = ''))
 
 rm(list = setdiff(ls(), dirs))
 
