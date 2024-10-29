@@ -1,18 +1,37 @@
 library(tidyverse)
 library(lubridate)
 library(patchwork)
+
+## DIRECTORIES -----------------------------------------------------------------
 data_dir <- 'data/processed/'
 model_dir <- 'rslt/models/scaled-sightings/'
 stbl_dir <- 'rslt/stability-selection/'
 val_dir <- 'rslt/nested-validation/'
-dirs <- c('data_dir', 'model_dir', 'stbl_dir', 'val_dir', 'dirs')
 
 tbl_out_dir <- 'rslt/tbl/'
 fs::dir_create(tbl_out_dir)
 fig_out_dir <- 'rslt/fig/'
 fs::dir_create(fig_out_dir)
 
-## ASV TABLES ------------------------------------------------------------------
+dirs <- c('data_dir', 'model_dir', 'stbl_dir', 'val_dir', 'dirs')
+
+## TABLE: SELECTION CONSISTENCY ------------------------------------------------
+
+## AMPLICON TAXONOMY
+
+# candidate asvs from 18sv9
+paste(data_dir, 'ncog18sv9.RData', sep = '') |> load()
+asv_taxa_18sv9 <- asv_taxa 
+
+# candidate asvs from 18sv4
+paste(data_dir, 'ncog18sv4.RData', sep = '') |> load()
+asv_taxa_18sv4 <- asv_taxa
+
+# candidate asvs from 16s
+paste(data_dir, 'ncog16s.RData', sep = '') |> load()
+asv_taxa_16s <- asv_taxa
+
+## UNION/INTERSECTION FUNCTIONS
 
 # function to compute "soft intersection" of sets in <set_list>
 intersect_fn <- function(set_list, thresh){
@@ -30,81 +49,11 @@ union_fn <- function(set_list){
   return(out)
 }
 
-# candidate asvs from 18sv9
-paste(data_dir, 'ncog18sv9.RData', sep = '') |> load()
-asv_taxa_18sv9 <- asv_taxa 
-
-# candidate asvs from 18sv4
-paste(data_dir, 'ncog18sv4.RData', sep = '') |> load()
-asv_taxa_18sv4 <- asv_taxa
-
-# candidate asvs from 16s
-paste(data_dir, 'ncog16s.RData', sep = '') |> load()
-asv_taxa_16s <- asv_taxa
-
-# selected asvs from 18sv9 model
-paste(data_dir, 'ncog18sv9.RData', sep = '') |> load()
-paste(model_dir, 'fitted-models-18sv9.RData', sep = '') |> load()
-sel_asv_18sv9 <- fitted_models |>
-  mutate(species = factor(species, 
-                          levels = c('bm', 'bp', 'mn'),
-                          labels = c('Blue whale', 
-                                     'Fin whale', 
-                                     'Humpback whale')),
-         coef.ss = map(coef, ~2^.x)) |>
-  select(species, coef, coef.ss, ss) |>
-  unnest(everything()) |>
-  rename(asv = ss,
-         coef.lr = coef) |>
-  left_join(asv_taxa, join_by(asv == short.id))
-
-
-
-# prediction metrics from 18sv9 model
-pred_metrics <- paste(stbl_dir, '18sv9-ss/loo-preds.rds', sep = '') |> 
-  read_rds() |>
-  group_by(species) |>
-  summarize(cor.ss = cor(pred.ss, obs.ss),
-            cor.lr = cor(pred.lr, obs.lr),
-            rmspe.ss = (pred.ss - obs.ss)^2 |> mean() |> sqrt(),
-            rmspe.lr = (pred.lr - obs.lr)^2 |> mean() |> sqrt())
-
-# merge validation stable sets with asv taxa
-# why when run 71-73 theres 3 rows per outr.id?
-validation_stable_sets_18sv9 <- paste(val_dir, '18sv9-ss/validation-stable-sets.rds', sep = '') |>
-  read_rds() |>
-  mutate(asv = map(asv, unique)) |> 
-  unnest(asv)
-
-# dataframe to pass into intersect/union functions
-validation_ss_taxa_18sv9 <- validation_stable_sets_18sv9 |> 
-  left_join(asv_taxa_18sv9, join_by(asv == short.id))
-
-# Check counts are the same
-validation_ss_taxa_18sv9 |> group_by(outer.id) |> count()
-
-validation_stable_sets_18sv9 |> group_by(outer.id) |> count()
-
-# CODE CHUNK FOR TESTING
-# validation_ss_taxa |>
-#   group_by(species, outer.id, d,p,c) |>
-#   drop_na() |>
-#   unique() |>
-#   group_by(outer.id, species) |>
-#   summarize(class.list = list(c)) |>
-#   mutate(class.list = map(class.list, unique)) |>
-#   group_by(species) |>
-#   summarise(intersect = list(union_fn(class.list)))
-
-
 # Function: find intersection based on taxonomic levels
 # input: dataset containing validation id, species, asv, and taxonomic info
 # output: 1 row per species containing intersection based on taxonomic level
-
 intersect_fn_taxa <- function(data, tax.level, thresh){
-  
   if(tolower(tax.level) == "c" | tolower(tax.level) == "class"){
-    
     res <- data |> 
       group_by(species, outer.id, d,p,c) |> 
       drop_na() |> 
@@ -138,25 +87,15 @@ intersect_fn_taxa <- function(data, tax.level, thresh){
       summarise(intersect = list(intersect_fn(family.list, thresh)))
   }
   else{return("invalid taxonomic level")}
-  
   return(res)
 }
-
-# test function
-intersect_fn_taxa(validation_ss_taxa_18sv9, "c", 0.5)
-
-intersect_fn_taxa(validation_ss_taxa_18sv9, "o", 0.5)
-
-intersect_fn_taxa(validation_ss_taxa_18sv9, "f", 0.5)
 
 # Function: find union based on taxonomic level
 # input: dataset containing validation id, species, asv, and taxonomic info
 # output: 1 row per species containing intersection based on taxonomic level
-
 union_fn_taxa <- function(data, tax.level){
   
   if(tolower(tax.level) == "c" | tolower(tax.level) == "class"){
-    
     res <- data |> 
       group_by(species, outer.id, d,p,c) |> 
       drop_na() |> 
@@ -190,18 +129,36 @@ union_fn_taxa <- function(data, tax.level){
       summarise(union = list(union_fn(family.list)))
   }
   else{return("invalid taxonomic level")}
-  
   return(res)
 }
 
-# test function
-union_fn_taxa(validation_ss_taxa_18sv9, "c")
+## 18SV9
 
-union_fn_taxa(validation_ss_taxa_18sv9, "o")
+# merge validation stable sets with asv taxa
+validation_stable_sets_18sv9 <- paste(val_dir, '18sv9-ss/validation-stable-sets.rds', sep = '') |>
+  read_rds() |>
+  mutate(asv = map(asv, unique)) |>
+  unnest(asv)
 
-union_fn_taxa(validation_ss_taxa_18sv9, "f")
+validation_ss_taxa_18sv9 <- validation_stable_sets_18sv9 |>
+  left_join(asv_taxa_18sv9, join_by(asv == short.id))
 
-# Join all intersections (threshold = 0.5)
+# measures of overlap at asv level
+asv_jindex_18sv9 <- paste(val_dir, '18sv9-ss/validation-stable-sets.rds', sep = '') |>
+  read_rds() |>
+  mutate(asv = map(asv, unique)) |>
+  select(species, asv)  |>
+  group_by(species) |>
+  summarize(intersect = intersect_fn(asv, 0.5) |> list(),
+            union = union_fn(asv) |> list()) |>
+  mutate(j.index = map2(intersect, union, ~length(.x)/length(.y))) |>
+  mutate(n.intersect = map(intersect, length),
+         n.union = map(union, length)) |>
+  unnest(-c(intersect, union)) |>
+  mutate(taxonomic.level = "asv") |>
+  select(species, taxonomic.level, intersect, union, n.intersect, n.union, j.index)
+
+# intersections and unions at class, order, and family levels (threshold = 0.5)
 class_int_18sv9 <- intersect_fn_taxa(validation_ss_taxa_18sv9, "c", 0.5) |> 
   mutate(taxonomic.level = "class")
 
@@ -211,10 +168,6 @@ order_int_18sv9 <- intersect_fn_taxa(validation_ss_taxa_18sv9, "o", 0.5) |>
 family_int_18sv9 <- intersect_fn_taxa(validation_ss_taxa_18sv9, "f", 0.5) |> 
   mutate(taxonomic.level = "family")
 
-# final table with all intersections by species and taxonomic level
-intersection_18sv9_tax <- rbind(class_int_18sv9, order_int_18sv9, family_int_18sv9)
-
-# Join all unions
 class_un_18sv9 <- union_fn_taxa(validation_ss_taxa_18sv9, "c") |> 
   mutate(taxonomic.level = "class")
 
@@ -224,43 +177,197 @@ order_un_18sv9 <- union_fn_taxa(validation_ss_taxa_18sv9, "o") |>
 family_un_18sv9 <- union_fn_taxa(validation_ss_taxa_18sv9, "f") |> 
   mutate(taxonomic.level = "family")
 
-# final table with all unions by species and taxonomic level
+# measures of overlap (j index) at class, order, and family level
+intersection_18sv9_tax <- rbind(class_int_18sv9, order_int_18sv9, family_int_18sv9)
 union_18sv9_tax <- rbind(class_un_18sv9, order_un_18sv9, family_un_18sv9)
-
-
-# Final table containing j index for each species at class, order, and family level
-j_index_18sv9 <- intersection_18sv9_tax |> 
+tax_jindex_18sv9 <- intersection_18sv9_tax |> 
   inner_join(union_18sv9_tax, join_by(species, taxonomic.level)) |> 
   mutate(n.intersect = sapply(intersect, length),
          n.union = sapply(union, length),
-         j.index = n.intersect/n.union)
+         j.index = n.intersect/n.union) |>
+  select(species, taxonomic.level, intersect, union, n.intersect, n.union, j.index)
 
-# consistency of selection procedure at asv level
-selection_consistency <- paste(val_dir, '18sv9-ss/validation-stable-sets.rds', sep = '') |>
+# combine (retains specific asv lists)
+selection_consistency_18sv9_long <- rbind(asv_jindex_18sv9, tax_jindex_18sv9) |>
+  mutate(taxonomic.level = factor(taxonomic.level, levels = c('asv', 'family', 'class', 'order'))) |>
+  arrange(species, taxonomic.level)
+
+# render as table
+selection_consistency_18sv9 <- selection_consistency_18sv9_long |>
+  mutate(marker = '16S',
+         n = n.union,
+         j = j.index) |>
+  select(species, marker, taxonomic.level, j, n) |>
+  pivot_wider(names_from = taxonomic.level, values_from = c(j, n)) |>
+  select(species, marker, ends_with('asv'), ends_with('family'), ends_with('class'), ends_with('order'))
+  
+## 18SV4
+
+# merge validation stable sets with asv taxa
+validation_stable_sets_18sv4 <- paste(val_dir, '18sv4-ss/validation-stable-sets.rds', sep = '') |>
+  read_rds() |>
+  mutate(asv = map(asv, unique)) |>
+  unnest(asv)
+
+validation_ss_taxa_18sv4 <- validation_stable_sets_18sv4 |>
+  left_join(asv_taxa_18sv4, join_by(asv == short.id))
+
+# measures of overlap at asv level
+asv_jindex_18sv4 <- paste(val_dir, '18sv4-ss/validation-stable-sets.rds', sep = '') |>
   read_rds() |>
   mutate(asv = map(asv, unique)) |>
   select(species, asv)  |>
   group_by(species) |>
-  summarize(int = intersect_fn(asv, 0.5) |> list(),
-            un = union_fn(asv) |> list()) |>
-  mutate(j.index = map2(int, un, ~length(.x)/length(.y))) |>
-  mutate(int = map(int, length),
-         un = map(un, length)) |>
-  unnest(everything()) |> 
-  rename(n.intersect = int,
-         n.union = un) |> 
-  mutate(taxonomic.level = "asv",
-         intersect = NA,
-         union = NA)
+  summarize(intersect = intersect_fn(asv, 0.5) |> list(),
+            union = union_fn(asv) |> list()) |>
+  mutate(j.index = map2(intersect, union, ~length(.x)/length(.y))) |>
+  mutate(n.intersect = map(intersect, length),
+         n.union = map(union, length)) |>
+  unnest(-c(intersect, union)) |>
+  mutate(taxonomic.level = "asv") |>
+  select(species, taxonomic.level, intersect, union, n.intersect, n.union, j.index)
 
-j_index_18sv9 <- rbind(j_index_18sv9, selection_consistency)
+# intersections and unions at class, order, and family levels (threshold = 0.5)
+class_int_18sv4 <- intersect_fn_taxa(validation_ss_taxa_18sv4, "c", 0.5) |> 
+  mutate(taxonomic.level = "class")
 
-# join metrics
-model_summary_18sv9 <- model_metrics |>
+order_int_18sv4 <- intersect_fn_taxa(validation_ss_taxa_18sv4, "o", 0.5) |> 
+  mutate(taxonomic.level = "order")
+
+family_int_18sv4 <- intersect_fn_taxa(validation_ss_taxa_18sv4, "f", 0.5) |> 
+  mutate(taxonomic.level = "family")
+
+class_un_18sv4 <- union_fn_taxa(validation_ss_taxa_18sv4, "c") |> 
+  mutate(taxonomic.level = "class")
+
+order_un_18sv4 <- union_fn_taxa(validation_ss_taxa_18sv4, "o") |> 
+  mutate(taxonomic.level = "order")
+
+family_un_18sv4 <- union_fn_taxa(validation_ss_taxa_18sv4, "f") |> 
+  mutate(taxonomic.level = "family")
+
+# measures of overlap (j index) at class, order, and family level
+intersection_18sv4_tax <- rbind(class_int_18sv4, order_int_18sv4, family_int_18sv4)
+union_18sv4_tax <- rbind(class_un_18sv4, order_un_18sv4, family_un_18sv4)
+tax_jindex_18sv4 <- intersection_18sv4_tax |> 
+  inner_join(union_18sv4_tax, join_by(species, taxonomic.level)) |> 
+  mutate(n.intersect = sapply(intersect, length),
+         n.union = sapply(union, length),
+         j.index = n.intersect/n.union) |>
+  select(species, taxonomic.level, intersect, union, n.intersect, n.union, j.index)
+
+# combine (retains specific asv lists)
+selection_consistency_18sv4_long <- rbind(asv_jindex_18sv4, tax_jindex_18sv4) |>
+  mutate(taxonomic.level = factor(taxonomic.level, levels = c('asv', 'family', 'class', 'order'))) |>
+  arrange(species, taxonomic.level)
+
+# render as table
+selection_consistency_18sv4 <- selection_consistency_18sv4_long |>
+  mutate(marker = '16S',
+         n = n.union,
+         j = j.index) |>
+  select(species, marker, taxonomic.level, j, n) |>
+  pivot_wider(names_from = taxonomic.level, values_from = c(j, n)) |>
+  select(species, marker, ends_with('asv'), ends_with('family'), ends_with('class'), ends_with('order'))
+
+## 16S
+
+# merge validation stable sets with asv taxa
+validation_stable_sets_16s <- paste(val_dir, '16s-ss/validation-stable-sets.rds', sep = '') |>
+  read_rds() |>
+  mutate(asv = map(asv, unique)) |>
+  unnest(asv)
+
+validation_ss_taxa_16s <- validation_stable_sets_16s |>
+  left_join(asv_taxa_16s, join_by(asv == short.id))
+
+# measures of overlap at asv level
+asv_jindex_16s <- paste(val_dir, '16s-ss/validation-stable-sets.rds', sep = '') |>
+  read_rds() |>
+  mutate(asv = map(asv, unique)) |>
+  select(species, asv)  |>
+  group_by(species) |>
+  summarize(intersect = intersect_fn(asv, 0.5) |> list(),
+            union = union_fn(asv) |> list()) |>
+  mutate(j.index = map2(intersect, union, ~length(.x)/length(.y))) |>
+  mutate(n.intersect = map(intersect, length),
+         n.union = map(union, length)) |>
+  unnest(-c(intersect, union)) |>
+  mutate(taxonomic.level = "asv") |>
+  select(species, taxonomic.level, intersect, union, n.intersect, n.union, j.index)
+
+# intersections and unions at class, order, and family levels (threshold = 0.5)
+class_int_16s <- intersect_fn_taxa(validation_ss_taxa_16s, "c", 0.5) |> 
+  mutate(taxonomic.level = "class")
+
+order_int_16s <- intersect_fn_taxa(validation_ss_taxa_16s, "o", 0.5) |> 
+  mutate(taxonomic.level = "order")
+
+family_int_16s <- intersect_fn_taxa(validation_ss_taxa_16s, "f", 0.5) |> 
+  mutate(taxonomic.level = "family")
+
+class_un_16s <- union_fn_taxa(validation_ss_taxa_16s, "c") |> 
+  mutate(taxonomic.level = "class")
+
+order_un_16s <- union_fn_taxa(validation_ss_taxa_16s, "o") |> 
+  mutate(taxonomic.level = "order")
+
+family_un_16s <- union_fn_taxa(validation_ss_taxa_16s, "f") |> 
+  mutate(taxonomic.level = "family")
+
+# measures of overlap (j index) at class, order, and family level
+intersection_16s_tax <- rbind(class_int_16s, order_int_16s, family_int_16s)
+union_16s_tax <- rbind(class_un_16s, order_un_16s, family_un_16s)
+tax_jindex_16s <- intersection_16s_tax |> 
+  inner_join(union_16s_tax, join_by(species, taxonomic.level)) |> 
+  mutate(n.intersect = sapply(intersect, length),
+         n.union = sapply(union, length),
+         j.index = n.intersect/n.union) |>
+  select(species, taxonomic.level, intersect, union, n.intersect, n.union, j.index)
+
+# combine (retains specific asv lists)
+selection_consistency_16s_long <- rbind(asv_jindex_16s, tax_jindex_16s) |>
+  mutate(taxonomic.level = factor(taxonomic.level, levels = c('asv', 'family', 'class', 'order'))) |>
+  arrange(species, taxonomic.level)
+
+# render as table
+selection_consistency_16s <- selection_consistency_16s_long |>
+  mutate(marker = '16S',
+         n = n.union,
+         j = j.index) |>
+  select(species, marker, taxonomic.level, j, n) |>
+  pivot_wider(names_from = taxonomic.level, values_from = c(j, n)) |>
+  select(species, marker, ends_with('asv'), ends_with('family'), ends_with('class'), ends_with('order'))
+
+## COMBINE ALL
+
+selection_consistency_tbl <- rbind(selection_consistency_16s, 
+                                   selection_consistency_18sv4, 
+                                   selection_consistency_18sv9)
+
+selection_consistency_tbl
+
+## TABLE: MODEL FIT ------------------------------------------------------------
+
+# selected asvs from 18sv9 model
+paste(data_dir, 'ncog18sv9.RData', sep = '') |> load()
+paste(model_dir, 'fitted-models-18sv9.RData', sep = '') |> load()
+sel_asv_18sv9 <- fitted_models |>
+  mutate(species = factor(species,
+                          levels = c('bm', 'bp', 'mn'),
+                          labels = c('Blue whale',
+                                     'Fin whale',
+                                     'Humpback whale')),
+         coef.ss = map(coef, ~2^.x)) |>
+  select(species, coef, coef.ss, ss) |>
+  unnest(everything()) |>
+  rename(asv = ss,
+         coef.lr = coef) |>
+  left_join(asv_taxa, join_by(asv == short.id))
+
+model_fit_18sv9 <- model_metrics |>
   mutate(marker = '18sv9') |>
-  select(species, marker, n.asv, adj.rsq.lr, adj.rsq.ss) |>
-  left_join(pred_metrics) |>
-  left_join(selection_consistency)
+  select(species, marker, n.asv, adj.rsq.lr, adj.rsq.ss)
 
 # selected asvs from 18sv4 model
 paste(data_dir, 'ncog18sv4.RData', sep = '') |> load()
@@ -278,96 +385,6 @@ sel_asv_18sv4 <- fitted_models |>
          coef.lr = coef) |>
   left_join(asv_taxa, join_by(asv == short.id))
 
-# prediction metrics from 18sv4 model
-pred_metrics <- paste(stbl_dir, '18sv4-ss/loo-preds.rds', sep = '') |> 
-  read_rds() |>
-  group_by(species) |>
-  summarize(cor.ss = cor(pred.ss, obs.ss),
-            cor.lr = cor(pred.lr, obs.lr),
-            rmspe.ss = (pred.ss - obs.ss)^2 |> mean() |> sqrt(),
-            rmspe.lr = (pred.lr - obs.lr)^2 |> mean() |> sqrt())
-
-# merge validation stable sets with asv taxa
-validation_stable_sets_18sv4 <- paste(val_dir, '18sv4-ss/validation-stable-sets.rds', sep = '') |>
-  read_rds() |>
-  mutate(asv = map(asv, unique)) |> 
-  unnest(asv)
-
-# dataframe to pass into intersect/union functions
-validation_ss_taxa_18sv4 <- validation_stable_sets_18sv4 |> 
-  left_join(asv_taxa_18sv4, join_by(asv == short.id))
-
-# Check counts are the same
-validation_ss_taxa_18sv4 |> group_by(outer.id) |> count()
-
-validation_stable_sets_18sv4 |> group_by(outer.id) |> count()
-
-# test intersect function
-intersect_fn_taxa(validation_ss_taxa_18sv4, "c", 0.5)
-
-intersect_fn_taxa(validation_ss_taxa_18sv4, "o", 0.5)
-
-intersect_fn_taxa(validation_ss_taxa_18sv4, "f", 0.5)
-
-# test union function
-union_fn_taxa(validation_ss_taxa_18sv4, "c")
-
-union_fn_taxa(validation_ss_taxa_18sv4, "o")
-
-union_fn_taxa(validation_ss_taxa_18sv4, "f")
-
-# Join all intersections (threshold = 0.5)
-class_int_18sv4 <- intersect_fn_taxa(validation_ss_taxa_18sv4, "c", 0.5) |> 
-  mutate(taxonomic.level = "class")
-
-order_int_18sv4 <- intersect_fn_taxa(validation_ss_taxa_18sv4, "o", 0.5) |> 
-  mutate(taxonomic.level = "order")
-
-family_int_18sv4 <- intersect_fn_taxa(validation_ss_taxa_18sv4, "f", 0.5) |> 
-  mutate(taxonomic.level = "family")
-
-# final table with all intersections by species and taxonomic level
-intersection_18sv4_tax <- rbind(class_int_18sv4, order_int_18sv4, family_int_18sv4)
-
-# Join all unions
-class_un_18sv4 <- union_fn_taxa(validation_ss_taxa_18sv4, "c") |> 
-  mutate(taxonomic.level = "class")
-
-order_un_18sv4 <- union_fn_taxa(validation_ss_taxa_18sv4, "o") |> 
-  mutate(taxonomic.level = "order")
-
-family_un_18sv4 <- union_fn_taxa(validation_ss_taxa_18sv4, "f") |> 
-  mutate(taxonomic.level = "family")
-
-# final table with all unions by species and taxonomic level
-union_18sv4_tax <- rbind(class_un_18sv4, order_un_18sv4, family_un_18sv4)
-
-
-# Final table containing j index for each species at class, order, and family level
-j_index_18sv4 <- intersection_18sv4_tax |> 
-  inner_join(union_18sv4_tax, join_by(species, taxonomic.level)) |> 
-  mutate(n.intersect = sapply(intersect, length),
-         n.union = sapply(union, length),
-         j.index = n.intersect/n.union)
-
-# consistency of selection procedure
-selection_consistency <- paste(val_dir, '18sv4-ss/validation-stable-sets.rds', sep = '') |> 
-  read_rds() |>
-  select(species, asv)  |>
-  group_by(species) |>
-  summarize(int = intersect_fn(asv, 0.5) |> list(),
-            un = union_fn(asv) |> list()) |>
-  mutate(j.index = map2(int, un, ~length(.x)/length(.y))) |>
-  mutate(int = map(int, length),
-         un = map(un, length)) |>
-  unnest(everything())  |> 
-  rename(n.intersect = int,
-         n.union = un) |> 
-  mutate(taxonomic.level = "asv",
-         intersect = NA,
-         union = NA)
-
-j_index_18sv4 <- rbind(j_index_18sv4, selection_consistency)
 
 # join metrics
 model_summary_18sv4 <- model_metrics |>
@@ -392,98 +409,6 @@ sel_asv_16s <- fitted_models |>
          coef.lr = coef) |>
   left_join(asv_taxa, join_by(asv == short.id))
 
-# prediction metrics from 16s model
-pred_metrics <- paste(stbl_dir, '16s-ss/loo-preds.rds', sep = '') |> 
-  read_rds() |>
-  group_by(species) |>
-  summarize(cor.ss = cor(pred.ss, obs.ss),
-            cor.lr = cor(pred.lr, obs.lr),
-            rmspe.ss = (pred.ss - obs.ss)^2 |> mean() |> sqrt(),
-            rmspe.lr = (pred.lr - obs.lr)^2 |> mean() |> sqrt())
-
-
-# merge validation stable sets with asv taxa
-validation_stable_sets_16s <- paste(val_dir, '16s-ss/validation-stable-sets.rds', sep = '') |>
-  read_rds() |>
-  mutate(asv = map(asv, unique)) |> 
-  unnest(asv)
-
-# dataframe to pass into intersect/union functions
-validation_ss_taxa_16s <- validation_stable_sets_16s |> 
-  left_join(asv_taxa_16s, join_by(asv == short.id))
-
-# Check counts are the same
-validation_ss_taxa_16s |> group_by(outer.id) |> count()
-
-validation_stable_sets_16s |> group_by(outer.id) |> count()
-
-# test intersect function
-intersect_fn_taxa(validation_ss_taxa_16s, "c", 0.5)
-
-intersect_fn_taxa(validation_ss_taxa_16s, "o", 0.5)
-
-intersect_fn_taxa(validation_ss_taxa_16s, "f", 0.5)
-
-# test union function
-union_fn_taxa(validation_ss_taxa_16s, "c")
-
-union_fn_taxa(validation_ss_taxa_16s, "o")
-
-union_fn_taxa(validation_ss_taxa_16s, "f")
-
-# Join all intersections (threshold = 0.5)
-class_int_16s <- intersect_fn_taxa(validation_ss_taxa_16s, "c", 0.5) |> 
-  mutate(taxonomic.level = "class")
-
-order_int_16s <- intersect_fn_taxa(validation_ss_taxa_16s, "o", 0.5) |> 
-  mutate(taxonomic.level = "order")
-
-family_int_16s <- intersect_fn_taxa(validation_ss_taxa_16s, "f", 0.5) |> 
-  mutate(taxonomic.level = "family")
-
-# final table with all intersections by species and taxonomic level
-intersection_16s_tax <- rbind(class_int_16s, order_int_16s, family_int_16s)
-
-# Join all unions
-class_un_16s <- union_fn_taxa(validation_ss_taxa_16s, "c") |> 
-  mutate(taxonomic.level = "class")
-
-order_un_16s <- union_fn_taxa(validation_ss_taxa_16s, "o") |> 
-  mutate(taxonomic.level = "order")
-
-family_un_16s <- union_fn_taxa(validation_ss_taxa_16s, "f") |> 
-  mutate(taxonomic.level = "family")
-
-# final table with all unions by species and taxonomic level
-union_16s_tax <- rbind(class_un_16s, order_un_16s, family_un_16s)
-
-
-# Final table containing j index for each species at class, order, and family level
-j_index_16s <- intersection_16s_tax |> 
-  inner_join(union_16s_tax, join_by(species, taxonomic.level)) |> 
-  mutate(n.intersect = sapply(intersect, length),
-         n.union = sapply(union, length),
-         j.index = n.intersect/n.union)
-
-# consistency of selection procedure
-selection_consistency <- paste(val_dir, '16s-ss/validation-stable-sets.rds', sep = '') |> 
-  read_rds() |>
-  select(species, asv)  |>
-  group_by(species) |>
-  summarize(int = intersect_fn(asv, 0.5) |> list(),
-            un = union_fn(asv) |> list()) |>
-  mutate(j.index = map2(int, un, ~length(.x)/length(.y))) |>
-  mutate(int = map(int, length),
-         un = map(un, length)) |>
-  unnest(everything())  |> 
-  rename(n.intersect = int,
-         n.union = un) |> 
-  mutate(taxonomic.level = "asv",
-         intersect = NA,
-         union = NA)
-
-j_index_16s <- rbind(j_index_16s, selection_consistency)
-
 # join metrics
 model_summary_16s <- model_metrics |>
   mutate(marker = '16s') |>
@@ -491,8 +416,45 @@ model_summary_16s <- model_metrics |>
   left_join(pred_metrics) |>
   left_join(selection_consistency)
 
-# join all model summaries
-model_summaries <- bind_rows(model_summary_16s, model_summary_18sv4, model_summary_18sv9)
+## TABLE: COEFFICIENTS ---------------------------------------------------------
+
+## TABLE: PREDICTIONS ----------------------------------------------------------
+
+# prediction metrics from 18sv9 model
+pred_metrics_18sv9 <- paste(stbl_dir, '18sv9-ss/loo-preds.rds', sep = '') |>
+  read_rds() |>
+  group_by(species) |>
+  summarize(cor.ss = cor(pred.ss, obs.ss),
+            cor.lr = cor(pred.lr, obs.lr),
+            rmspe.ss = (pred.ss - obs.ss)^2 |> mean() |> sqrt(),
+            rmspe.lr = (pred.lr - obs.lr)^2 |> mean() |> sqrt()) |>
+  mutate(marker = '18SV9')
+
+# prediction metrics from 18sv4 model
+pred_metrics_18sv4 <- paste(stbl_dir, '18sv4-ss/loo-preds.rds', sep = '') |> 
+  read_rds() |>
+  group_by(species) |>
+  summarize(cor.ss = cor(pred.ss, obs.ss),
+            cor.lr = cor(pred.lr, obs.lr),
+            rmspe.ss = (pred.ss - obs.ss)^2 |> mean() |> sqrt(),
+            rmspe.lr = (pred.lr - obs.lr)^2 |> mean() |> sqrt()) |>
+  mutate(marker = '18SV4')
+
+# prediction metrics from 16s model
+pred_metrics_16s <- paste(stbl_dir, '16s-ss/loo-preds.rds', sep = '') |> 
+  read_rds() |>
+  group_by(species) |>
+  summarize(cor.ss = cor(pred.ss, obs.ss),
+            cor.lr = cor(pred.lr, obs.lr),
+            rmspe.ss = (pred.ss - obs.ss)^2 |> mean() |> sqrt(),
+            rmspe.lr = (pred.lr - obs.lr)^2 |> mean() |> sqrt()) |>
+  mutate(marker = '16S')
+
+# combine
+pred_metrics <- rbind(pred_metrics_16s, pred_metrics_18sv4, pred_metrics_18sv9) |>
+  select(species, marker, ends_with('lr'), ends_with('ss'))
+
+## TABLE: LITERATURE OVERLAP ---------------------------------------------------
 
 # Read in candidate set & stable set asv model results
 candidate_model_results <- read_rds('rslt/tbl/candidate-asv-model-res.rds')
@@ -502,27 +464,9 @@ ss_model_results <- read_rds('rslt/tbl/stable-set-asv-model-res.rds')
 class_overlap <- read_rds('rslt/tbl/overlap-table-class.rds')
 order_overlap <- read_rds('rslt/tbl/overlap-table-order.rds')
 
-# create final j index table
-j_index_16s <- j_index_16s |> 
-  mutate(gene.seq = "16s")
+order_overlap
 
-j_index_18sv4 <- j_index_18sv4 |> 
-  mutate(gene.seq = "18sv4")
-
-j_index_18sv9 <- j_index_18sv9 |> 
-  mutate(gene.seq = "18sv9")
-
-j_index_final <- rbind(j_index_16s,j_index_18sv4, j_index_18sv9)
-
-j_index_final <- j_index_final |> 
-  select(species, taxonomic.level, gene.seq, j.index) |> 
-  pivot_wider(names_from = taxonomic.level,
-              values_from = j.index) |> 
-  arrange(species, gene.seq) |> 
-  rename(j.class = class,
-         j.order= order,
-         j.family = family,
-         j.asv = asv)
+## EXPORT TABLES ---------------------------------------------------------------
 
 # write as excel sheets
 sheets <- list("18Sv9-candidates" = asv_taxa_18sv9, 
