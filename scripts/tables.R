@@ -1,4 +1,6 @@
 library(tidyverse)
+library(lubridate)
+library(patchwork)
 
 ## DIRECTORIES -----------------------------------------------------------------
 data_dir <- 'data/processed/'
@@ -6,8 +8,7 @@ model_dir <- 'rslt/models/scaled-sightings/'
 stbl_dir <- 'rslt/stability-selection/'
 val_dir <- 'rslt/nested-validation/'
 
-out_dir <- 'rslt/tbl/'
-fs::dir_create(out_dir)
+dirs <- c('data_dir', 'model_dir', 'stbl_dir', 'val_dir', 'dirs')
 
 ## TABLE: SELECTION CONSISTENCY ------------------------------------------------
 
@@ -606,6 +607,10 @@ class_overlap
 
 ## EXPORT TABLES ---------------------------------------------------------------
 
+# output directory
+tbl_out_dir <- 'rslt/tbl/'
+fs::dir_create(tbl_out_dir)
+
 # named list of tables
 sheets <- list("tbl2-modelfit" = model_fit,
                "tbl3-validation" = selection_consistency_tbl,
@@ -621,4 +626,4 @@ sheets <- list("tbl2-modelfit" = model_fit,
                "stbl3c-coef18sv9" = sel_asv_18sv9)
 
 # export as excel workbook
-writexl::write_xlsx(sheets, paste(out_dir, 'tables.xlsx', sep = ''))
+writexl::write_xlsx(sheets, paste(tbl_out_dir, 'tables.xlsx', sep = ''))
