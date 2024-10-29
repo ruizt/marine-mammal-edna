@@ -418,6 +418,27 @@ model_summary_16s <- model_metrics |>
 
 ## TABLE: COEFFICIENTS ---------------------------------------------------------
 
+top_coef_16s <- sel_asv_16s |> 
+  drop_na(o) |> 
+  mutate(mag = abs(coef.lr)) |> 
+  group_by(species) |> 
+  slice_max(mag, n = 5) |> 
+  select(species, coef.lr, coef.ss, d, p, c, o, f, g)
+
+top_coef_18sv4 <- sel_asv_18sv4 |> 
+  drop_na(o) |> 
+  mutate(mag = abs(coef.lr)) |> 
+  group_by(species) |> 
+  slice_max(mag, n = 5) |> 
+  select(species, coef.lr, coef.ss, d, p, c, o, f, g)
+
+top_coef_18sv9 <- sel_asv_18sv9 |> 
+  drop_na(o) |> 
+  mutate(mag = abs(coef.lr)) |> 
+  group_by(species) |> 
+  slice_max(mag, n = 5) |> 
+  select(species, coef.lr, coef.ss, d, p, c, o, f, g)
+
 ## TABLE: PREDICTIONS ----------------------------------------------------------
 
 # prediction metrics from 18sv9 model
@@ -480,7 +501,10 @@ sheets <- list("18Sv9-candidates" = asv_taxa_18sv9,
                "ss-asv-overlap-results" = ss_model_results,
                "class-overlap-lit-review" = class_overlap,
                "order-overlap-lit-review" = order_overlap,
-               "j-index" = j_index_final)
+               "j-index" = j_index_final,
+               "coef-16s" = top_coef_16s,
+               "coef-18sv4" = top_coef_18sv4,
+               "coef-18sv9" = top_coef_18sv9)
 writexl::write_xlsx(sheets, paste(tbl_out_dir, 'summary-tables.xlsx', sep = ''))
 
 rm(list = setdiff(ls(), dirs))
