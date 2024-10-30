@@ -1,6 +1,4 @@
 library(tidyverse)
-library(lubridate)
-library(patchwork)
 
 ## DIRECTORIES -----------------------------------------------------------------
 data_dir <- 'data/processed/'
@@ -8,7 +6,8 @@ model_dir <- 'rslt/models/scaled-sightings/'
 stbl_dir <- 'rslt/stability-selection/'
 val_dir <- 'rslt/nested-validation/'
 
-dirs <- c('data_dir', 'model_dir', 'stbl_dir', 'val_dir', 'dirs')
+out_dir <- 'rslt/tbl/'
+fs::dir_create(out_dir)
 
 ## TABLE: SELECTION CONSISTENCY ------------------------------------------------
 
@@ -189,7 +188,7 @@ selection_consistency_18sv9_long <- rbind(asv_jindex_18sv9, tax_jindex_18sv9) |>
 
 # render as table
 selection_consistency_18sv9 <- selection_consistency_18sv9_long |>
-  mutate(marker = '16S',
+  mutate(marker = '18SV9',
          n = n.union,
          j = j.index) |>
   select(species, marker, taxonomic.level, j, n) |>
@@ -258,7 +257,7 @@ selection_consistency_18sv4_long <- rbind(asv_jindex_18sv4, tax_jindex_18sv4) |>
 
 # render as table
 selection_consistency_18sv4 <- selection_consistency_18sv4_long |>
-  mutate(marker = '16S',
+  mutate(marker = '18SV4',
          n = n.union,
          j = j.index) |>
   select(species, marker, taxonomic.level, j, n) |>
@@ -336,9 +335,14 @@ selection_consistency_16s <- selection_consistency_16s_long |>
 
 ## COMBINE ALL ##
 
-selection_consistency_tbl <- rbind(selection_consistency_16s, 
+selection_consistency <- rbind(selection_consistency_16s, 
                                    selection_consistency_18sv4, 
-                                   selection_consistency_18sv9)
+                                   selection_consistency_18sv9) |>
+  mutate(species = factor(species, 
+                          levels = c('bm', 'bp', 'mn'),
+                          labels = c('Blue',
+                                     'Fin',
+                                     'Humpback')))
 
 selection_consistency_tbl
 
@@ -398,7 +402,7 @@ model_fit_18sv9 <- model_metrics |>
                           labels = c('Blue',
                                      'Fin',
                                      'Humpback')),
-         marker = '18sv9') |>
+         marker = '18SV9') |>
   left_join(nfam_18sv9) |>
   left_join(nord_18sv9) |>
   left_join(nclass_18sv9) |>
@@ -607,13 +611,9 @@ class_overlap
 
 ## EXPORT TABLES ---------------------------------------------------------------
 
-# output directory
-tbl_out_dir <- 'rslt/tbl/'
-fs::dir_create(tbl_out_dir)
-
 # named list of tables
 sheets <- list("tbl2-modelfit" = model_fit,
-               "tbl3-validation" = selection_consistency_tbl,
+               "tbl3-validation" = selection_consistency,
                "tbl4a-coef16s" = top_coef_16s,
                "tbl4b-coef18sv4" = top_coef_18sv4,
                "tbl4c-coef18sv9" = top_coef_18sv9,
@@ -626,4 +626,4 @@ sheets <- list("tbl2-modelfit" = model_fit,
                "stbl3c-coef18sv9" = sel_asv_18sv9)
 
 # export as excel workbook
-writexl::write_xlsx(sheets, paste(tbl_out_dir, 'tables.xlsx', sep = ''))
+writexl::write_xlsx(sheets, paste(out_dir, 'tables.xlsx', sep = ''))
