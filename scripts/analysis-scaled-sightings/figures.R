@@ -198,54 +198,39 @@ ggsave(fig_predictions, filename = paste(out_dir, 'fig-predictions.png', sep = '
 ## FIGURE: MODEL DIAGNOSTICS ---------------------------------------------------
 
 # predictions from 18sv9
-load('rslt/models/scaled-sightings/fitted-models-18sv9-ss.RData')
+load('rslt/models/scaled-sightings/fitted-models-18sv9.RData')
 fit_pts_18sv9 <- fit_df |>
   mutate(cruise.ym = ym(cruise),
          year = year(cruise.ym),
-         quarter = factor(season,
-                          levels = c('winter', 'spring', 'summer', 'fall')) |>
-           as.numeric(),
-         cruise.yq = paste(year, quarter, sep = '-') |> yq(),
          species = factor(species,
                           levels = c('bm', 'bp', 'mn'),
-                          labels = c('Blue whales', 'Fin whales', 'Humpback whales'))) |>
-  select(cruise, cruise.ym, cruise.yq, species, y, fitted, lr.resid) |>
-  arrange(species, cruise.yq) |>
-  rename(lr.fit = fitted, lr.obs = y) |>
+                          labels = c('Blue', 'Fin', 'Humpback'))) |>
+  select(cruise, cruise.ym, species, lr.obs, lr.fit, lr.resid) |>
+  arrange(species, cruise.ym) |>
   mutate(marker = '18SV9')
 
 # predictions from 18sv4
-load('rslt/models/scaled-sightings/fitted-models-18sv4-ss.RData')
+load('rslt/models/scaled-sightings/fitted-models-18sv4.RData')
 fit_pts_18sv4 <- fit_df |>
   mutate(cruise.ym = ym(cruise),
          year = year(cruise.ym),
-         quarter = factor(season,
-                          levels = c('winter', 'spring', 'summer', 'fall')) |>
-           as.numeric(),
-         cruise.yq = paste(year, quarter, sep = '-') |> yq(),
          species = factor(species,
                           levels = c('bm', 'bp', 'mn'),
-                          labels = c('Blue whales', 'Fin whales', 'Humpback whales'))) |>
-  select(cruise, cruise.ym, cruise.yq, species, y, fitted, lr.resid) |>
-  arrange(species, cruise.yq) |>
-  rename(lr.fit = fitted, lr.obs = y) |>
+                          labels = c('Blue', 'Fin', 'Humpback'))) |>
+  select(cruise, cruise.ym, species, lr.obs, lr.fit, lr.resid) |>
+  arrange(species, cruise.ym) |>
   mutate(marker = '18SV4')
 
 # predictions from 16s
-load('rslt/models/scaled-sightings/increased-res-fitted-models-16s-ss.RData')
+load('rslt/models/scaled-sightings/fitted-models-16s.RData')
 fit_pts_16s <- fit_df |>
   mutate(cruise.ym = ym(cruise),
          year = year(cruise.ym),
-         quarter = factor(season,
-                          levels = c('winter', 'spring', 'summer', 'fall')) |>
-           as.numeric(),
-         cruise.yq = paste(year, quarter, sep = '-') |> yq(),
          species = factor(species,
                           levels = c('bm', 'bp', 'mn'),
-                          labels = c('Blue whales', 'Fin whales', 'Humpback whales'))) |>
-  select(cruise, cruise.ym, cruise.yq, species, y, fitted, lr.resid) |>
-  arrange(species, cruise.yq) |>
-  rename(lr.fit = fitted, lr.obs = y) |>
+                          labels = c('Blue', 'Fin', 'Humpback'))) |>
+  select(cruise, cruise.ym, species, lr.obs, lr.fit, lr.resid) |>
+  arrange(species, cruise.ym) |>
   mutate(marker = '16S')
 
 # merge above outputs
@@ -254,63 +239,20 @@ fit_pts <- bind_rows(fit_pts_16s, fit_pts_18sv4, fit_pts_18sv9)
 # for rescaling axes without <scales = 'free_x'>
 zscore <- function(x){(x - mean(x))/sd(x)}
 
-# annotations for adding adjusted rsq
-ann_data <- fit_pts |>
-  group_by(species, marker) |>
-  mutate(across(c(lr.fit, lr.obs), zscore)) |>
-  summarize(lr.obs = max(lr.obs),
-            lr.fit = min(lr.fit)) |>
-  left_join(model_summaries, join_by(species, marker)) |>
-  ungroup() |>
-  mutate(species = fct_relabel(species, ~str_remove_all(.x, ' whales')),
-         lr.fit = min(lr.fit) + 0.5,
-         lr.obs = max(lr.obs))
-
-# observed vs fitted
-obs_fit <- fit_pts |>
-  mutate(species = fct_relabel(species, ~str_remove_all(.x, ' whales'))) |>
-  group_by(species, marker) |>
-  mutate(across(c(lr.fit, lr.obs), zscore)) |>
-  ggplot(aes(x = lr.obs, y = lr.fit)) +
-  facet_grid(species ~ marker) +
-  # facet_wrap(species ~ marker, scales = 'free') +
-  geom_point() +
-  geom_abline(slope = 1, intercept = 0, linewidth = 0.4) +
-  # geom_smooth(span = 1.5) +
-  theme_bw() +
-  theme(panel.grid.major = element_line(color = 'black', linewidth = 0.1),
-        panel.grid.minor = element_blank(),
-        axis.text = element_blank(),
-        axis.ticks = element_blank()) +
-  labs(x = 'Observed values', y = 'Fitted values', title = 'A. Model fit') +
-  geom_label(data = ann_data,
-             aes(label = paste("R^'2' == ", round(adj.rsq.ss, 2))),
-             parse = T,
-             size = 8,
-             size.unit = 'pt',
-             hjust = 1)
-
-obs_fit
-
 # plot residuals vs fit for each model
-resid_fit <- bind_rows(fit_pts_16s, fit_pts_18sv4, fit_pts_18sv9) |>
-  mutate(species = fct_relabel(species, ~str_remove_all(.x, ' whales'))) |>
+resid_fit <- fit_pts |>
   group_by(species, marker) |>
   mutate(across(c(lr.fit, lr.resid), zscore)) |>
   ggplot(aes(x = lr.fit, y = lr.resid)) +
   facet_grid(species ~ marker) +
   # facet_wrap(species ~ marker, scales = 'free') +
-  geom_point() +
-  geom_hline(yintercept = 0, linewidth = 0.4) +
+  geom_point(alpha = 0.5) +
+  geom_hline(yintercept = 0, linewidth = 0.2) +
   # geom_smooth(span = 1.5) +
   theme_bw() +
   theme(panel.grid.major = element_line(color = 'black', linewidth = 0.1),
-        panel.grid.minor = element_blank(),
-        axis.text = element_blank(),
-        axis.ticks = element_blank()) +
-  labs(x = 'Fitted values', y = 'Residuals', title = 'B. Residual diagnostics')
-
-resid_fit
+        panel.grid.minor = element_blank()) +
+  labs(x = 'z(fitted)', y = 'z(residual)')
 
 # function for residual autocorrelation
 pacf_fn <- function(x){
@@ -322,15 +264,15 @@ pacf_fn <- function(x){
 }
 
 # plot pacf for each model
-resid_pacf <- bind_rows(fit_pts_16s, fit_pts_18sv4, fit_pts_18sv9) |>
+resid_pacf <- fit_pts |>
+  ungroup() |>
   select(species, marker, lr.resid) |>
-  mutate(species = fct_relabel(species, ~str_remove_all(.x, ' whales'))) |>
   nest(resids = lr.resid, .by = c(species, marker)) |>
   mutate(pacf = map(resids, pacf_fn)) |>
   unnest(pacf) |>
   ggplot(aes(x = lag)) +
   facet_grid(species ~ marker) +
-  scale_y_continuous(limits = c(-1, 1), n.breaks = 4) +
+  scale_y_continuous(limits = c(-0.5, 1), n.breaks = 6) +
   scale_x_continuous(breaks = seq(0, 10, by = 2)) +
   geom_linerange(aes(ymin = 0, ymax = pacf),
                  linewidth = 0.4) +
@@ -338,18 +280,19 @@ resid_pacf <- bind_rows(fit_pts_16s, fit_pts_18sv4, fit_pts_18sv9) |>
               fill = 'blue',
               alpha = 0.2) +
   theme_bw() +
-  theme(panel.grid = element_line(color = 'black', linewidth = 0.1),
+  theme(panel.grid.major.y = element_line(color = 'black', linewidth = 0.1),
+        panel.grid.minor.y = element_line(color = 'grey', linewidth = 0.1),
         panel.grid.minor.x = element_blank(),
-        axis.text.y = element_blank(),
-        axis.ticks.y = element_blank()) +
-  labs(x = 'Lag', title = 'C. Residual PACF')
+        panel.grid.major.x = element_blank()) +
+  labs(x = 'Lag', y = 'Partial autocorrelation')
 
 resid_pacf
 
 # panel layout
-fig_resid <- obs_fit + resid_fit + resid_pacf + plot_layout(nrow = 1, widths = c(1, 1, 1))
-ggsave(fig_resid, filename = 'rslt/_draft/plots/resids-ss-diagnostics.png',
-       width = 9, height = 4, units = 'in', dpi = 400)
+resid_diagnostics <- resid_fit + resid_pacf + plot_layout(nrow = 1, widths = c(1, 1)) +
+  plot_annotation(tag_levels = 'A')
+ggsave(resid_diagnostics, filename = paste(out_dir, 'sfig-resid.png', sep = ''),
+       width = 8, height = 4, units = 'in', dpi = 400)
 
 
 

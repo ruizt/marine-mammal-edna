@@ -1,4 +1,5 @@
 library(tidyverse)
+library(lubridate)
 
 ## DIRECTORIES -----------------------------------------------------------------
 data_dir <- 'data/processed/'
@@ -9,9 +10,158 @@ val_dir <- 'rslt/nested-validation/'
 out_dir <- 'rslt/tbl/'
 fs::dir_create(out_dir)
 
-## TABLE: SELECTION CONSISTENCY ------------------------------------------------
+## SUPPLEMENTARY TABLE 2: AMPLICON DATA SUMMARY (LONG) -------------------------
 
-## AMPLICON TAXONOMY ##
+## 18SV9 ## 
+
+paste(data_dir, 'ncog18sv9.RData', sep = '') |> load()
+
+cruise_meta_18sv9 <- sample_metadata |>
+  select(sample.id, cruise, sta.id, datetime, depthm) |>
+  mutate(datetime = mdy_hm(datetime)) |>
+  separate(sta.id, into = c('line', 'station'), sep = ' ') |>
+  group_by(cruise) |>
+  summarize(start.date = min(datetime) |> as_date(),
+            end.date = max(datetime) |> as_date(),
+            min.depth = min(depthm),
+            max.depth = max(depthm),
+            n.samples = n())
+
+ncog_summary_18sv9 <- sample_metadata |>
+  select(sample.id, cruise, sta.id, datetime, depthm) |>
+  mutate(datetime = mdy_hm(datetime)) |>
+  separate(sta.id, into = c('line', 'station'), sep = ' ') |>
+  count(cruise, line) |>
+  pivot_wider(names_from = line, values_from = n) |>
+  left_join(cruise_meta_18sv9) |>
+  mutate(cruise = ym(cruise), 
+         year = year(cruise)) |>
+  group_by(year) |> 
+  mutate(qtr = paste('Q', row_number(), sep = ''),
+         season = factor(qtr, levels = paste('Q', 1:4, sep = ''),
+                         labels = c('winter', 'spring', 'summer', 'fall')),
+         marker = '18SV9') |>
+  select(marker, year, season, start.date, end.date, min.depth, max.depth, 
+         where(is.integer), n.samples)
+
+## 18SV4 ## 
+
+paste(data_dir, 'ncog18sv4.RData', sep = '') |> load()
+
+cruise_meta_18sv4 <- sample_metadata |>
+  select(sample.id, cruise, sta.id, datetime, depthm) |>
+  mutate(datetime = mdy_hm(datetime)) |>
+  separate(sta.id, into = c('line', 'station'), sep = ' ') |>
+  group_by(cruise) |>
+  summarize(start.date = min(datetime) |> as_date(),
+            end.date = max(datetime) |> as_date(),
+            min.depth = min(depthm),
+            max.depth = max(depthm),
+            n.samples = n())
+
+ncog_summary_18sv4 <- sample_metadata |>
+  select(sample.id, cruise, sta.id, datetime, depthm) |>
+  mutate(datetime = mdy_hm(datetime)) |>
+  separate(sta.id, into = c('line', 'station'), sep = ' ') |>
+  count(cruise, line) |>
+  pivot_wider(names_from = line, values_from = n) |>
+  left_join(cruise_meta_18sv4) |>
+  mutate(cruise = ym(cruise), 
+         year = year(cruise)) |>
+  group_by(year) |> 
+  mutate(qtr = paste('Q', row_number(), sep = ''),
+         season = factor(qtr, levels = paste('Q', 1:4, sep = ''),
+                         labels = c('winter', 'spring', 'summer', 'fall')),
+         marker = '18SV4') |>
+  select(marker, year, season, start.date, end.date, min.depth, max.depth, 
+         where(is.integer), n.samples)
+
+## 16S ## 
+
+paste(data_dir, 'ncog16s.RData', sep = '') |> load()
+
+cruise_meta_16s <- sample_metadata |>
+  select(sample.id, cruise, sta.id, datetime, depthm) |>
+  mutate(datetime = mdy_hm(datetime)) |>
+  separate(sta.id, into = c('line', 'station'), sep = ' ') |>
+  group_by(cruise) |>
+  summarize(start.date = min(datetime) |> as_date(),
+            end.date = max(datetime) |> as_date(),
+            min.depth = min(depthm),
+            max.depth = max(depthm),
+            n.samples = n())
+
+ncog_summary_16s <- sample_metadata |>
+  select(sample.id, cruise, sta.id, datetime, depthm) |>
+  mutate(datetime = mdy_hm(datetime)) |>
+  separate(sta.id, into = c('line', 'station'), sep = ' ') |>
+  count(cruise, line) |>
+  pivot_wider(names_from = line, values_from = n) |>
+  left_join(cruise_meta_16s) |>
+  mutate(cruise = ym(cruise), 
+         year = year(cruise)) |>
+  group_by(year) |> 
+  mutate(qtr = paste('Q', row_number(), sep = ''),
+         season = factor(qtr, levels = paste('Q', 1:4, sep = ''),
+                         labels = c('winter', 'spring', 'summer', 'fall')),
+         marker = '16S') |>
+  select(marker, year, season, start.date, end.date, min.depth, max.depth, 
+         where(is.integer), n.samples)
+
+# combine into long-form summary (number of samples per line)
+ncog_summary <- bind_rows(ncog_summary_16s, 
+                          ncog_summary_18sv4, 
+                          ncog_summary_18sv9)
+
+## TABLE 1a-b: SAMPLING SUMMARIES ----------------------------------------------
+
+# aggregate previous table into short form summary
+ncog_summary_short <- ncog_summary |>
+  select(-n.samples) |>
+  pivot_longer(where(is.integer)) |>
+  drop_na() |>
+  group_by(marker, year, season, start.date, end.date) |>
+  summarize(n.samples = sum(value, na.rm = T),
+            n.lines = n(),
+            .groups = 'drop') |>
+  pivot_wider(names_from = marker, values_from = starts_with('n')) |>
+  select(year, season, ends_with('date'), ends_with('16S'), ends_with('18SV4'),
+         ends_with('18SV9'))
+  
+
+## TABLE 1b: VISUAL SIGHTING SUMMARY
+
+visual_sightings <- read_csv('data/_raw/CalCOFI_2004-2021_CombinedSightings.csv') |>
+  rename_with(~str_remove_all(.x, '[:punct:]') |> 
+                str_squish() |> 
+                str_replace_all(' ', '.') |> 
+                tolower()) |>
+  mutate(species = tolower(species.1)) |>
+  filter(adjusted.both.on.effort.and.on.transect == 'ON',
+         species %in% c('bm', 'bp', 'mn')) |>
+  mutate(datetime = mdy_hm(datetime.local),
+         year = year(datetime),
+         season = factor(season, levels = c('winter', 'spring', 'summer', 'fall'))) |>
+  select(year, season, datetime, species, best) |>
+  filter(year >= 2014) 
+
+sighting_counts <- visual_sightings |>
+  count(year, season, species) |>
+  mutate(species = factor(species,
+                          levels = c('bm', 'bp', 'mn'),
+                          labels = c('Blue',
+                                     'Fin',
+                                     'Humpback'))) |>
+  pivot_wider(names_from = species, values_from = n) |>
+  mutate(across(where(is.integer), ~replace_na(.x, value = 0L)))
+
+sighting_summary <- visual_sightings |>
+  group_by(year, season) |>
+  summarize(start.date = min(date(datetime)),
+            end.date = max(date(datetime))) |>
+  left_join(sighting_counts)
+
+## SUPP TABLES 3a-c ------------------------------------------------------------
 
 # candidate asvs from 18sv9
 paste(data_dir, 'ncog18sv9.RData', sep = '') |> load()
@@ -24,6 +174,194 @@ asv_taxa_18sv4 <- asv_taxa
 # candidate asvs from 16s
 paste(data_dir, 'ncog16s.RData', sep = '') |> load()
 asv_taxa_16s <- asv_taxa
+
+## TABLE 2: MODEL FIT ----------------------------------------------------------
+
+## 18SV9 ##
+
+# load model info
+paste(model_dir, 'fitted-models-18sv9.RData', sep = '') |> load()
+
+# selected asvs
+sel_asv_18sv9 <- fitted_models |>
+  mutate(species = factor(species,
+                          levels = c('bm', 'bp', 'mn'),
+                          labels = c('Blue',
+                                     'Fin',
+                                     'Humpback')),
+         marker = '18SV9',
+         coef.ss = map(coef, ~2^.x)) |>
+  select(species, coef, coef.ss, ss) |>
+  unnest(everything()) |>
+  rename(asv = ss,
+         coef.lr = coef) |>
+  left_join(asv_taxa_18sv9, join_by(asv == short.id)) |>
+  select(-asv, -feature.id) |>
+  arrange(species, desc(coef.lr))
+
+# number of unique families among selected asvs
+nfam_18sv9 <- sel_asv_18sv9 |>
+  group_by(species) |>
+  distinct(f) |>
+  count(name = 'n.family')
+
+# number of unique orders among selected asvs
+nord_18sv9 <- sel_asv_18sv9 |>
+  group_by(species) |>
+  distinct(o) |>
+  count(name = 'n.order')
+
+# number of unique classes among selected asvs
+nclass_18sv9 <- sel_asv_18sv9 |>
+  group_by(species) |>
+  distinct(c) |>
+  count(name = 'n.class')
+
+# retreive hyperparameter info
+parms_18sv9 <- paste(stbl_dir, '18sv9-ss/stable-sets.rds', sep = '') |> 
+  read_rds() |>
+  mutate(eta.range = paste('[', round(eta.min, 2), ', ', round(eta.max, 2), ']', sep = '')) |>
+  select(species, ncomp, eta.range)
+
+# join with model fit metrics
+model_fit_18sv9 <- model_metrics |>
+  left_join(parms_18sv9) |>
+  mutate(species = factor(species,
+                          levels = c('bm', 'bp', 'mn'),
+                          labels = c('Blue',
+                                     'Fin',
+                                     'Humpback')),
+         marker = '18SV9') |>
+  left_join(nfam_18sv9) |>
+  left_join(nord_18sv9) |>
+  left_join(nclass_18sv9) |>
+  select(species, marker, ncomp, eta.range, adj.rsq.lr, adj.rsq.ss, n.asv, n.family, n.order, n.class)
+
+## 18SV4 ##
+
+# load model info
+paste(model_dir, 'fitted-models-18sv4.RData', sep = '') |> load()
+
+# selected asvs
+sel_asv_18sv4 <- fitted_models |>
+  mutate(species = factor(species,
+                          levels = c('bm', 'bp', 'mn'),
+                          labels = c('Blue',
+                                     'Fin',
+                                     'Humpback')),
+         marker = '18SV4',
+         coef.ss = map(coef, ~2^.x)) |>
+  select(species, coef, coef.ss, ss) |>
+  unnest(everything()) |>
+  rename(asv = ss,
+         coef.lr = coef) |>
+  left_join(asv_taxa_18sv4, join_by(asv == short.id)) |>
+  select(-asv, -feature.id) |>
+  arrange(species, desc(coef.lr))
+
+# number of unique families among selected asvs
+nfam_18sv4 <- sel_asv_18sv4 |>
+  group_by(species) |>
+  distinct(f) |>
+  count(name = 'n.family')
+
+# number of unique orders among selected asvs
+nord_18sv4 <- sel_asv_18sv4 |>
+  group_by(species) |>
+  distinct(o) |>
+  count(name = 'n.order')
+
+# number of unique classes among selected asvs
+nclass_18sv4 <- sel_asv_18sv4 |>
+  group_by(species) |>
+  distinct(c) |>
+  count(name = 'n.class')
+
+# retreive hyperparameter info
+parms_18sv4 <- paste(stbl_dir, '18sv4-ss/stable-sets.rds', sep = '') |> 
+  read_rds() |>
+  mutate(eta.range = paste('[', round(eta.min, 2), ', ', round(eta.max, 2), ']', sep = '')) |>
+  select(species, ncomp, eta.range)
+
+# join with model fit metrics
+model_fit_18sv4 <- model_metrics |>
+  left_join(parms_18sv4) |>
+  mutate(species = factor(species,
+                          levels = c('bm', 'bp', 'mn'),
+                          labels = c('Blue',
+                                     'Fin',
+                                     'Humpback')),
+         marker = '18SV4') |>
+  left_join(nfam_18sv4) |>
+  left_join(nord_18sv4) |>
+  left_join(nclass_18sv4) |>
+  select(species, marker, ncomp, eta.range, adj.rsq.lr, adj.rsq.ss, n.asv, n.family, n.order, n.class)
+
+## 16S ##
+
+# load model info
+paste(model_dir, 'fitted-models-16s.RData', sep = '') |> load()
+
+# selected asvs
+sel_asv_16s <- fitted_models |>
+  mutate(species = factor(species,
+                          levels = c('bm', 'bp', 'mn'),
+                          labels = c('Blue',
+                                     'Fin',
+                                     'Humpback')),
+         marker = '16S',
+         coef.ss = map(coef, ~2^.x)) |>
+  select(species, coef, coef.ss, ss) |>
+  unnest(everything()) |>
+  rename(asv = ss,
+         coef.lr = coef) |>
+  left_join(asv_taxa_16s, join_by(asv == short.id)) |>
+  select(-asv, -feature.id) |>
+  arrange(species, desc(coef.lr))
+
+# number of unique families among selected asvs
+nfam_16s <- sel_asv_16s |>
+  group_by(species) |>
+  distinct(f) |>
+  count(name = 'n.family')
+
+# number of unique orders among selected asvs
+nord_16s <- sel_asv_16s |>
+  group_by(species) |>
+  distinct(o) |>
+  count(name = 'n.order')
+
+# number of unique classes among selected asvs
+nclass_16s <- sel_asv_16s |>
+  group_by(species) |>
+  distinct(c) |>
+  count(name = 'n.class')
+
+# retreive hyperparameter info
+parms_16s <- paste(stbl_dir, '16s-ss/stable-sets.rds', sep = '') |> 
+  read_rds() |>
+  mutate(eta.range = paste('[', round(eta.min, 2), ', ', round(eta.max, 2), ']', sep = '')) |>
+  select(species, ncomp, eta.range)
+
+# join with model fit metrics
+model_fit_16s <- model_metrics |>
+  left_join(parms_16s) |>
+  mutate(species = factor(species,
+                          levels = c('bm', 'bp', 'mn'),
+                          labels = c('Blue',
+                                     'Fin',
+                                     'Humpback')),
+         marker = '16S') |>
+  left_join(nfam_16s) |>
+  left_join(nord_16s) |>
+  left_join(nclass_16s) |>
+  select(species, marker, ncomp, eta.range, adj.rsq.lr, adj.rsq.ss, n.asv, n.family, n.order, n.class)
+
+## COMBINE ##
+
+model_fit <- bind_rows(model_fit_16s, model_fit_18sv4, model_fit_18sv9)
+
+## TABLE 3: SELECTION CONSISTENCY ----------------------------------------------
 
 ## UNION/INTERSECTION FUNCTIONS ##
 
@@ -344,195 +682,9 @@ selection_consistency <- rbind(selection_consistency_16s,
                                      'Fin',
                                      'Humpback')))
 
-selection_consistency_tbl
+selection_consistency
 
-## TABLE: MODEL FIT ------------------------------------------------------------
-
-## 18SV9 ##
-
-# load model info
-paste(model_dir, 'fitted-models-18sv9.RData', sep = '') |> load()
-
-# selected asvs
-sel_asv_18sv9 <- fitted_models |>
-  mutate(species = factor(species,
-                          levels = c('bm', 'bp', 'mn'),
-                          labels = c('Blue',
-                                     'Fin',
-                                     'Humpback')),
-         marker = '18SV9',
-         coef.ss = map(coef, ~2^.x)) |>
-  select(species, coef, coef.ss, ss) |>
-  unnest(everything()) |>
-  rename(asv = ss,
-         coef.lr = coef) |>
-  left_join(asv_taxa_18sv9, join_by(asv == short.id)) |>
-  select(-asv, -feature.id) |>
-  arrange(species, desc(coef.lr))
-
-# number of unique families among selected asvs
-nfam_18sv9 <- sel_asv_18sv9 |>
-  group_by(species) |>
-  distinct(f) |>
-  count(name = 'n.family')
-
-# number of unique orders among selected asvs
-nord_18sv9 <- sel_asv_18sv9 |>
-  group_by(species) |>
-  distinct(o) |>
-  count(name = 'n.order')
-
-# number of unique classes among selected asvs
-nclass_18sv9 <- sel_asv_18sv9 |>
-  group_by(species) |>
-  distinct(c) |>
-  count(name = 'n.class')
-
-# retreive hyperparameter info
-parms_18sv9 <- paste(stbl_dir, '18sv9-ss/stable-sets.rds', sep = '') |> 
-  read_rds() |>
-  mutate(eta.range = paste('[', round(eta.min, 2), ', ', round(eta.max, 2), ']', sep = '')) |>
-  select(species, ncomp, eta.range)
-
-# join with model fit metrics
-model_fit_18sv9 <- model_metrics |>
-  left_join(parms_18sv9) |>
-  mutate(species = factor(species,
-                          levels = c('bm', 'bp', 'mn'),
-                          labels = c('Blue',
-                                     'Fin',
-                                     'Humpback')),
-         marker = '18SV9') |>
-  left_join(nfam_18sv9) |>
-  left_join(nord_18sv9) |>
-  left_join(nclass_18sv9) |>
-  select(species, marker, ncomp, eta.range, adj.rsq.lr, adj.rsq.ss, n.asv, n.family, n.order, n.class)
-
-## 18SV4 ##
-
-# load model info
-paste(model_dir, 'fitted-models-18sv4.RData', sep = '') |> load()
-
-# selected asvs
-sel_asv_18sv4 <- fitted_models |>
-  mutate(species = factor(species,
-                          levels = c('bm', 'bp', 'mn'),
-                          labels = c('Blue',
-                                     'Fin',
-                                     'Humpback')),
-         marker = '18SV4',
-         coef.ss = map(coef, ~2^.x)) |>
-  select(species, coef, coef.ss, ss) |>
-  unnest(everything()) |>
-  rename(asv = ss,
-         coef.lr = coef) |>
-  left_join(asv_taxa_18sv4, join_by(asv == short.id)) |>
-  select(-asv, -feature.id) |>
-  arrange(species, desc(coef.lr))
-
-# number of unique families among selected asvs
-nfam_18sv4 <- sel_asv_18sv4 |>
-  group_by(species) |>
-  distinct(f) |>
-  count(name = 'n.family')
-
-# number of unique orders among selected asvs
-nord_18sv4 <- sel_asv_18sv4 |>
-  group_by(species) |>
-  distinct(o) |>
-  count(name = 'n.order')
-
-# number of unique classes among selected asvs
-nclass_18sv4 <- sel_asv_18sv4 |>
-  group_by(species) |>
-  distinct(c) |>
-  count(name = 'n.class')
-
-# retreive hyperparameter info
-parms_18sv4 <- paste(stbl_dir, '18sv4-ss/stable-sets.rds', sep = '') |> 
-  read_rds() |>
-  mutate(eta.range = paste('[', round(eta.min, 2), ', ', round(eta.max, 2), ']', sep = '')) |>
-  select(species, ncomp, eta.range)
-
-# join with model fit metrics
-model_fit_18sv4 <- model_metrics |>
-  left_join(parms_18sv4) |>
-  mutate(species = factor(species,
-                          levels = c('bm', 'bp', 'mn'),
-                          labels = c('Blue',
-                                     'Fin',
-                                     'Humpback')),
-         marker = '18SV4') |>
-  left_join(nfam_18sv4) |>
-  left_join(nord_18sv4) |>
-  left_join(nclass_18sv4) |>
-  select(species, marker, ncomp, eta.range, adj.rsq.lr, adj.rsq.ss, n.asv, n.family, n.order, n.class)
-
-## 16S ##
-
-# load model info
-paste(model_dir, 'fitted-models-16s.RData', sep = '') |> load()
-
-# selected asvs
-sel_asv_16s <- fitted_models |>
-  mutate(species = factor(species,
-                          levels = c('bm', 'bp', 'mn'),
-                          labels = c('Blue',
-                                     'Fin',
-                                     'Humpback')),
-         marker = '16S',
-         coef.ss = map(coef, ~2^.x)) |>
-  select(species, coef, coef.ss, ss) |>
-  unnest(everything()) |>
-  rename(asv = ss,
-         coef.lr = coef) |>
-  left_join(asv_taxa_16s, join_by(asv == short.id)) |>
-  select(-asv, -feature.id) |>
-  arrange(species, desc(coef.lr))
-
-# number of unique families among selected asvs
-nfam_16s <- sel_asv_16s |>
-  group_by(species) |>
-  distinct(f) |>
-  count(name = 'n.family')
-
-# number of unique orders among selected asvs
-nord_16s <- sel_asv_16s |>
-  group_by(species) |>
-  distinct(o) |>
-  count(name = 'n.order')
-
-# number of unique classes among selected asvs
-nclass_16s <- sel_asv_16s |>
-  group_by(species) |>
-  distinct(c) |>
-  count(name = 'n.class')
-
-# retreive hyperparameter info
-parms_16s <- paste(stbl_dir, '16s-ss/stable-sets.rds', sep = '') |> 
-  read_rds() |>
-  mutate(eta.range = paste('[', round(eta.min, 2), ', ', round(eta.max, 2), ']', sep = '')) |>
-  select(species, ncomp, eta.range)
-
-# join with model fit metrics
-model_fit_16s <- model_metrics |>
-  left_join(parms_16s) |>
-  mutate(species = factor(species,
-                          levels = c('bm', 'bp', 'mn'),
-                          labels = c('Blue',
-                                     'Fin',
-                                     'Humpback')),
-         marker = '16S') |>
-  left_join(nfam_16s) |>
-  left_join(nord_16s) |>
-  left_join(nclass_16s) |>
-  select(species, marker, ncomp, eta.range, adj.rsq.lr, adj.rsq.ss, n.asv, n.family, n.order, n.class)
-
-## COMBINE ##
-
-model_fit <- bind_rows(model_fit_16s, model_fit_18sv4, model_fit_18sv9)
-
-## TABLE: COEFFICIENTS ---------------------------------------------------------
+## TABLES 4a-c: COEFFICIENTS ---------------------------------------------------
 
 top_coef_16s <- sel_asv_16s |> 
   drop_na(o) |> 
@@ -541,7 +693,8 @@ top_coef_16s <- sel_asv_16s |>
   group_by(species) |> 
   slice_max(mag, n = 5) |> 
   select(species, marker, coef.lr, coef.ss, d, p, c, o, f, g) |>
-  arrange(species, desc(coef.ss))
+  arrange(species, desc(coef.ss)) |>
+  mutate(across(where(is.numeric), ~round(.x, 3)))
 
 top_coef_18sv4 <- sel_asv_18sv4 |> 
   drop_na(o) |> 
@@ -550,7 +703,8 @@ top_coef_18sv4 <- sel_asv_18sv4 |>
   group_by(species) |> 
   slice_max(mag, n = 5) |> 
   select(species, marker, coef.lr, coef.ss, d, p, c, o, f, g) |>
-  arrange(species, desc(coef.ss))
+  arrange(species, desc(coef.ss)) |>
+  mutate(across(where(is.numeric), ~round(.x, 3)))
 
 top_coef_18sv9 <- sel_asv_18sv9 |> 
   drop_na(o) |> 
@@ -559,9 +713,10 @@ top_coef_18sv9 <- sel_asv_18sv9 |>
   group_by(species) |> 
   slice_max(mag, n = 5) |> 
   select(species, marker, coef.lr, coef.ss, d, p, c, o, f, g) |>
-  arrange(species, desc(coef.ss))
+  arrange(species, desc(coef.ss)) |>
+  mutate(across(where(is.numeric), ~round(.x, 3)))
 
-## TABLE: PREDICTIONS ----------------------------------------------------------
+## TABLE 5: PREDICTIONS --------------------------------------------------------
 
 # prediction metrics from 18sv9 model
 pred_metrics_18sv9 <- paste(stbl_dir, '18sv9-ss/loo-preds.rds', sep = '') |>
@@ -593,37 +748,68 @@ pred_metrics_16s <- paste(stbl_dir, '16s-ss/loo-preds.rds', sep = '') |>
             rmspe.lr = (pred.lr - obs.lr)^2 |> mean() |> sqrt()) |>
   mutate(marker = '16S')
 
+# naive predictions
+naive_preds <- paste(model_dir, 'naive-preds.rds', sep = '') |> read_rds()
+
 # combine
 pred_metrics <- rbind(pred_metrics_16s, pred_metrics_18sv4, pred_metrics_18sv9) |>
-  select(species, marker, ends_with('lr'), ends_with('ss'))
+  select(species, marker, ends_with('lr'), ends_with('ss')) |>
+  left_join(naive_preds) |>
+  mutate(rel.reduction.lag = (rmspe.lag - rmspe.ss)/rmspe.lag,
+         rel.reduction.mean = (rmspe.mean - rmspe.ss)/rmspe.mean,
+         across(where(is.double), ~round(.x, 3)),
+         across(starts_with('rel'), ~.x*100)) |>
+  mutate(species = factor(species,
+                          levels = c('bm', 'bp', 'mn'),
+                          labels = c('Blue',
+                                     'Fin',
+                                     'Humpback'))) |>
+  select(species, marker, ends_with('lr'), ends_with('ss'), starts_with('rel'))
 
-## TABLE: LITERATURE OVERLAP ---------------------------------------------------
-
-# Read in candidate set & stable set asv model results
-candidate_model_results <- read_rds('rslt/tbl/candidate-asv-model-res.rds')
-ss_model_results <- read_rds('rslt/tbl/stable-set-asv-model-res.rds')
+## TABLE 6: LITERATURE OVERLAP -------------------------------------------------
 
 # Read in lit review overlap tables
 class_overlap <- read_rds('rslt/tbl/overlap-table-class.rds')
 order_overlap <- read_rds('rslt/tbl/overlap-table-order.rds')
 
 class_overlap
+order_overlap
+
+## SUPP TABLE 5a-c: COMMONLY SELECTED TAXA -------------------------------------
+
+
+## SUPP TABLE 6a-b: LIT/NCOG OVERLAP (ORDER) -----------------------------------
+
+## 6a: all direct relationships
+
+## 6b: overlap with ncog data at order level
+
+## SUPP TABLE 7: MODELS FIT TO ASVS IN LIT REVIEW ------------------------------
+
+#
+candidate_model_results <- read_rds('rslt/tbl/candidate-asv-model-res.rds')
+
+#
+ss_model_results <- read_rds('rslt/tbl/stable-set-asv-model-res.rds')
 
 ## EXPORT TABLES ---------------------------------------------------------------
 
 # named list of tables
-sheets <- list("tbl2-modelfit" = model_fit,
+sheets <- list("tbl1a-ednasampling" = ncog_summary_short,
+               "tbl1b-visualsampling" = sighting_summary,
+               "tbl2-modelfit" = model_fit,
                "tbl3-validation" = selection_consistency,
                "tbl4a-coef16s" = top_coef_16s,
                "tbl4b-coef18sv4" = top_coef_18sv4,
                "tbl4c-coef18sv9" = top_coef_18sv9,
                "tbl5-modelpred" = pred_metrics,
-               "stbl2a-candidates16s" = asv_taxa_16s,
-               "stbl2b-candidates18sv4" = asv_taxa_18sv4,
-               "stbl2c-candidates18sv9" = asv_taxa_18sv9,
-               "stbl3a-coef16s" = sel_asv_16s,
-               "stbl3b-coef18sv4" = sel_asv_18sv4,
-               "stbl3c-coef18sv9" = sel_asv_18sv9)
+               "stbl2-ednasampling-long" = ncog_summary,
+               "stbl3a-candidates16s" = asv_taxa_16s,
+               "stbl3b-candidates18sv4" = asv_taxa_18sv4,
+               "stbl3c-candidates18sv9" = asv_taxa_18sv9,
+               "stbl4a-coef16s" = sel_asv_16s,
+               "stbl4b-coef18sv4" = sel_asv_18sv4,
+               "stbl4c-coef18sv9" = sel_asv_18sv9)
 
 # export as excel workbook
 writexl::write_xlsx(sheets, paste(out_dir, 'tables.xlsx', sep = ''))
