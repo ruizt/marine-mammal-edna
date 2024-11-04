@@ -1,6 +1,8 @@
 library(tidyverse)
 library(lubridate)
 library(patchwork)
+library(ggmap)
+library(mapdata)
 
 ## DIRECTORIES -----------------------------------------------------------------
 data_dir <- 'data/processed/'
@@ -11,7 +13,114 @@ val_dir <- 'rslt/nested-validation/'
 out_dir <- 'rslt/fig/'
 fs::dir_create(out_dir)
 
-## FIGURE: TIME SERIES ---------------------------------------------------------
+## FIGURE 1: SAMPLING MAPS -----------------------------------------------------
+
+# retrieve station metadata from NCOG
+paste(data_dir, 'ncog16s.RData', sep = '') |> load()
+ncog16s_meta <- sample_metadata |> 
+  select(sta.id, cruise, lat.dec, lon.dec) |>
+  mutate(marker = "16S")
+
+paste(data_dir, 'ncog18sv4.RData', sep = '') |> load()
+ncog18sv4_meta <- sample_metadata |> 
+  select(sta.id, cruise, lat.dec, lon.dec) |>
+  mutate(marker = "18SV4")
+
+paste(data_dir, 'ncog18sv9.RData', sep = '') |> load()
+ncog18sv9_meta <- sample_metadata |> 
+  select(sta.id, cruise, lat.dec, lon.dec) |>
+  mutate(marker = "18SV9")
+
+ncog_meta <- bind_rows(ncog16s_meta, ncog18sv4_meta, ncog18sv9_meta) |>
+  separate(sta.id, into = c('line', 'sta'), sep = ' ')
+
+# station locations
+stations <- ncog_meta |>
+  group_by(line, sta) |>
+  summarize(lat = mean(lat.dec), 
+            long = mean(lon.dec), 
+            .groups = 'drop') |>
+  arrange(line, desc(lat))
+
+# coordinates for labels
+line_labels <- stations |>
+  group_by(line) |>
+  slice_min(order_by = lat, n = 1)
+
+# bounding box
+bbox <- c(xmin = min(stations$long) - 2, 
+          xmax = max(stations$long) + 1, 
+          ymin = min(stations$lat) - 1,
+          ymax = max(stations$lat) + 1)
+
+# read in shapefile and crop to coastline
+gshhg <- read_sf("data/_gshhg-shp-2.3.7/GSHHS_shp/f/GSHHS_f_L1.shp") 
+sf_use_s2(F)
+gshhg_crop <- gshhg |> st_crop(bbox)
+
+# plot ncog sampling locations
+ncog_map <- ggplot(aes(x = long, y = lat), data = stations) +
+  geom_path(aes(group = line), linewidth = 0.3) +
+  geom_point(alpha = 0.5, size = 0.85) +
+  geom_text(aes(label = line),
+            hjust = 1, 
+            angle = 29, 
+            nudge_x = -0.25, 
+            nudge_y = -0.25*0.29,
+            data = line_labels) +
+  geom_sf(color = 'black', linewidth = 0.25,
+          data = gshhg_crop, inherit.aes = F) +
+  scale_x_continuous(limits = bbox[1:2], expand = expansion(0, 0)) +
+  scale_y_continuous(limits = bbox[3:4], expand = expansion(0, 0)) +
+  theme_bw() +
+  theme(panel.grid.major = element_line(color = 'black', linewidth = 0.1),
+        panel.grid.minor = element_blank()) +
+  labs(x = NULL, y = NULL)
+
+# read in sighting locations
+visual_sightings <- read_csv('data/_raw/CalCOFI_2004-2021_CombinedSightings.csv') |>
+  rename_with(~str_remove_all(.x, '[:punct:]') |> 
+                str_squish() |> 
+                str_replace_all(' ', '.') |> 
+                tolower()) |>
+  mutate(species = tolower(species.1)) |>
+  filter(adjusted.both.on.effort.and.on.transect == 'ON',
+         species %in% c('bm', 'bp', 'mn')) |>
+  mutate(datetime = mdy_hm(datetime.local),
+         year = year(datetime)) |>
+  select(cruise, year, datetime, species, declat, declong) |>
+  filter(year >= 2014) |>
+  distinct(declat, declong) |>
+  rename(lat = declat, long = declong)
+
+# plot sighting locations
+sighting_map <- ggplot(aes(x = long, y = lat), data = sighting_locations) +
+  geom_point(alpha = 0.5, size = 0.85) +
+  geom_path(aes(group = line), data = filter(stations, as.numeric(line) > 75)) +
+  geom_text(aes(label = line),
+            hjust = 1, 
+            angle = 29, 
+            nudge_x = -0.25, 
+            nudge_y = -0.25*0.29,
+            data = filter(line_labels, as.numeric(line) > 75)) +
+  geom_sf(color = 'black', linewidth = 0.25,
+          data = gshhg_crop, inherit.aes = F) +
+  scale_x_continuous(limits = bbox[1:2], expand = expansion(0, 0)) +
+  scale_y_continuous(limits = bbox[3:4], expand = expansion(0, 0)) +
+  theme_bw() +
+  theme(panel.grid.major = element_line(color = 'black', linewidth = 0.1),
+        panel.grid.minor = element_blank()) +
+  labs(x = NULL, y = NULL)
+
+fig_map <- ncog_map + sighting_map + 
+  plot_layout(nrow = 1) + 
+  plot_annotation(tag_levels = 'A')
+
+ggsave(fig_map, file = paste(out_dir, 'fig1-map.png', sep = ''),
+       width = 8, height = 4, units = 'in', dpi = 400)
+
+
+## FIGURE 2: TIME SERIES -------------------------------------------------------
 
 # load sighting data
 paste(data_dir, 'mm-sightings.RData', sep = '') |> load()
@@ -70,10 +179,10 @@ p2 <- sightings_raw |>
 
 p1 + p2 + plot_layout(ncol = 2, widths = c(2, 1))
 
-paste(fig_out_dir, 'fig-timeseries.png', sep = '') |>
+paste(out_dir, 'fig2-timeseries.png', sep = '') |>
   ggsave(width = 5, height = 4, dpi = 400, units = 'in')
 
-## FIGURE: PREDICTIONS ---------------------------------------------------------
+## FIGURE 3: PREDICTIONS ---------------------------------------------------------
 
 # predictions from 16s
 pred_pts_16s <- paste(stbl_dir, '16s-ss/loo-preds.rds', sep = '') |>
@@ -191,11 +300,11 @@ fig_predictions <- p1 + p2_ann +
   plot_layout(nrow = 1, ncol = 2, widths = c(1, 1))
 
 # export
-ggsave(fig_predictions, filename = paste(out_dir, 'fig-predictions.png', sep = ''),
+ggsave(fig_predictions, filename = paste(out_dir, 'fig3-predictions.png', sep = ''),
        width = 6.5, height = 4, units = 'in', dpi = 400)
 
 
-## FIGURE: MODEL DIAGNOSTICS ---------------------------------------------------
+## SUPPLEMENTARY FIGURE 1: MODEL DIAGNOSTICS -----------------------------------
 
 # predictions from 18sv9
 load('rslt/models/scaled-sightings/fitted-models-18sv9.RData')
@@ -268,7 +377,7 @@ resid_pacf <- fit_pts |>
   ungroup() |>
   select(species, marker, lr.resid) |>
   nest(resids = lr.resid, .by = c(species, marker)) |>
-  mutate(pacf = map(resids, pacf_fn)) |>
+  mutate(pacf = purrr::map(resids, pacf_fn)) |>
   unnest(pacf) |>
   ggplot(aes(x = lag)) +
   facet_grid(species ~ marker) +
@@ -291,7 +400,7 @@ resid_pacf
 # panel layout
 resid_diagnostics <- resid_fit + resid_pacf + plot_layout(nrow = 1, widths = c(1, 1)) +
   plot_annotation(tag_levels = 'A')
-ggsave(resid_diagnostics, filename = paste(out_dir, 'sfig-resid.png', sep = ''),
+ggsave(resid_diagnostics, filename = paste(out_dir, 'sfig1-resid.png', sep = ''),
        width = 8, height = 4, units = 'in', dpi = 400)
 
 
