@@ -362,7 +362,7 @@ get_summary_table <- function(taxonomic.level = "o"){
     left_join(overlap, join_by(species == Whale.species, gene.seq)) |> 
     rename(overlap = n) |> 
     mutate(
-      overlap = ifelse(is.na(), 0, overlap),
+      overlap = ifelse(is.na(overlap), 0, overlap),
       # 4) [Taxa overlap (n)] / [Lit count (n)]
       prop.lit.overlap = overlap/lit.count,
       
@@ -424,3 +424,4 @@ class_table
 saveRDS(order_table, 'rslt/tbl/overlap-table-order.rds')
 
 saveRDS(class_table, 'rslt/tbl/overlap-table-class.rds')
+
