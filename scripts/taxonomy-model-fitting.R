@@ -5,31 +5,30 @@ library(openxlsx)
 
 # Data processing --------------------------------------------------------------
 
+# directories
+model_dir <- 'rslt/models/scaled-sightings/'
+data_dir <- 'data/processed/'
+
+
 # load in documented relationships table
 doc.rel <- read.csv(here::here("data/whale-edna-relationships.csv"))
 
-# load asv tables 
-table_names <- getSheetNames("rslt/tbl/summary-tables.xlsx")
+doc.rel <- doc.rel |> 
+  mutate(Whale.species = str_replace(Whale.species, " whales", "s"))
 
-all_sheets <- lapply(table_names, function(sheet) {
-  read_excel("rslt/tbl/summary-tables.xlsx", sheet = sheet)
-})
 
 # candidate asvs
-asv_taxa_18sv9 <- all_sheets[[1]] 
+# candidate asvs from 18sv9
+paste(data_dir, 'ncog18sv9.RData', sep = '') |> load()
+asv_taxa_18sv9 <- asv_taxa 
 
-asv_taxa_18sv4 <- all_sheets[[2]] 
+# candidate asvs from 18sv4
+paste(data_dir, 'ncog18sv4.RData', sep = '') |> load()
+asv_taxa_18sv4 <- asv_taxa
 
-asv_taxa_16s <- all_sheets[[3]] 
-
-# selected asvs
-ss_asvs_18sv9 <- all_sheets[[4]] 
-
-ss_asvs_18sv4 <- all_sheets[[5]] 
-
-ss_asvs_16s <- all_sheets[[6]] 
-
-
+# candidate asvs from 16s
+paste(data_dir, 'ncog16s.RData', sep = '') |> load()
+asv_taxa_16s <- asv_taxa
 
 
 # join candidate asv tables
@@ -48,6 +47,67 @@ asv_taxa_all <- rbind(asv_taxa_16s,
 
 asv_taxa_all
 
+
+# 18sv9
+paste(model_dir, 'fitted-models-18sv9.RData', sep = '') |> load()
+# selected asvs
+ss_asvs_18sv9 <- fitted_models |>
+  mutate(species = factor(species,
+                          levels = c('bm', 'bp', 'mn'),
+                          labels = c('Blue',
+                                     'Fin',
+                                     'Humpback')),
+         marker = '18SV9',
+         coef.ss = map(coef, ~2^.x)) |>
+  select(species, coef, coef.ss, ss) |>
+  unnest(everything()) |>
+  rename(asv = ss,
+         coef.lr = coef) |>
+  left_join(asv_taxa_18sv9, join_by(asv == short.id)) |>
+  select(-feature.id) |>
+  arrange(species, desc(coef.lr))
+
+# 18sv4
+paste(model_dir, 'fitted-models-18sv4.RData', sep = '') |> load()
+
+# selected asvs
+ss_asvs_18sv4 <- fitted_models |>
+  mutate(species = factor(species,
+                          levels = c('bm', 'bp', 'mn'),
+                          labels = c('Blue',
+                                     'Fin',
+                                     'Humpback')),
+         marker = '18SV4',
+         coef.ss = map(coef, ~2^.x)) |>
+  select(species, coef, coef.ss, ss) |>
+  unnest(everything()) |>
+  rename(asv = ss,
+         coef.lr = coef) |>
+  left_join(asv_taxa_18sv4, join_by(asv == short.id)) |>
+  select(-feature.id) |>
+  arrange(species, desc(coef.lr))
+
+# 16s
+paste(model_dir, 'fitted-models-16s.RData', sep = '') |> load()
+
+# selected asvs
+ss_asvs_16s <- fitted_models |>
+  mutate(species = factor(species,
+                          levels = c('bm', 'bp', 'mn'),
+                          labels = c('Blue',
+                                     'Fin',
+                                     'Humpback')),
+         marker = '16S',
+         coef.ss = map(coef, ~2^.x)) |>
+  select(species, coef, coef.ss, ss) |>
+  unnest(everything()) |>
+  rename(asv = ss,
+         coef.lr = coef) |>
+  left_join(asv_taxa_16s, join_by(asv == short.id)) |>
+  select(-feature.id) |>
+  arrange(species, desc(coef.lr))
+
+
 # join selected asv tables
 ss_asvs_16s <- ss_asvs_16s |> 
   mutate(gene.seq = "16s")
@@ -64,10 +124,6 @@ ss_asvs_all <- rbind(ss_asvs_16s,
 
 ss_asvs_all <- ss_asvs_all |> 
   mutate(species = paste(tolower(species), "s", sep = ""))
-
-ss_asvs_all
-
-
 # ------------------------------------------------------------------------------
 
 ## MODEL: STABLE SET ASV OVERLAP WITH DOCUMENTED RELATIONSHIPS
@@ -96,8 +152,8 @@ asvs_16s <- ss_asvs_all |>
          species,
          Connection,
          p,c,o,f,g) |> 
-  mutate(species = case_when(species == "blue whales" ~ "bm",
-                             species == "humpback whales" ~ "mn")) |> 
+  mutate(species = case_when(species == "blues" ~ "bm",
+                             species == "humpbacks" ~ "mn")) |> 
   distinct()
 
 
@@ -137,19 +193,19 @@ ss_taxonomy_results <- data.frame(
 )
 
 for(ncomp in ncomp_grid){
-  for(.species in species_grid){
+  for(spec in species_grid){
     # select relevant features
     species_asvs <- asvs_16s |> 
-      filter(species == .species)
+      filter(species == spec)
     
     print(species_asvs)
     
-    p = species_asvs |> count()
+    p = nrow(species_asvs)
     
     x <- whales |> 
       select(all_of(species_asvs$asv)) 
     # target column
-    y <- whales |> select(.species) |> pull()
+    y <- whales |> select(spec) |> pull()
     
     # fit model
     fit <- spls(x, y , eta = 0, K = ncomp)
@@ -168,7 +224,7 @@ for(ncomp in ncomp_grid){
     new_row <- data.frame(
       Marker = "16s",
       Model = "pls",
-      Species = .species,
+      Species = spec,
       P = p,
       Ncomp = ncomp,
       R2 = r2,
@@ -293,8 +349,8 @@ asvs_16s <- asv_taxa_all |>
          Whale.species,
          Connection,
          p,c,o,f,g) |> 
-  mutate(Whale.species = case_when(Whale.species == "blue whales" ~ "bm",
-                                   Whale.species == "humpback whales" ~ "mn")) |> 
+  mutate(Whale.species = case_when(Whale.species == "blues" ~ "bm",
+                                   Whale.species == "humpbacks" ~ "mn")) |> 
   distinct() 
 
 # 18sv9 ASVs to fit the model on
@@ -414,7 +470,7 @@ whales
 
 ## BM MODEL --------------------------------------------------------------------
 bm_18sv9_asvs <- asvs_18sv9 |> 
-  filter(Whale.species == "blue whales")
+  filter(Whale.species == "blues")
 
 bm_18sv9 <- whales |> 
   select(bm, all_of(bm_18sv9_asvs$short.id))
@@ -450,7 +506,7 @@ row1 <- data.frame(marker = "18sv9", model = "lm",species = "bm", p = nrow(bm_18
 # MN MODEL ---------------------------------------------------------------------
 
 mn_18sv9_asvs <- asvs_18sv9 |> 
-  filter(Whale.species == "humpback whales")
+  filter(Whale.species == "humpbacks")
 
 mn_18sv9 <- whales |> 
   select(mn, all_of(mn_18sv9_asvs$short.id))
