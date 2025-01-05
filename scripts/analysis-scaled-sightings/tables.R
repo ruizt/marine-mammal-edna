@@ -152,8 +152,8 @@ sighting_counts <- visual_sightings |>
                           labels = c('Blue',
                                      'Fin',
                                      'Humpback'))) |>
-  pivot_wider(names_from = species, values_from = n) |>
-  mutate(across(where(is.integer), ~replace_na(.x, value = 0L)))
+  pivot_wider(names_from = species, values_from = n) |> 
+  mutate(across(where(is.integer), ~replace_na(.x, replace = 0L)))
 
 sighting_summary <- visual_sightings |>
   group_by(year, season) |>
@@ -769,11 +769,23 @@ pred_metrics <- rbind(pred_metrics_16s, pred_metrics_18sv4, pred_metrics_18sv9) 
 ## TABLE 6: LITERATURE OVERLAP -------------------------------------------------
 
 # Read in lit review overlap tables (fixed overlap calculation)
-class_overlap <- read_rds('rslt/tbl/overlap-table-class.rds')
-order_overlap <- read_rds('rslt/tbl/overlap-table-order.rds')
+class_overlap <- read_rds('rslt/tbl/overlap-table-class.rds') |>
+  mutate(species = factor(species,
+                          levels = c('blues', 'fins', 'humpbacks'),
+                          labels = c('Blue',
+                                     'Fin',
+                                     'Humpback')),
+         taxonomic.level = 'class')
+order_overlap <- read_rds('rslt/tbl/overlap-table-order.rds') |>
+  mutate(species = factor(species,
+                          levels = c('blues', 'fins', 'humpbacks'),
+                          labels = c('Blue',
+                                     'Fin',
+                                     'Humpback')),
+         taxonomic.level = 'order') 
 
-class_overlap
-order_overlap
+lit_overlap <- bind_rows(class_overlap, order_overlap) |>
+  select(taxonomic.level, gene.seq, species, ends_with('count'), ends_with('overlap'))
 
 ## SUPP TABLE 5a-c: COMMONLY SELECTED TAXA -------------------------------------
 
@@ -789,7 +801,6 @@ tax_intersection_list_16s <- rbind(tax_jindex_16s, asv_jindex_16s) |>
                                      'Humpback'))) |> 
   unnest(intersection)
 
-tax_intersection_list_16s
 #18sv4
 tax_intersection_list_18sv4 <- rbind(tax_jindex_18sv4, asv_jindex_18sv4) |> 
   select(species, taxonomic.level, intersect) |> 
@@ -911,7 +922,13 @@ asv_taxa_all <- rbind(asv_taxa_16s,
 # create table
 ncog_lit_overlap_order <- rbind(get_ncog_asvs("16s", "o"),
                                 get_ncog_asvs("18sv4", "o"),
-                                get_ncog_asvs("18sv9", "o"))
+                                get_ncog_asvs("18sv9", "o")) |>
+  rename_with(tolower) |>
+  mutate(whale.species = factor(whale.species,
+                          levels = c('blue whales', 'fin whales', 'humpback whales'),
+                          labels = c('Blue',
+                                     'Fin',
+                                     'Humpback')))
 
 ## SUPP TABLE 7: MODELS FIT TO ASVS IN LIT REVIEW ------------------------------
 

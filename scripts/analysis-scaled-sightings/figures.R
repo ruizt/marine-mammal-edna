@@ -3,6 +3,7 @@ library(lubridate)
 library(patchwork)
 library(ggmap)
 library(mapdata)
+library(sf)
 
 ## DIRECTORIES -----------------------------------------------------------------
 data_dir <- 'data/processed/'
@@ -40,7 +41,8 @@ stations <- ncog_meta |>
   summarize(lat = mean(lat.dec), 
             long = mean(lon.dec), 
             .groups = 'drop') |>
-  arrange(line, desc(lat))
+  arrange(line, desc(lat)) |>
+  filter(as.numeric(line) > 74)
 
 # coordinates for labels
 line_labels <- stations |>
@@ -61,7 +63,7 @@ gshhg_crop <- gshhg |> st_crop(bbox)
 # plot ncog sampling locations
 ncog_map <- ggplot(aes(x = long, y = lat), data = stations) +
   geom_path(aes(group = line), linewidth = 0.3) +
-  geom_point(alpha = 0.5, size = 0.85) +
+  geom_point(alpha = 0.5, size = 1.5) +
   geom_text(aes(label = line),
             hjust = 1, 
             angle = 29, 
@@ -94,8 +96,8 @@ visual_sightings <- read_csv('data/_raw/CalCOFI_2004-2021_CombinedSightings.csv'
   rename(lat = declat, long = declong)
 
 # plot sighting locations
-sighting_map <- ggplot(aes(x = long, y = lat), data = sighting_locations) +
-  geom_point(alpha = 0.5, size = 0.85) +
+sighting_map <- ggplot(aes(x = long, y = lat), data = visual_sightings) +
+  geom_point(alpha = 0.5, size = 1.5) +
   geom_path(aes(group = line), data = filter(stations, as.numeric(line) > 75)) +
   geom_text(aes(label = line),
             hjust = 1, 
@@ -119,6 +121,13 @@ fig_map <- ncog_map + sighting_map +
 ggsave(fig_map, file = paste(out_dir, 'fig1-map.png', sep = ''),
        width = 8, height = 4, units = 'in', dpi = 400)
 
+ncog_map_slide <- ncog_map + labs(title = 'A. eDNA sampling')
+sighting_map_slide <- sighting_map + labs(title = 'B. Whale sightings')
+fig_map_slide <- ncog_map_slide + sighting_map_slide +
+  plot_layout(nrow = 1)
+
+ggsave(fig_map_slide, file = paste(out_dir, 'fig1-map-slide.png', sep = ''),
+       width = 8, height = 4, units = 'in', dpi = 400)
 
 ## FIGURE 2: TIME SERIES -------------------------------------------------------
 
@@ -181,6 +190,9 @@ p1 + p2 + plot_layout(ncol = 2, widths = c(2, 1))
 
 paste(out_dir, 'fig2-timeseries.png', sep = '') |>
   ggsave(width = 5, height = 4, dpi = 400, units = 'in')
+
+paste(out_dir, 'fig2-timeseries-slide.png', sep = '') |>
+  ggsave(width = 6, height = 3, dpi = 400, units = 'in')
 
 ## FIGURE 3: PREDICTIONS ---------------------------------------------------------
 
