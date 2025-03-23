@@ -55,8 +55,8 @@ edna_raw <- edna_in |>
 
 ## FILTERING -------------------------------------------------------------------
 
-# identify surface and dmc samples
-## (data dimensions: 956 x 2; 956 samples)
+# identify surface and dmc samples in core region
+## (data dimensions: 918 x 2; 918 samples)
 surface_dmc_samples <- metadata |> 
   select(sample.name, chlora) |>
   separate(sample.name, 
@@ -64,6 +64,7 @@ surface_dmc_samples <- metadata |>
            sep = '_') |>
   filter(is.na(misc)) |>
   select(-misc) |>
+  filter(as.numeric(line) > 74) |>
   group_by(cruise, line, sta) |>
   mutate(max.chla = chlora == max(chlora),
          min.depth = as.numeric(depth) == min(as.numeric(depth))) |>
@@ -73,7 +74,7 @@ surface_dmc_samples <- metadata |>
   unite(sample.id, c(cruise, line, sta, depth), sep = '_')
 
 # select asv's that appear in at least 1% of samples and at most 99% of samples
-## (data dimensions: 1 x 8936; 8936 ASVs)
+## (data dimensions: 1 x 8864; 8864 ASVs)
 cols_of_interest <- edna_raw |>
   filter(sample.id %in% pull(surface_dmc_samples, sample.id)) |>
   select(starts_with('asv')) |>
@@ -86,7 +87,7 @@ cols_of_interest <- edna_raw |>
   pull(col)
 
 # identify samples in which at least 1% of asv's of interest are present
-## (data dimensions: 1 x 943;  943 obs)
+## (data dimensions: 1 x 908;  908 obs)
 samples_of_interest <- edna_raw |> 
   select(sample.id, all_of(cols_of_interest)) |>
   filter(sample.id %in% pull(surface_dmc_samples, sample.id)) |>
@@ -98,13 +99,13 @@ samples_of_interest <- edna_raw |>
 
 
 # implement filtering criteria above
-## (data dimensions: 943 x 8937; 943 obs, 8936 ASVs)
+## (data dimensions: 908 x 8865; 908 obs, 8864 ASVs)
 edna_filtered <- edna_raw |>
   select(sample.id, all_of(cols_of_interest)) |>
   filter(sample.id %in% samples_of_interest)
 
 # identify stations with only one observation (i.e. sample at one depth only)
-## (removing 9 samples)
+## (removing 8 samples)
 samples_to_drop <- edna_filtered |>
   separate(sample.id, 
            into = c('cruise', 'line', 'sta', 'depth'),
@@ -116,7 +117,7 @@ samples_to_drop <- edna_filtered |>
   pull(sample.id)
 
 # remove single-depth samples and asvs present in under 1% of remaining samples
-## (data dimensions: 934 x 8933; 934 obs, 8932 ASVs)
+## (data dimensions: 900 x 8865; 900 obs, 8864 ASVs)
 edna_filtered %<>% 
   filter(!(str_trunc(sample.id, 18, ellipsis = '') %in% samples_to_drop)) |>
   select(where(~mean(.x > 0) > 0.01))
@@ -141,7 +142,6 @@ imputation_out <- edna_filtered |>
                            z.warning = 1.001*z.max)
 
 # bind imputed values to sample info
-## (data dimensions: 934 x 8934; 934 obs, 8932 ASVs + 1 ID + 1 depth indicator)
 edna_imputed <- edna_filtered |>
   select(sample.id) |>
   bind_cols(imputation_out) |>
@@ -151,7 +151,6 @@ edna_imputed <- edna_filtered |>
 
 
 # save imputed data
-## REMOVE DIRECTORY FROM VERSION CONTROL BEFORE FINALIZING
 fs::dir_create(paste(out_dir, '_imputed/', sep = ''))
 save(edna_imputed, 
      file = paste(out_dir, '_imputed/ncog18sv9-imputed.RData', sep = ''))

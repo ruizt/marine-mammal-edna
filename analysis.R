@@ -2,24 +2,22 @@
 source('scripts/processing/processing-18sv9.R')
 source('scripts/processing/processing-18sv4.R')
 source('scripts/processing/processing-16s.R')
-source('scripts/processing/processing-mm.R')
+source('scripts/processing/processing-density.R')
+source('scripts/processing/validation-partitions-dens.R')
 
-## GENERATE DATA PARTITIONS FOR VALIDATION PROCEDURES --------------------------
-source('scripts/processing/validation-partitions.R')
-
-## SCALED SIGHTINGS ANALYSIS ---------------------------------------------------
+## DENSITY MODELING ------------------------------------------------------------
 
 # perform stability selection to identify asvs of interest
-source('scripts/analysis-scaled-sightings/stability-selection-18sv9-ss.R')
-source('scripts/analysis-scaled-sightings/stability-selection-18sv4-ss.R')
-source('scripts/analysis-scaled-sightings/stability-selection-16s-ss.R')
+source('scripts/analysis-density-estimates/stability-selection-18sv9-dens.R')
+source('scripts/analysis-density-estimates/stability-selection-18sv4-dens.R')
+source('scripts/analysis-density-estimates/stability-selection-16s-dens.R')
 
 # nested validation procedure to assess consistency of selection procedure
-source('scripts/analysis-scaled-sightings/nested-validation-18sv9-ss.R')
-source('scripts/analysis-scaled-sightings/nested-validation-18sv4-ss.R')
-source('scripts/analysis-scaled-sightings/nested-validation-16s-ss.R')
+source('scripts/analysis-density-estimates/nested-validation-18sv9-dens.R')
+source('scripts/analysis-density-estimates/nested-validation-18sv4-dens.R')
+source('scripts/analysis-density-estimates/nested-validation-16s-ss.R')
 
-# fit models on stable sets
-source('scripts/analysis-scaled-sightings/model-fitting-18sv9-ss.R')
-source('scripts/analysis-scaled-sightings/model-fitting-18sv4-ss.R')
-source('scripts/analysis-scaled-sightings/model-fitting-16s-ss.R')
+# model fitting to stable sets
+source('scripts/analysis-density-estimates/model-fitting-16s-dens.R')
+source('scripts/analysis-density-estimates/model-fitting-18sv4-dens.R')
+source('scripts/analysis-density-estimates/model-fitting-18sv9-dens.R')

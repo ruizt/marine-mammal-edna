@@ -56,7 +56,7 @@ edna_raw <- edna_in |>
 ## FILTERING -------------------------------------------------------------------
 
 # identify surface and dmc samples
-## (data dimensions: 956 x 2; 956 samples)
+## (data dimensions: 918 x 2; 918 samples)
 ## Warning message: Expected 5 pieces. Missing pieces filled with `NA` in 1145 rows
 surface_dmc_samples <- metadata |> 
   select(sample.name, chlora) |>
@@ -65,6 +65,7 @@ surface_dmc_samples <- metadata |>
            sep = '_') |>
   filter(is.na(misc)) |>
   select(-misc) |>
+  filter(as.numeric(line) > 74) |>
   group_by(cruise, line, sta) |>
   mutate(max.chla = chlora == max(chlora),
          min.depth = as.numeric(depth) == min(as.numeric(depth))) |>
@@ -74,7 +75,7 @@ surface_dmc_samples <- metadata |>
   unite(sample.id, c(cruise, line, sta, depth), sep = '_')
 
 # select asv's that appear in at least 1% of samples and at most 99% of samples
-## (data dimensions: 1 x 6060; 6060 ASVs)
+## (data dimensions: 1 x 5951; 5951 ASVs)
 cols_of_interest <- edna_raw |>
   filter(sample.id %in% pull(surface_dmc_samples, sample.id)) |>
   select(starts_with('asv')) |>
@@ -87,7 +88,7 @@ cols_of_interest <- edna_raw |>
   pull(col)
 
 # identify samples in which at least 1% of asv's of interest are present
-## (data dimensions: 1 x 949;  949 obs)
+## (data dimensions: 1 x 913;  913 obs)
 samples_of_interest <- edna_raw |> 
   select(sample.id, all_of(cols_of_interest)) |>
   filter(sample.id %in% pull(surface_dmc_samples, sample.id)) |>
@@ -99,7 +100,7 @@ samples_of_interest <- edna_raw |>
 
 
 # implement filtering criteria above
-## (data dimensions: 949 x 6061; 949 obs, 6060 ASVs)
+## (data dimensions: 913 x 5952; 949 obs, 5951 ASVs)
 edna_filtered <- edna_raw |>
   select(sample.id, all_of(cols_of_interest)) |>
   filter(sample.id %in% samples_of_interest)
@@ -117,7 +118,7 @@ samples_to_drop <- edna_filtered |>
   pull(sample.id)
 
 # remove single-depth samples and asvs present in under 1% of remaining samples
-## (data dimensions: 946 x 6061; 946 obs, 6060 ASVs)
+## (data dimensions: 910 x 5952; 910 obs, 5951 ASVs)
 edna_filtered %<>% 
   filter(!(str_trunc(sample.id, 18, ellipsis = '') %in% samples_to_drop)) |>
   select(where(~mean(.x > 0) > 0.01))
@@ -133,7 +134,7 @@ z.max <- edna_filtered |>
 ## IMPUTATION ------------------------------------------------------------------
 
 # impute zeros ( x_{ijkl} )
-## LONG RUNTIME: ~5-10min, Number of adjusted imputations:  684763 
+## LONG RUNTIME: ~5-10min
 imputation_out <- edna_filtered |> 
   select(-sample.id) |>
   zCompositions::cmultRepl(label = 0, 
@@ -142,7 +143,6 @@ imputation_out <- edna_filtered |>
                            z.warning = 1.001*z.max)
 
 # bind imputed values to sample info
-## (data dimensions: 946 x 6062; 946 obs, 6060 ASVs)
 edna_imputed <- edna_filtered |>
   select(sample.id) |>
   bind_cols(imputation_out) |>
@@ -150,7 +150,6 @@ edna_imputed <- edna_filtered |>
   select(sample.id, depth.fac, starts_with('asv'))
 
 # save imputed data
-## REMOVE DIRECTORY FROM VERSION CONTROL BEFORE FINALIZING
 fs::dir_create(paste(out_dir, '_imputed/', sep = ''))
 save(edna_imputed, 
      file = paste(out_dir, '_imputed/ncog16s-imputed.RData', sep = ''))
