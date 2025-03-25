@@ -8,7 +8,7 @@ library(here)
 # candidate taxa overlap with documented relationships --------------------------
 
 # directories
-model_dir <- 'rslt/models/scaled-sightings/'
+model_dir <- 'rslt/models/density/'
 data_dir <- 'data/processed/'
 
 

@@ -7,6 +7,7 @@ library(collapse)
 data_dir <- 'data/processed/'
 stbl_dir <- 'rslt/stability-selection/16s-dens/'
 out_dir <- 'rslt/models/density/'
+fs::dir_create(out_dir)
 
 ## DATA INPUTS -----------------------------------------------------------------
 

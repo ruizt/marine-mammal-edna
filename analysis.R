@@ -15,7 +15,7 @@ source('scripts/analysis-density-estimates/stability-selection-16s-dens.R')
 # nested validation procedure to assess consistency of selection procedure
 source('scripts/analysis-density-estimates/nested-validation-18sv9-dens.R')
 source('scripts/analysis-density-estimates/nested-validation-18sv4-dens.R')
-source('scripts/analysis-density-estimates/nested-validation-16s-ss.R')
+source('scripts/analysis-density-estimates/nested-validation-16s-dens.R')
 
 # model fitting to stable sets
 source('scripts/analysis-density-estimates/model-fitting-16s-dens.R')

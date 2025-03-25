@@ -6,7 +6,7 @@ library(openxlsx)
 # Data processing --------------------------------------------------------------
 
 # directories
-model_dir <- 'rslt/models/scaled-sightings/'
+model_dir <- 'rslt/models/density/'
 data_dir <- 'data/processed/'
 
 
@@ -170,10 +170,10 @@ data_dir <- 'data/processed/'
 paste(data_dir, 'ncog16s.RData', sep = '') |> load()
 edna_16s <- edna
 
-paste(data_dir, 'mm-sightings.RData', sep = '') |> load() 
+paste(data_dir, 'density-estimates.RData', sep = '') |> load() 
 
 # join sightings, and 16s 
-whales <- inner_join(sightings, edna_16s, by = 'cruise') 
+whales <- inner_join(dens, edna_16s, by = 'cruise') 
 
 
 # MODEL FITTING GRID SEARCH FOR NCOMP
@@ -464,7 +464,7 @@ best_16s_models <- candidate_taxonomy_results |>
 paste(data_dir, 'ncog18sv9.RData', sep = '') |> load()
 edna_18sv9 <- edna
 # join asvs with whale sightings 
-whales <- inner_join(sightings, edna_18sv9, by = "cruise")
+whales <- inner_join(dens, edna_18sv9, by = "cruise")
 whales
 
 
@@ -545,7 +545,7 @@ row2 <- data.frame(marker = "18sv9",model = "lm", species = "mn", p = nrow(mn_18
 paste(data_dir, 'ncog18sv4.RData', sep = '') |> load()
 edna_18sv4 <- edna
 # join asvs with whale sightings 
-whales <- inner_join(sightings, edna_18sv4, by = "cruise")
+whales <- inner_join(dens, edna_18sv4, by = "cruise")
 whales
 
 # matches

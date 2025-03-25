@@ -13,10 +13,10 @@ paste(out_dir, 'inner-spls-fits/', sep = '_') |> dir_create()
 
 ## DATA INPUTS -----------------------------------------------------------------
 
-# read in and combine 18sv9 data and scaled sightings
+# read in and combine 18sv9 data and density estimates
 paste(data_dir, 'ncog18sv9.RData', sep = '') |> load()
 paste(data_dir, 'density-estimates.RData', sep = '') |> load() 
-whales <- inner_join(sightings, edna, by = 'cruise')
+whales <- inner_join(dens, edna, by = 'cruise')
 
 # dimensions
 p <- whales |> dplyr::select(starts_with('asv')) |> ncol()

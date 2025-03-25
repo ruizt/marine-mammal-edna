@@ -3,7 +3,7 @@ library(lubridate)
 
 ## DIRECTORIES -----------------------------------------------------------------
 data_dir <- 'data/processed/'
-model_dir <- 'rslt/models/scaled-sightings/'
+model_dir <- 'rslt/models/density/'
 stbl_dir <- 'rslt/stability-selection/'
 val_dir <- 'rslt/nested-validation/'
 
@@ -157,8 +157,8 @@ sighting_counts <- visual_sightings |>
 
 sighting_summary <- visual_sightings |>
   group_by(year, season) |>
-  summarize(start.date = min(date(datetime)),
-            end.date = max(date(datetime))) |>
+  summarize(first.sighting = min(date(datetime)),
+            last.sighting = max(date(datetime))) |>
   left_join(sighting_counts)
 
 ## SUPP TABLES 3a-c ------------------------------------------------------------
@@ -218,7 +218,7 @@ nclass_18sv9 <- sel_asv_18sv9 |>
   count(name = 'n.class')
 
 # retreive hyperparameter info
-parms_18sv9 <- paste(stbl_dir, '18sv9-ss/stable-sets.rds', sep = '') |> 
+parms_18sv9 <- paste(stbl_dir, '18sv9-dens/stable-sets.rds', sep = '') |> 
   read_rds() |>
   mutate(eta.range = paste('[', round(eta.min, 2), ', ', round(eta.max, 2), ']', sep = '')) |>
   select(species, ncomp, eta.range)
@@ -235,7 +235,7 @@ model_fit_18sv9 <- model_metrics |>
   left_join(nfam_18sv9) |>
   left_join(nord_18sv9) |>
   left_join(nclass_18sv9) |>
-  select(species, marker, ncomp, eta.range, adj.rsq.lr, adj.rsq.ss, n.asv, n.family, n.order, n.class)
+  select(species, marker, ncomp, eta.range, adj.rsq.lr, adj.rsq.dens, n.asv, n.family, n.order, n.class)
 
 ## 18SV4 ##
 
@@ -278,7 +278,7 @@ nclass_18sv4 <- sel_asv_18sv4 |>
   count(name = 'n.class')
 
 # retreive hyperparameter info
-parms_18sv4 <- paste(stbl_dir, '18sv4-ss/stable-sets.rds', sep = '') |> 
+parms_18sv4 <- paste(stbl_dir, '18sv4-dens/stable-sets.rds', sep = '') |> 
   read_rds() |>
   mutate(eta.range = paste('[', round(eta.min, 2), ', ', round(eta.max, 2), ']', sep = '')) |>
   select(species, ncomp, eta.range)
@@ -295,7 +295,7 @@ model_fit_18sv4 <- model_metrics |>
   left_join(nfam_18sv4) |>
   left_join(nord_18sv4) |>
   left_join(nclass_18sv4) |>
-  select(species, marker, ncomp, eta.range, adj.rsq.lr, adj.rsq.ss, n.asv, n.family, n.order, n.class)
+  select(species, marker, ncomp, eta.range, adj.rsq.lr, adj.rsq.dens, n.asv, n.family, n.order, n.class)
 
 ## 16S ##
 
@@ -338,7 +338,7 @@ nclass_16s <- sel_asv_16s |>
   count(name = 'n.class')
 
 # retreive hyperparameter info
-parms_16s <- paste(stbl_dir, '16s-ss/stable-sets.rds', sep = '') |> 
+parms_16s <- paste(stbl_dir, '16s-dens/stable-sets.rds', sep = '') |> 
   read_rds() |>
   mutate(eta.range = paste('[', round(eta.min, 2), ', ', round(eta.max, 2), ']', sep = '')) |>
   select(species, ncomp, eta.range)
@@ -355,7 +355,7 @@ model_fit_16s <- model_metrics |>
   left_join(nfam_16s) |>
   left_join(nord_16s) |>
   left_join(nclass_16s) |>
-  select(species, marker, ncomp, eta.range, adj.rsq.lr, adj.rsq.ss, n.asv, n.family, n.order, n.class)
+  select(species, marker, ncomp, eta.range, adj.rsq.lr, adj.rsq.dens, n.asv, n.family, n.order, n.class)
 
 ## COMBINE ##
 
@@ -467,7 +467,7 @@ union_fn_taxa <- function(data, tax.level){
 ## 18SV9 ##
 
 # merge validation stable sets with asv taxa
-validation_stable_sets_18sv9 <- paste(val_dir, '18sv9-ss/validation-stable-sets.rds', sep = '') |>
+validation_stable_sets_18sv9 <- paste(val_dir, '18sv9-dens/validation-stable-sets.rds', sep = '') |>
   read_rds() |>
   mutate(asv = map(asv, unique)) |>
   unnest(asv)
@@ -476,7 +476,7 @@ validation_ss_taxa_18sv9 <- validation_stable_sets_18sv9 |>
   left_join(asv_taxa_18sv9, join_by(asv == short.id))
 
 # measures of overlap at asv level
-asv_jindex_18sv9 <- paste(val_dir, '18sv9-ss/validation-stable-sets.rds', sep = '') |>
+asv_jindex_18sv9 <- paste(val_dir, '18sv9-dens/validation-stable-sets.rds', sep = '') |>
   read_rds() |>
   mutate(asv = map(asv, unique)) |>
   select(species, asv)  |>
@@ -536,7 +536,7 @@ selection_consistency_18sv9 <- selection_consistency_18sv9_long |>
 ## 18SV4 ##
 
 # merge validation stable sets with asv taxa
-validation_stable_sets_18sv4 <- paste(val_dir, '18sv4-ss/validation-stable-sets.rds', sep = '') |>
+validation_stable_sets_18sv4 <- paste(val_dir, '18sv4-dens/validation-stable-sets.rds', sep = '') |>
   read_rds() |>
   mutate(asv = map(asv, unique)) |>
   unnest(asv)
@@ -545,7 +545,7 @@ validation_ss_taxa_18sv4 <- validation_stable_sets_18sv4 |>
   left_join(asv_taxa_18sv4, join_by(asv == short.id))
 
 # measures of overlap at asv level
-asv_jindex_18sv4 <- paste(val_dir, '18sv4-ss/validation-stable-sets.rds', sep = '') |>
+asv_jindex_18sv4 <- paste(val_dir, '18sv4-dens/validation-stable-sets.rds', sep = '') |>
   read_rds() |>
   mutate(asv = map(asv, unique)) |>
   select(species, asv)  |>
@@ -605,7 +605,7 @@ selection_consistency_18sv4 <- selection_consistency_18sv4_long |>
 ## 16S ##
 
 # merge validation stable sets with asv taxa
-validation_stable_sets_16s <- paste(val_dir, '16s-ss/validation-stable-sets.rds', sep = '') |>
+validation_stable_sets_16s <- paste(val_dir, '16s-dens/validation-stable-sets.rds', sep = '') |>
   read_rds() |>
   mutate(asv = map(asv, unique)) |>
   unnest(asv)
@@ -614,7 +614,7 @@ validation_ss_taxa_16s <- validation_stable_sets_16s |>
   left_join(asv_taxa_16s, join_by(asv == short.id))
 
 # measures of overlap at asv level
-asv_jindex_16s <- paste(val_dir, '16s-ss/validation-stable-sets.rds', sep = '') |>
+asv_jindex_16s <- paste(val_dir, '16s-dens/validation-stable-sets.rds', sep = '') |>
   read_rds() |>
   mutate(asv = map(asv, unique)) |>
   select(species, asv)  |>
@@ -719,32 +719,32 @@ top_coef_18sv9 <- sel_asv_18sv9 |>
 ## TABLE 5: PREDICTIONS --------------------------------------------------------
 
 # prediction metrics from 18sv9 model
-pred_metrics_18sv9 <- paste(stbl_dir, '18sv9-ss/loo-preds.rds', sep = '') |>
+pred_metrics_18sv9 <- paste(stbl_dir, '18sv9-dens/loo-preds.rds', sep = '') |>
   read_rds() |>
   group_by(species) |>
-  summarize(cor.ss = cor(pred.ss, obs.ss),
+  summarize(cor.dens = cor(pred.dens, obs.dens),
             cor.lr = cor(pred.lr, obs.lr),
-            rmspe.ss = (pred.ss - obs.ss)^2 |> mean() |> sqrt(),
+            rmspe.dens = (pred.dens - obs.dens)^2 |> mean() |> sqrt(),
             rmspe.lr = (pred.lr - obs.lr)^2 |> mean() |> sqrt()) |>
   mutate(marker = '18SV9')
 
 # prediction metrics from 18sv4 model
-pred_metrics_18sv4 <- paste(stbl_dir, '18sv4-ss/loo-preds.rds', sep = '') |> 
+pred_metrics_18sv4 <- paste(stbl_dir, '18sv4-dens/loo-preds.rds', sep = '') |> 
   read_rds() |>
   group_by(species) |>
-  summarize(cor.ss = cor(pred.ss, obs.ss),
+  summarize(cor.dens = cor(pred.dens, obs.dens),
             cor.lr = cor(pred.lr, obs.lr),
-            rmspe.ss = (pred.ss - obs.ss)^2 |> mean() |> sqrt(),
+            rmspe.dens = (pred.dens - obs.dens)^2 |> mean() |> sqrt(),
             rmspe.lr = (pred.lr - obs.lr)^2 |> mean() |> sqrt()) |>
   mutate(marker = '18SV4')
 
 # prediction metrics from 16s model
-pred_metrics_16s <- paste(stbl_dir, '16s-ss/loo-preds.rds', sep = '') |> 
+pred_metrics_16s <- paste(stbl_dir, '16s-dens/loo-preds.rds', sep = '') |> 
   read_rds() |>
   group_by(species) |>
-  summarize(cor.ss = cor(pred.ss, obs.ss),
+  summarize(cor.dens = cor(pred.dens, obs.dens),
             cor.lr = cor(pred.lr, obs.lr),
-            rmspe.ss = (pred.ss - obs.ss)^2 |> mean() |> sqrt(),
+            rmspe.dens = (pred.dens - obs.dens)^2 |> mean() |> sqrt(),
             rmspe.lr = (pred.lr - obs.lr)^2 |> mean() |> sqrt()) |>
   mutate(marker = '16S')
 
@@ -753,10 +753,10 @@ naive_preds <- paste(model_dir, 'naive-preds.rds', sep = '') |> read_rds()
 
 # combine
 pred_metrics <- rbind(pred_metrics_16s, pred_metrics_18sv4, pred_metrics_18sv9) |>
-  select(species, marker, ends_with('lr'), ends_with('ss')) |>
+  select(species, marker, ends_with('lr'), ends_with('dens')) |>
   left_join(naive_preds) |>
-  mutate(rel.reduction.lag = (rmspe.lag - rmspe.ss)/rmspe.lag,
-         rel.reduction.mean = (rmspe.mean - rmspe.ss)/rmspe.mean,
+  mutate(rel.reduction.lag = (rmspe.lag - rmspe.dens)/rmspe.lag,
+         rel.reduction.mean = (rmspe.mean - rmspe.dens)/rmspe.mean,
          across(where(is.double), ~round(.x, 3)),
          across(starts_with('rel'), ~.x*100)) |>
   mutate(species = factor(species,
@@ -764,7 +764,7 @@ pred_metrics <- rbind(pred_metrics_16s, pred_metrics_18sv4, pred_metrics_18sv9) 
                           labels = c('Blue',
                                      'Fin',
                                      'Humpback'))) |>
-  select(species, marker, ends_with('lr'), ends_with('ss'), starts_with('rel'))
+  select(species, marker, ends_with('lr'), ends_with('dens'), starts_with('rel'))
 
 ## TABLE 6: LITERATURE OVERLAP -------------------------------------------------
 
