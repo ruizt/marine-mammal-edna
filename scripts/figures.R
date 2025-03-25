@@ -79,18 +79,8 @@ ncog_map <- ggplot(aes(x = long, y = lat), data = stations) +
   labs(x = NULL, y = NULL)
 
 # read in sighting locations
-visual_sightings <- read_csv('data/_raw/CalCOFI_2004-2021_CombinedSightings.csv') |>
-  rename_with(~str_remove_all(.x, '[:punct:]') |> 
-                str_squish() |> 
-                str_replace_all(' ', '.') |> 
-                tolower()) |>
-  mutate(species = tolower(species.1)) |>
-  filter(adjusted.both.on.effort.and.on.transect == 'ON',
-         species %in% c('bm', 'bp', 'mn')) |>
-  mutate(datetime = mdy_hm(datetime.local),
-         year = year(datetime)) |>
-  select(cruise, year, datetime, species, declat, declong) |>
-  filter(year >= 2014) |>
+paste(data_dir, 'sightings.RData', sep = '') |> load()
+visual_sightings <- sightings |>
   distinct(declat, declong) |>
   rename(lat = declat, long = declong)
 
