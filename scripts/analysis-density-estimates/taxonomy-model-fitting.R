@@ -178,7 +178,7 @@ whales <- inner_join(dens, edna_16s, by = 'cruise')
 
 # MODEL FITTING GRID SEARCH FOR NCOMP
 species_grid <- c("bm","mn") # blue whales and humpbacks only
-ncomp_grid <- 1:9
+ncomp_grid <- 1:5
 n <- 25
 
 ss_taxonomy_results <- data.frame(
@@ -604,5 +604,5 @@ ss_asv_results
 
 
 # Save results for later
-saveRDS(candidate_asv_results, "rslt/tbl/candidate-asv-model-res.rds")
-saveRDS(ss_asv_results, "rslt/tbl/stable-set-asv-model-res.rds")
+saveRDS(candidate_asv_results, "_tbl/candidate-asv-model-res.rds")
+saveRDS(ss_asv_results, "_tbl/stable-set-asv-model-res.rds")

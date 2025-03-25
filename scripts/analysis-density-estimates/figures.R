@@ -11,7 +11,7 @@ model_dir <- 'rslt/models/density/'
 stbl_dir <- 'rslt/stability-selection/'
 val_dir <- 'rslt/nested-validation/'
 
-out_dir <- 'rslt/fig/dens/'
+out_dir <- '_fig/'
 fs::dir_create(out_dir)
 
 ## FIGURE 1: SAMPLING MAPS -----------------------------------------------------

@@ -421,7 +421,7 @@ class_table
 
 # Save tables for later
 
-saveRDS(order_table, 'rslt/tbl/overlap-table-order.rds')
+saveRDS(order_table, '_tbl/overlap-table-order.rds')
 
-saveRDS(class_table, 'rslt/tbl/overlap-table-class.rds')
+saveRDS(class_table, '_tbl/overlap-table-class.rds')
 

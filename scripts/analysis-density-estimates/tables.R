@@ -7,7 +7,7 @@ model_dir <- 'rslt/models/density/'
 stbl_dir <- 'rslt/stability-selection/'
 val_dir <- 'rslt/nested-validation/'
 
-out_dir <- 'rslt/tbl/'
+out_dir <- '_tbl/'
 fs::dir_create(out_dir)
 
 ## SUPPLEMENTARY TABLE 2: AMPLICON DATA SUMMARY (LONG) -------------------------
@@ -769,14 +769,14 @@ pred_metrics <- rbind(pred_metrics_16s, pred_metrics_18sv4, pred_metrics_18sv9) 
 ## TABLE 6: LITERATURE OVERLAP -------------------------------------------------
 
 # Read in lit review overlap tables (fixed overlap calculation)
-class_overlap <- read_rds('rslt/tbl/overlap-table-class.rds') |>
+class_overlap <- read_rds('_tbl/overlap-table-class.rds') |>
   mutate(species = factor(species,
                           levels = c('blues', 'fins', 'humpbacks'),
                           labels = c('Blue',
                                      'Fin',
                                      'Humpback')),
          taxonomic.level = 'class')
-order_overlap <- read_rds('rslt/tbl/overlap-table-order.rds') |>
+order_overlap <- read_rds('_tbl/overlap-table-order.rds') |>
   mutate(species = factor(species,
                           levels = c('blues', 'fins', 'humpbacks'),
                           labels = c('Blue',
@@ -934,11 +934,11 @@ ncog_lit_overlap_order <- rbind(get_ncog_asvs("16s", "o"),
 
 # These models were fit on candidate asv overlap with documented relationships
 # LEVEL OF OVERLAP: ORDER
-candidate_model_results <- read_rds('rslt/tbl/candidate-asv-model-res.rds')
+candidate_model_results <- read_rds('_tbl/candidate-asv-model-res.rds')
 
 # These models were fit on selected asv overlap with documented relatioships
 # LEVEL OF OVERLAP: CLASS
-ss_model_results <- read_rds('rslt/tbl/stable-set-asv-model-res.rds')
+ss_model_results <- read_rds('_tbl/stable-set-asv-model-res.rds')
 
 ## EXPORT TABLES ---------------------------------------------------------------
 
