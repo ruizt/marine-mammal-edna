@@ -129,23 +129,11 @@ ncog_summary_short <- ncog_summary |>
          ends_with('18SV9'))
   
 
-## TABLE 1b: VISUAL SIGHTING SUMMARY
+# load sightings data
+load('data/processed/sightings.RData')
 
-visual_sightings <- read_csv('data/_raw/CalCOFI_2004-2021_CombinedSightings.csv') |>
-  rename_with(~str_remove_all(.x, '[:punct:]') |> 
-                str_squish() |> 
-                str_replace_all(' ', '.') |> 
-                tolower()) |>
-  mutate(species = tolower(species.1)) |>
-  filter(adjusted.both.on.effort.and.on.transect == 'ON',
-         species %in% c('bm', 'bp', 'mn')) |>
-  mutate(datetime = mdy_hm(datetime.local),
-         year = year(datetime),
-         season = factor(season, levels = c('winter', 'spring', 'summer', 'fall'))) |>
-  select(year, season, datetime, species, best) |>
-  filter(year >= 2014) 
-
-sighting_counts <- visual_sightings |>
+# aggregate
+sighting_counts <- sightings |>
   count(year, season, species) |>
   mutate(species = factor(species,
                           levels = c('bm', 'bp', 'mn'),
@@ -153,8 +141,9 @@ sighting_counts <- visual_sightings |>
                                      'Fin',
                                      'Humpback'))) |>
   pivot_wider(names_from = species, values_from = n) |> 
-  mutate(across(where(is.integer), ~replace_na(.x, replace = 0L)))
+  mutate(across(where(is.integer), ~tidyr::replace_na(.x, replace = 0L)))
 
+# add date ranges
 sighting_summary <- visual_sightings |>
   group_by(year, season) |>
   summarize(first.sighting = min(date(datetime)),
@@ -684,39 +673,7 @@ selection_consistency <- rbind(selection_consistency_16s,
 
 selection_consistency
 
-## TABLES 4a-c: COEFFICIENTS ---------------------------------------------------
-
-top_coef_16s <- sel_asv_16s |> 
-  drop_na(o) |> 
-  mutate(mag = abs(coef.lr),
-         marker = '16S') |> 
-  group_by(species) |> 
-  slice_max(mag, n = 5) |> 
-  select(species, marker, coef.lr, coef.ss, d, p, c, o, f, g) |>
-  arrange(species, desc(coef.ss)) |>
-  mutate(across(where(is.numeric), ~round(.x, 3)))
-
-top_coef_18sv4 <- sel_asv_18sv4 |> 
-  drop_na(o) |> 
-  mutate(mag = abs(coef.lr),
-         marker = '18SV4') |> 
-  group_by(species) |> 
-  slice_max(mag, n = 5) |> 
-  select(species, marker, coef.lr, coef.ss, d, p, c, o, f, g) |>
-  arrange(species, desc(coef.ss)) |>
-  mutate(across(where(is.numeric), ~round(.x, 3)))
-
-top_coef_18sv9 <- sel_asv_18sv9 |> 
-  drop_na(o) |> 
-  mutate(mag = abs(coef.lr),
-         marker = '18SV9') |> 
-  group_by(species) |> 
-  slice_max(mag, n = 5) |> 
-  select(species, marker, coef.lr, coef.ss, d, p, c, o, f, g) |>
-  arrange(species, desc(coef.ss)) |>
-  mutate(across(where(is.numeric), ~round(.x, 3)))
-
-## TABLE 5: PREDICTIONS --------------------------------------------------------
+## TABLE 4: PREDICTIONS --------------------------------------------------------
 
 # prediction metrics from 18sv9 model
 pred_metrics_18sv9 <- paste(stbl_dir, '18sv9-dens/loo-preds.rds', sep = '') |>
@@ -766,180 +723,6 @@ pred_metrics <- rbind(pred_metrics_16s, pred_metrics_18sv4, pred_metrics_18sv9) 
                                      'Humpback'))) |>
   select(species, marker, ends_with('lr'), ends_with('dens'), starts_with('rel'))
 
-## TABLE 6: LITERATURE OVERLAP -------------------------------------------------
-
-# Read in lit review overlap tables (fixed overlap calculation)
-class_overlap <- read_rds('_tbl/overlap-table-class.rds') |>
-  mutate(species = factor(species,
-                          levels = c('blues', 'fins', 'humpbacks'),
-                          labels = c('Blue',
-                                     'Fin',
-                                     'Humpback')),
-         taxonomic.level = 'class')
-order_overlap <- read_rds('_tbl/overlap-table-order.rds') |>
-  mutate(species = factor(species,
-                          levels = c('blues', 'fins', 'humpbacks'),
-                          labels = c('Blue',
-                                     'Fin',
-                                     'Humpback')),
-         taxonomic.level = 'order') 
-
-lit_overlap <- bind_rows(class_overlap, order_overlap) |>
-  select(taxonomic.level, gene.seq, species, ends_with('count'), ends_with('overlap'))
-
-## SUPP TABLE 5a-c: COMMONLY SELECTED TAXA -------------------------------------
-
-#16s
-tax_intersection_list_16s <- rbind(tax_jindex_16s, asv_jindex_16s) |> 
-  select(species, taxonomic.level, intersect) |> 
-  arrange(species) |> 
-  rename(intersection = intersect) |> 
-  mutate(species = factor(species, 
-                          levels = c('bm', 'bp', 'mn'),
-                          labels = c('Blue',
-                                     'Fin',
-                                     'Humpback'))) |> 
-  unnest(intersection)
-
-#18sv4
-tax_intersection_list_18sv4 <- rbind(tax_jindex_18sv4, asv_jindex_18sv4) |> 
-  select(species, taxonomic.level, intersect) |> 
-  arrange(species) |> 
-  rename(intersection = intersect) |> 
-  mutate(species = factor(species, 
-                          levels = c('bm', 'bp', 'mn'),
-                          labels = c('Blue',
-                                     'Fin',
-                                     'Humpback'))) |> 
-  unnest(intersection)
-
-#18sv9
-tax_intersection_list_18sv9 <- rbind(tax_jindex_18sv9, asv_jindex_18sv9) |> 
-  select(species, taxonomic.level, intersect) |> 
-  arrange(species) |> 
-  rename(intersection = intersect) |> 
-  mutate(species = factor(species, 
-                          levels = c('bm', 'bp', 'mn'),
-                          labels = c('Blue',
-                                     'Fin',
-                                     'Humpback'))) |> 
-  unnest(intersection)
-
-## SUPP TABLE 6a-b: LIT/NCOG OVERLAP (ORDER) -----------------------------------
-
-## 6a: all direct relationships
-doc.rel <- read.csv(here::here("data/whale-edna-relationships.csv"))
-
-## 6b: overlap with ncog data at order level
-
-# FUNCTION: get_ncog_asvs()  ---------------------------------------------------------------------
-# function takes input marker and taxonomic level
-# function outputs all asvs (of that marker) that appear in the documented relationships file
-get_ncog_asvs <- function(marker, taxonomic.level){
-  if (!(tolower(marker) %in% c("16s", "18sv4", "18sv9"))){
-    print("invalid marker")
-  }
-  if (tolower(taxonomic.level) == "genus" | tolower(taxonomic.level) == "g"){
-    asv_taxa_all |> 
-      filter(gene.seq == tolower(marker)) |> 
-      inner_join(doc.rel, join_by(p == Phylum,
-                                  c == Class,
-                                  o == Order, 
-                                  f == Family,
-                                  g == Genus)) |> 
-      select(gene.seq,short.id,
-             Whale.species,
-             Connection,
-             p,c,o,f,g) |> 
-      distinct()
-  }
-  else if (tolower(taxonomic.level) == "family" | tolower(taxonomic.level) == "f"){
-    asv_taxa_all |> 
-      filter(gene.seq == tolower(marker)) |> 
-      inner_join(doc.rel, join_by(p == Phylum,
-                                  c == Class,
-                                  o == Order, 
-                                  f == Family)) |> 
-      select(gene.seq,short.id,
-             Whale.species,
-             Connection,
-             p,c,o,f,g) |> 
-      distinct()
-  }
-  else if (tolower(taxonomic.level) == "order" | tolower(taxonomic.level) == "o"){
-    asv_taxa_all |> 
-      filter(gene.seq == tolower(marker)) |> 
-      inner_join(doc.rel, join_by(p == Phylum,
-                                  c == Class,
-                                  o == Order)) |> 
-      select(gene.seq,short.id,
-             Whale.species,
-             Connection,
-             p,c,o,f,g) |> 
-      distinct()
-  }
-  else if (tolower(taxonomic.level) == "class" | tolower(taxonomic.level) == "c"){
-    asv_taxa_all |> 
-      filter(gene.seq == tolower(marker)) |> 
-      inner_join(doc.rel, join_by(p == Phylum,
-                                  c == Class),
-                 relationship = "many-to-many") |> 
-      select(gene.seq,short.id,
-             Whale.species,
-             Connection,
-             p,c,o,f,g) |> 
-      distinct()
-  }
-  else if (tolower(taxonomic.level) == "phylum" | tolower(taxonomic.level) == "p"){
-    asv_taxa_all |> 
-      filter(gene.seq == tolower(marker)) |> 
-      inner_join(doc.rel, join_by(p == Phylum),
-                 relationship = "many-to-many") |> 
-      select(gene.seq,short.id,
-             Whale.species,
-             Connection,
-             p,c,o,f,g) |> 
-      distinct()
-  }
-  else{print("invalid taxonomic level")}
-}
-
-# join candidate asv tables
-asv_taxa_16s <- asv_taxa_16s |> 
-  mutate(gene.seq = "16s") 
-
-asv_taxa_18sv4 <- asv_taxa_18sv4|> 
-  mutate(gene.seq = "18sv4")
-
-asv_taxa_18sv9 <- asv_taxa_18sv9|> 
-  mutate(gene.seq = "18sv9")
-
-asv_taxa_all <- rbind(asv_taxa_16s,
-                      asv_taxa_18sv4,
-                      asv_taxa_18sv9)
-
-
-# create table
-ncog_lit_overlap_order <- rbind(get_ncog_asvs("16s", "o"),
-                                get_ncog_asvs("18sv4", "o"),
-                                get_ncog_asvs("18sv9", "o")) |>
-  rename_with(tolower) |>
-  mutate(whale.species = factor(whale.species,
-                          levels = c('blue whales', 'fin whales', 'humpback whales'),
-                          labels = c('Blue',
-                                     'Fin',
-                                     'Humpback')))
-
-## SUPP TABLE 7: MODELS FIT TO ASVS IN LIT REVIEW ------------------------------
-
-# These models were fit on candidate asv overlap with documented relationships
-# LEVEL OF OVERLAP: ORDER
-candidate_model_results <- read_rds('_tbl/candidate-asv-model-res.rds')
-
-# These models were fit on selected asv overlap with documented relatioships
-# LEVEL OF OVERLAP: CLASS
-ss_model_results <- read_rds('_tbl/stable-set-asv-model-res.rds')
-
 ## EXPORT TABLES ---------------------------------------------------------------
 
 # named list of tables
@@ -947,25 +730,14 @@ sheets <- list("tbl1a-ednasampling" = ncog_summary_short,
                "tbl1b-visualsampling" = sighting_summary,
                "tbl2-modelfit" = model_fit,
                "tbl3-validation" = selection_consistency,
-               "tbl4a-coef16s" = top_coef_16s,
-               "tbl4b-coef18sv4" = top_coef_18sv4,
-               "tbl4c-coef18sv9" = top_coef_18sv9,
-               "tbl5-modelpred" = pred_metrics,
-               "tbl6-litoverlap" = lit_overlap,
+               "tbl4-modelpred" = pred_metrics,
                "stbl2-ednasampling-long" = ncog_summary,
                "stbl3a-candidates16s" = asv_taxa_16s,
                "stbl3b-candidates18sv4" = asv_taxa_18sv4,
                "stbl3c-candidates18sv9" = asv_taxa_18sv9,
                "stbl4a-coef16s" = sel_asv_16s,
                "stbl4b-coef18sv4" = sel_asv_18sv4,
-               "stbl4c-coef18sv9" = sel_asv_18sv9,
-               "stbl5a-validation16s" = tax_intersection_list_16s,
-               "stbl5b-validation18sv4" = tax_intersection_list_18sv4,
-               "stbl5c-validation16sv9" = tax_intersection_list_18sv9,
-               "stbl6a-litreview" = doc.rel,
-               "stbl6b-ncoglitoverlap" = ncog_lit_overlap_order,
-               "stbl7a-litmodels-order" = candidate_model_results,
-               "stbl7b-litmodels-class" = ss_model_results)
+               "stbl4c-coef18sv9" = sel_asv_18sv9)
 
 # export as excel workbook
 writexl::write_xlsx(sheets, paste(out_dir, 'tables.xlsx', sep = ''))

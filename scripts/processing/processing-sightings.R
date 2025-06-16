@@ -14,8 +14,9 @@ sightings <- paste(in_dir, 'CalCOFI_2004-2021_CombinedSightings.csv', sep = '') 
   filter(adjusted.both.on.effort.and.on.transect == 'ON',
          species %in% c('bm', 'bp', 'mn')) |>
   mutate(datetime = mdy_hm(datetime.local),
-         year = year(datetime)) |>
-  select(cruise, year, datetime, species, declat, declong, best) |>
+         year = year(datetime),
+         season = factor(season, levels = c('winter', 'spring', 'summer', 'fall'))) |>
+  select(datetime, cruise, year, season, species, declat, declong, best) |>
   filter(year >= 2014) 
 
 save(sightings, file = paste(out_dir, 'sightings.RData', sep = ''))

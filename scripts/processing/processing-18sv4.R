@@ -15,10 +15,16 @@ metadata <- paste(in_dir, "NCOG_sample_log_DNA_stvx_meta_2014-2020.csv", sep = '
   rename_with(tolower) |>
   rename_with(~str_replace_all(.x, '_', '.'))
 
+# internal standard removal
+feature.exclude <- paste(in_dir, "18sv4-exclude.txt", sep = '') |> 
+  read_delim(delim = '/n', col_names = F) |>
+  pull(1)
+
 # read in 18sV4 reads   # Rows: 42032 Columns: 1552
 edna_in <- paste(in_dir, 'NCOG_18sV4_asv_count_tax.tsv', sep = '') |>
   read_tsv() |>
-  mutate(short.id = paste('asv', row_number(), sep = '.'))
+  mutate(short.id = paste('asv', row_number(), sep = '.')) |>
+  filter(!(Feature.ID %in% feature.exclude))
 
 # retain taxon names   # Warning: pieces discarded and filled with NA
 taxa <- edna_in |> 

@@ -55,9 +55,11 @@ bbox <- c(xmin = min(stations$long) - 2,
           ymax = max(stations$lat) + 1)
 
 # read in shapefile and crop to coastline
-gshhg <- read_sf("data/_gshhg-shp-2.3.7/GSHHS_shp/f/GSHHS_f_L1.shp") 
-sf_use_s2(F)
-gshhg_crop <- gshhg |> st_crop(bbox)
+# gshhg <- read_sf("data/_gshhg-shp-2.3.7/GSHHS_shp/f/GSHHS_f_L1.shp") 
+# sf_use_s2(F)
+# gshhg_crop <- gshhg |> st_crop(bbox)
+# save(gshhg_crop, file = 'data/gshhg.RData')
+load('data/gshhg.RData')
 
 # plot ncog sampling locations
 ncog_map <- ggplot(aes(x = long, y = lat), data = stations) +
