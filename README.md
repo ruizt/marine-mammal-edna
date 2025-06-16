@@ -12,8 +12,9 @@ Repository contributors: T.D. Ruiz, N. Patrick, K.G. Chan
 
 The file `analysis.R` is a high-level script showing the order of execution of individual analyses. 
 
-- The scripts in `~/scrips/processing/` will not execute without the raw data files, which are not included with this repository; the results, however, are stored in `~/data/processed/`. 
+- The scripts in `~/scripts/processing/` will not execute without the raw data files, which are not included with this repository; the results, however, are stored in `~/data/processed/`.
 - The remaining scripts reproduce the analysis in the paper from this processed data; outputs are stored in `~/rslt/`. Note that execution times are long (approximately 3 hours per script).
+- The stability selection and nested validation portions of the analysis require data partitions not included in the repository due to file size. These can be found here [ADD LINK]
 
 The map figures utilize shapefiles from GSHHG Release v2.3.7, URL [https://www.soest.hawaii.edu/pwessel/gshhg/](https://www.soest.hawaii.edu/pwessel/gshhg/) accessed December 2024.
 - Wessel, P., and W. H. F. Smith (1996), A global, self-consistent, hierarchical, high-resolution shoreline database, J. Geophys. Res., 101(B4), 8741–8743, doi:10.1029/96JB00104.
