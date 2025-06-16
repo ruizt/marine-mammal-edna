@@ -17,6 +17,7 @@ data_18sv9 <- edna
 metadata_18sv9 <- sample_metadata
 
 load('data/processed/density-estimates.RData')
+load('data/processed/sightings.RData')
 
 sheets <- list("annotations-16s" = ann_16s,
                "data-16s" = data_16s,
@@ -27,6 +28,7 @@ sheets <- list("annotations-16s" = ann_16s,
                "annotations-18sv9" = ann_18sv9,
                "data-18sv9" = data_18sv9,
                "metadata-18sv9" = metadata_18sv9,
+               "sightings" = sightings,
                "density-raw" = dens_raw,
                "density-processed" = dens)
 
