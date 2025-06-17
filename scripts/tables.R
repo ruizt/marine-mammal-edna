@@ -3,7 +3,7 @@ library(lubridate)
 
 ## DIRECTORIES -----------------------------------------------------------------
 data_dir <- 'data/processed/'
-model_dir <- 'rslt/models/density/'
+model_dir <- 'rslt/models/'
 stbl_dir <- 'rslt/stability-selection/'
 val_dir <- 'rslt/nested-validation/'
 
@@ -144,7 +144,7 @@ sighting_counts <- sightings |>
   mutate(across(where(is.integer), ~tidyr::replace_na(.x, replace = 0L)))
 
 # add date ranges
-sighting_summary <- visual_sightings |>
+sighting_summary <- sightings |>
   group_by(year, season) |>
   summarize(first.sighting = min(date(datetime)),
             last.sighting = max(date(datetime))) |>
@@ -179,7 +179,7 @@ sel_asv_18sv9 <- fitted_models |>
                                      'Fin',
                                      'Humpback')),
          marker = '18SV9',
-         coef.ss = map(coef, ~2^.x)) |>
+         coef.ss = purrr::map(coef, ~2^.x)) |>
   select(species, coef, coef.ss, ss) |>
   unnest(everything()) |>
   rename(asv = ss,
@@ -207,7 +207,7 @@ nclass_18sv9 <- sel_asv_18sv9 |>
   count(name = 'n.class')
 
 # retreive hyperparameter info
-parms_18sv9 <- paste(stbl_dir, '18sv9-dens/stable-sets.rds', sep = '') |> 
+parms_18sv9 <- paste(stbl_dir, '18sv9/stable-sets.rds', sep = '') |> 
   read_rds() |>
   mutate(eta.range = paste('[', round(eta.min, 2), ', ', round(eta.max, 2), ']', sep = '')) |>
   select(species, ncomp, eta.range)
@@ -239,7 +239,7 @@ sel_asv_18sv4 <- fitted_models |>
                                      'Fin',
                                      'Humpback')),
          marker = '18SV4',
-         coef.ss = map(coef, ~2^.x)) |>
+         coef.ss = purrr::map(coef, ~2^.x)) |>
   select(species, coef, coef.ss, ss) |>
   unnest(everything()) |>
   rename(asv = ss,
@@ -267,7 +267,7 @@ nclass_18sv4 <- sel_asv_18sv4 |>
   count(name = 'n.class')
 
 # retreive hyperparameter info
-parms_18sv4 <- paste(stbl_dir, '18sv4-dens/stable-sets.rds', sep = '') |> 
+parms_18sv4 <- paste(stbl_dir, '18sv4/stable-sets.rds', sep = '') |> 
   read_rds() |>
   mutate(eta.range = paste('[', round(eta.min, 2), ', ', round(eta.max, 2), ']', sep = '')) |>
   select(species, ncomp, eta.range)
@@ -299,7 +299,7 @@ sel_asv_16s <- fitted_models |>
                                      'Fin',
                                      'Humpback')),
          marker = '16S',
-         coef.ss = map(coef, ~2^.x)) |>
+         coef.ss = purrr::map(coef, ~2^.x)) |>
   select(species, coef, coef.ss, ss) |>
   unnest(everything()) |>
   rename(asv = ss,
@@ -327,7 +327,7 @@ nclass_16s <- sel_asv_16s |>
   count(name = 'n.class')
 
 # retreive hyperparameter info
-parms_16s <- paste(stbl_dir, '16s-dens/stable-sets.rds', sep = '') |> 
+parms_16s <- paste(stbl_dir, '16s/stable-sets.rds', sep = '') |> 
   read_rds() |>
   mutate(eta.range = paste('[', round(eta.min, 2), ', ', round(eta.max, 2), ']', sep = '')) |>
   select(species, ncomp, eta.range)
@@ -381,7 +381,7 @@ intersect_fn_taxa <- function(data, tax.level, thresh){
       unique() |> 
       group_by(outer.id, species) |> 
       summarize(class.list = list(c)) |> 
-      mutate(class.list = map(class.list, unique)) |> 
+      mutate(class.list = purrr::map(class.list, unique)) |> 
       group_by(species) |> 
       summarise(intersect = list(intersect_fn(class.list, thresh)))
   }
@@ -392,7 +392,7 @@ intersect_fn_taxa <- function(data, tax.level, thresh){
       unique() |> 
       group_by(outer.id, species) |> 
       summarize(order.list = list(o)) |> 
-      mutate(order.list = map(order.list, unique)) |> 
+      mutate(order.list = purrr::map(order.list, unique)) |> 
       group_by(species) |> 
       summarise(intersect = list(intersect_fn(order.list, thresh)))
   }
@@ -403,7 +403,7 @@ intersect_fn_taxa <- function(data, tax.level, thresh){
       unique() |> 
       group_by(outer.id, species) |> 
       summarize(family.list = list(f)) |> 
-      mutate(family.list = map(family.list, unique)) |> 
+      mutate(family.list = purrr::map(family.list, unique)) |> 
       group_by(species) |> 
       summarise(intersect = list(intersect_fn(family.list, thresh)))
   }
@@ -423,7 +423,7 @@ union_fn_taxa <- function(data, tax.level){
       unique() |> 
       group_by(outer.id, species) |> 
       summarize(class.list = list(c)) |> 
-      mutate(class.list = map(class.list, unique)) |> 
+      mutate(class.list = purrr::map(class.list, unique)) |> 
       group_by(species) |> 
       summarise(union = list(union_fn(class.list)))
   }
@@ -434,7 +434,7 @@ union_fn_taxa <- function(data, tax.level){
       unique() |> 
       group_by(outer.id, species) |> 
       summarize(order.list = list(o)) |> 
-      mutate(order.list = map(order.list, unique)) |> 
+      mutate(order.list = purrr::map(order.list, unique)) |> 
       group_by(species) |> 
       summarise(union = list(union_fn(order.list)))
   }
@@ -445,7 +445,7 @@ union_fn_taxa <- function(data, tax.level){
       unique() |> 
       group_by(outer.id, species) |> 
       summarize(family.list = list(f)) |> 
-      mutate(family.list = map(family.list, unique)) |> 
+      mutate(family.list = purrr::map(family.list, unique)) |> 
       group_by(species) |> 
       summarise(union = list(union_fn(family.list)))
   }
@@ -456,25 +456,25 @@ union_fn_taxa <- function(data, tax.level){
 ## 18SV9 ##
 
 # merge validation stable sets with asv taxa
-validation_stable_sets_18sv9 <- paste(val_dir, '18sv9-dens/validation-stable-sets.rds', sep = '') |>
+validation_stable_sets_18sv9 <- paste(val_dir, '18sv9/validation-stable-sets.rds', sep = '') |>
   read_rds() |>
-  mutate(asv = map(asv, unique)) |>
+  mutate(asv = purrr::map(asv, unique)) |>
   unnest(asv)
 
 validation_ss_taxa_18sv9 <- validation_stable_sets_18sv9 |>
   left_join(asv_taxa_18sv9, join_by(asv == short.id))
 
 # measures of overlap at asv level
-asv_jindex_18sv9 <- paste(val_dir, '18sv9-dens/validation-stable-sets.rds', sep = '') |>
+asv_jindex_18sv9 <- paste(val_dir, '18sv9/validation-stable-sets.rds', sep = '') |>
   read_rds() |>
-  mutate(asv = map(asv, unique)) |>
+  mutate(asv = purrr::map(asv, unique)) |>
   select(species, asv)  |>
   group_by(species) |>
   summarize(intersect = intersect_fn(asv, 0.5) |> list(),
             union = union_fn(asv) |> list()) |>
   mutate(j.index = map2(intersect, union, ~length(.x)/length(.y))) |>
-  mutate(n.intersect = map(intersect, length),
-         n.union = map(union, length)) |>
+  mutate(n.intersect = purrr::map(intersect, length),
+         n.union = purrr::map(union, length)) |>
   unnest(-c(intersect, union)) |>
   mutate(taxonomic.level = "asv") |>
   select(species, taxonomic.level, intersect, union, n.intersect, n.union, j.index)
@@ -525,25 +525,25 @@ selection_consistency_18sv9 <- selection_consistency_18sv9_long |>
 ## 18SV4 ##
 
 # merge validation stable sets with asv taxa
-validation_stable_sets_18sv4 <- paste(val_dir, '18sv4-dens/validation-stable-sets.rds', sep = '') |>
+validation_stable_sets_18sv4 <- paste(val_dir, '18sv4/validation-stable-sets.rds', sep = '') |>
   read_rds() |>
-  mutate(asv = map(asv, unique)) |>
+  mutate(asv = purrr::map(asv, unique)) |>
   unnest(asv)
 
 validation_ss_taxa_18sv4 <- validation_stable_sets_18sv4 |>
   left_join(asv_taxa_18sv4, join_by(asv == short.id))
 
 # measures of overlap at asv level
-asv_jindex_18sv4 <- paste(val_dir, '18sv4-dens/validation-stable-sets.rds', sep = '') |>
+asv_jindex_18sv4 <- paste(val_dir, '18sv4/validation-stable-sets.rds', sep = '') |>
   read_rds() |>
-  mutate(asv = map(asv, unique)) |>
+  mutate(asv = purrr::map(asv, unique)) |>
   select(species, asv)  |>
   group_by(species) |>
   summarize(intersect = intersect_fn(asv, 0.5) |> list(),
             union = union_fn(asv) |> list()) |>
   mutate(j.index = map2(intersect, union, ~length(.x)/length(.y))) |>
-  mutate(n.intersect = map(intersect, length),
-         n.union = map(union, length)) |>
+  mutate(n.intersect = purrr::map(intersect, length),
+         n.union = purrr::map(union, length)) |>
   unnest(-c(intersect, union)) |>
   mutate(taxonomic.level = "asv") |>
   select(species, taxonomic.level, intersect, union, n.intersect, n.union, j.index)
@@ -594,25 +594,25 @@ selection_consistency_18sv4 <- selection_consistency_18sv4_long |>
 ## 16S ##
 
 # merge validation stable sets with asv taxa
-validation_stable_sets_16s <- paste(val_dir, '16s-dens/validation-stable-sets.rds', sep = '') |>
+validation_stable_sets_16s <- paste(val_dir, '16s/validation-stable-sets.rds', sep = '') |>
   read_rds() |>
-  mutate(asv = map(asv, unique)) |>
+  mutate(asv = purrr::map(asv, unique)) |>
   unnest(asv)
 
 validation_ss_taxa_16s <- validation_stable_sets_16s |>
   left_join(asv_taxa_16s, join_by(asv == short.id))
 
 # measures of overlap at asv level
-asv_jindex_16s <- paste(val_dir, '16s-dens/validation-stable-sets.rds', sep = '') |>
+asv_jindex_16s <- paste(val_dir, '16s/validation-stable-sets.rds', sep = '') |>
   read_rds() |>
-  mutate(asv = map(asv, unique)) |>
+  mutate(asv = purrr::map(asv, unique)) |>
   select(species, asv)  |>
   group_by(species) |>
   summarize(intersect = intersect_fn(asv, 0.5) |> list(),
             union = union_fn(asv) |> list()) |>
   mutate(j.index = map2(intersect, union, ~length(.x)/length(.y))) |>
-  mutate(n.intersect = map(intersect, length),
-         n.union = map(union, length)) |>
+  mutate(n.intersect = purrr::map(intersect, length),
+         n.union = purrr::map(union, length)) |>
   unnest(-c(intersect, union)) |>
   mutate(taxonomic.level = "asv") |>
   select(species, taxonomic.level, intersect, union, n.intersect, n.union, j.index)
@@ -676,7 +676,7 @@ selection_consistency
 ## TABLE 4: PREDICTIONS --------------------------------------------------------
 
 # prediction metrics from 18sv9 model
-pred_metrics_18sv9 <- paste(stbl_dir, '18sv9-dens/loo-preds.rds', sep = '') |>
+pred_metrics_18sv9 <- paste(stbl_dir, '18sv9/loo-preds.rds', sep = '') |>
   read_rds() |>
   group_by(species) |>
   summarize(cor.dens = cor(pred.dens, obs.dens),
@@ -686,7 +686,7 @@ pred_metrics_18sv9 <- paste(stbl_dir, '18sv9-dens/loo-preds.rds', sep = '') |>
   mutate(marker = '18SV9')
 
 # prediction metrics from 18sv4 model
-pred_metrics_18sv4 <- paste(stbl_dir, '18sv4-dens/loo-preds.rds', sep = '') |> 
+pred_metrics_18sv4 <- paste(stbl_dir, '18sv4/loo-preds.rds', sep = '') |> 
   read_rds() |>
   group_by(species) |>
   summarize(cor.dens = cor(pred.dens, obs.dens),
@@ -696,7 +696,7 @@ pred_metrics_18sv4 <- paste(stbl_dir, '18sv4-dens/loo-preds.rds', sep = '') |>
   mutate(marker = '18SV4')
 
 # prediction metrics from 16s model
-pred_metrics_16s <- paste(stbl_dir, '16s-dens/loo-preds.rds', sep = '') |> 
+pred_metrics_16s <- paste(stbl_dir, '16s/loo-preds.rds', sep = '') |> 
   read_rds() |>
   group_by(species) |>
   summarize(cor.dens = cor(pred.dens, obs.dens),

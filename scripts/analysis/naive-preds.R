@@ -2,7 +2,7 @@ library(tidyverse)
 
 # directories
 data_dir <- 'data/processed/'
-out_dir <- 'rslt/models/density/'
+out_dir <- 'rslt/models/'
 
 # read in scaled sighting data
 paste(data_dir, 'density-estimates.RData', sep = '') |> load()

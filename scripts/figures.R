@@ -7,7 +7,7 @@ library(sf)
 
 ## DIRECTORIES -----------------------------------------------------------------
 data_dir <- 'data/processed/'
-model_dir <- 'rslt/models/density/'
+model_dir <- 'rslt/models/'
 stbl_dir <- 'rslt/stability-selection/'
 val_dir <- 'rslt/nested-validation/'
 
@@ -189,7 +189,7 @@ paste(out_dir, 'fig2-timeseries.png', sep = '') |>
 ## FIGURE 3: PREDICTIONS ---------------------------------------------------------
 
 # predictions from 16s
-pred_pts_16s <- paste(stbl_dir, '16s-dens/loo-preds.rds', sep = '') |>
+pred_pts_16s <- paste(stbl_dir, '16s/loo-preds.rds', sep = '') |>
   read_rds() |>
   mutate(cruise.ym = ym(obs.id),
          species = factor(species,
@@ -199,7 +199,7 @@ pred_pts_16s <- paste(stbl_dir, '16s-dens/loo-preds.rds', sep = '') |>
   arrange(species, cruise.ym)
 
 # predictions from 18sv4
-pred_pts_18sv4 <- paste(stbl_dir, '18sv4-dens/loo-preds.rds', sep = '') |>
+pred_pts_18sv4 <- paste(stbl_dir, '18sv4/loo-preds.rds', sep = '') |>
   read_rds() |>
   mutate(cruise.ym = ym(obs.id),
          species = factor(species,
@@ -209,7 +209,7 @@ pred_pts_18sv4 <- paste(stbl_dir, '18sv4-dens/loo-preds.rds', sep = '') |>
   arrange(species, cruise.ym)
 
 # predictions from 18sv9
-pred_pts_18sv9 <- paste(stbl_dir, '18sv9-dens/loo-preds.rds', sep = '') |>
+pred_pts_18sv9 <- paste(stbl_dir, '18sv9/loo-preds.rds', sep = '') |>
   read_rds() |>
   mutate(cruise.ym = ym(obs.id),
          species = factor(species,
@@ -311,7 +311,8 @@ ggsave(fig_predictions, filename = paste(out_dir, 'fig3-predictions.png', sep = 
 ## SUPPLEMENTARY FIGURE 1: MODEL DIAGNOSTICS -----------------------------------
 
 # predictions from 18sv9
-load('rslt/models/density/fitted-models-18sv9.RData')
+paste(model_dir, 'fitted-models-18sv9.RData', sep = '') |>
+  load()
 fit_pts_18sv9 <- fit_df |>
   mutate(cruise.ym = ym(cruise),
          year = year(cruise.ym),
@@ -323,7 +324,8 @@ fit_pts_18sv9 <- fit_df |>
   mutate(marker = '18SV9')
 
 # predictions from 18sv4
-load('rslt/models/density/fitted-models-18sv4.RData')
+paste(model_dir, 'fitted-models-18sv4.RData', sep = '') |>
+  load()
 fit_pts_18sv4 <- fit_df |>
   mutate(cruise.ym = ym(cruise),
          year = year(cruise.ym),
@@ -335,7 +337,8 @@ fit_pts_18sv4 <- fit_df |>
   mutate(marker = '18SV4')
 
 # predictions from 16s
-load('rslt/models/density/fitted-models-16s.RData')
+paste(model_dir, 'fitted-models-16s.RData', sep = '') |>
+  load()
 fit_pts_16s <- fit_df |>
   mutate(cruise.ym = ym(cruise),
          year = year(cruise.ym),
