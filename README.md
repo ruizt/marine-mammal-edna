@@ -1,10 +1,10 @@
 # predicting marine mammal density from eDNA
 
-Code repository for: *Microbial and small plankton environmental DNA predicts density of blue, fin, and humpback whales in the southern California bight.*
+Code repository for: *Microbial communities predict density of blue, fin, and humpback whales in the southern California Current Ecosystem.*
 
 Citation:
 
-> E.V. Satterthwaite, T.D. Ruiz, K.G. Chan, N. Patrick, M.N. Alksne, N.V. Patin, J. Dinasquet, R.H. Lampe, A.O. Shelton, L. Thomas, B. Semmens. Microbial and small plankton environmental DNA predicts density of blue, fin, and humpback whales in the southern California bight.
+> E.V. Satterthwaite, T.D. Ruiz, K.G. Chan, N. Patrick, M.N. Alksne, N.V. Patin, J. Dinasquet, R.H. Lampe, A.O. Shelton, L. Thomas, B. Semmens. Microbial communities predict density of blue, fin, and humpback whales in the southern California Current Ecosystem
 
 Repository contributors: T.D. Ruiz, N. Patrick, K.G. Chan
 
