@@ -10,11 +10,11 @@ Repository contributors: T.D. Ruiz, N. Patrick, K.G. Chan
 
 ## Notes
 
-The file `analysis.R` is a high-level script showing the order of execution of individual analyses. 
+The file `~/scripts/analysis.R` is a high-level script showing the order of execution of individual steps in the analysis described in the paper: data processing, aggregation, and transformation; stability selection; nested validation; model fitting; figure and table generation. Please note:
 
-- The scripts in `~/scripts/processing/` will not execute without the raw data files, which are not included with this repository; the results, however, are stored in `~/data/processed/`.
-- The remaining scripts reproduce the analysis in the paper from this processed data; outputs are stored in `~/rslt/`. Note that execution times are long (approximately 3 hours per script).
-- The stability selection and nested validation portions of the analysis require data partitions not included in the repository due to file size. These can be found here [ADD LINK]
+- The scripts in `~/scripts/processing/` will not execute without the raw data files, which are not included with this repository. Raw data files are not necessary to reproduce the analysis, but may be requested from the authors along with an explanation of the purpose of the request.
+- The results of the scripts in `~/scripts/processing/` needed for further analysis **are** available in this repository and are stored in `~/data/processed/`, with the exception of the data partitions, which can be obtained from [ADD LINK].
+- To reproduce the analysis in the paper starting from processed data, unzip the file `_combined-partitions.zip` in the `~/data/processed/` directory. Then execute the scripts as shown in `~/scripts/analysis.R` (not including processing scripts). Outputs of analyses are stored in `~/rslt/`. Note that execution times are long (approximately 3 hours per script).
 
 The map figures utilize shapefiles from GSHHG Release v2.3.7, URL [https://www.soest.hawaii.edu/pwessel/gshhg/](https://www.soest.hawaii.edu/pwessel/gshhg/) accessed December 2024.
 - Wessel, P., and W. H. F. Smith (1996), A global, self-consistent, hierarchical, high-resolution shoreline database, J. Geophys. Res., 101(B4), 8741–8743, doi:10.1029/96JB00104.
@@ -22,8 +22,11 @@ The map figures utilize shapefiles from GSHHG Release v2.3.7, URL [https://www.s
 ## Software
 
 RStudio Version 2024.12.1+563 (2024.12.1+563)
+
 R version 4.4.3 (2025-02-28)
+
 Platform: x86_64-apple-darwin20
+
 Running under: macOS Sequoia 15.3.2
 
 Packages (not including dependencies):
