@@ -7,7 +7,6 @@ source('scripts/processing/processing-16s.R')
 source('scripts/processing/processing-density.R')
 source('scripts/processing/processing-sightings.R')
 source('scripts/processing/validation-partitions.R')
-source('scripts/data.R')
 
 ## DENSITY MODELING ------------------------------------------------------------
 
@@ -34,3 +33,4 @@ source('scripts/analysis/naive-preds.R')
 
 source('scripts/figures.R')
 source('scripts/tables.R')
+source('scripts/data.R')
