@@ -19,4 +19,23 @@ sightings <- paste(in_dir, 'CalCOFI_2004-2021_CombinedSightings.csv', sep = '') 
   select(datetime, cruise, year, season, species, declat, declong, best) |>
   filter(year >= 2014) 
 
-save(sightings, file = paste(out_dir, 'sightings.RData', sep = ''))
+
+effort_dates <- paste(in_dir, 'CalCOFI_2004-2025_Effort_OnTransectOnEffortONLY.xlsx', sep = '') |>
+  readxl::read_xlsx() |>
+  rename_with(~str_remove_all(.x, '[:punct:]') |> 
+                str_squish() |> 
+                str_replace_all(' ', '.') |> 
+                tolower()) |>
+  mutate(start.date = date(startdatetimelocal),
+         end.date = date(enddatetimelocal),
+         cruise = str_remove_all(cruise, '-') |> 
+           str_trunc(4, side = 'left', ellipsis = '') %>%
+           str_c('CC', .)) |>
+  filter(cruise %in% unique(sightings$cruise)) |>
+  distinct(year, season, cruise, start.date, end.date) |>
+  group_by(cruise) |>
+  summarize(start.date = min(start.date, na.rm = T),
+            end.date = max(end.date, na.rm = T),
+            .groups = 'drop')
+
+save(list = c('sightings', 'effort_dates'), file = paste(out_dir, 'sightings.RData', sep = ''))

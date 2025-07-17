@@ -30,37 +30,38 @@ taxa <- edna_in |>
   rename_with(tolower) |>
   rename_with(~str_replace_all(.x, '_', '.')) |>
   separate(silva.taxon, 
-           into = c('d', 'p', 'c', 'o', 'f', 'g'), sep = ';') |>
-  select(feature.id, short.id, silva.confidence, d, p, c, o, f, g) |>
+           into = c('d', 'p', 'c', 'o', 'f', 'g', 's'), sep = ';') |>
+  select(feature.id, short.id, silva.confidence, d, p, c, o, f, g, s) |>
   mutate(across(everything(), 
                 ~str_replace(.x, '._', '') |> str_remove_all('_') |> str_trim())) 
 
 # retrieve sample ids of samples to exclude
-## (drop 16 samples)
 exclude_samples <- paste(in_dir, 'exclude_samples.txt', sep = '') |>
   read_delim(delim = '/n', skip = 3, col_names = 'sample.id') |>
   pull(sample.id)
 
 # rearrange read counts and cross reference sample ids with metadata 
-## (data dimensions: 1156 x 50409;  1156 obs, 50408 ASVs)
 edna_raw <- edna_in |>
   select(-starts_with('silva'), -starts_with('pr2'), -Feature.ID) |>
   rename_with(~str_remove_all(.x, 'X')) |>
-  pivot_longer(-short.id, names_to = 'sample.id', values_to = 'read.count') |>
+  pivot_longer(-short.id, names_to = 'sample.name.orig', values_to = 'read.count') |>
   pivot_wider(names_from = short.id, values_from = read.count) |> 
-  filter(sample.id %in% metadata$sample.name,
-         !(sample.id %in% exclude_samples)) |>
-  mutate(sterivex = str_ends(sample.id, 'S'),
-         sample.id = str_remove_all(sample.id, '_S')) |>
-  group_by(sample.id) |>
-  slice_max(sterivex) |>
-  select(-sterivex) |>
-  ungroup()
+  filter(sample.name.orig %in% metadata$sample.name, 
+         !(sample.name.orig %in% exclude_samples)) |>
+  mutate(yr = str_trunc(sample.name.orig, 4, side = 'right', ellipsis = '') |> 
+           as.numeric(),
+         sample.name.new = if_else(yr <= 2016, 
+                                   sample.name.orig, 
+                                   paste(sample.name.orig, '_S', sep = ''))) |>
+  filter(str_ends(sample.name.new, '_S')) |>
+  mutate(sample.id = str_remove_all(sample.name.new, '_S')) |>
+  select(-yr) |>
+  select(sample.name.orig, sample.name.new, sample.id, everything())
+
 
 ## FILTERING -------------------------------------------------------------------
 
 # identify surface and dmc samples in core region
-## (data dimensions: 918 x 2; 918 samples)
 surface_dmc_samples <- metadata |> 
   select(sample.name, chlora) |>
   separate(sample.name, 
@@ -78,7 +79,6 @@ surface_dmc_samples <- metadata |>
   unite(sample.id, c(cruise, line, sta, depth), sep = '_')
 
 # select asv's that appear in at least 1% of samples and at most 99% of samples
-## (data dimensions: 1 x 8864; 8864 ASVs)
 cols_of_interest <- edna_raw |>
   filter(sample.id %in% pull(surface_dmc_samples, sample.id)) |>
   select(starts_with('asv')) |>
@@ -91,7 +91,6 @@ cols_of_interest <- edna_raw |>
   pull(col)
 
 # identify samples in which at least 1% of asv's of interest are present
-## (data dimensions: 1 x 908;  908 obs)
 samples_of_interest <- edna_raw |> 
   select(sample.id, all_of(cols_of_interest)) |>
   filter(sample.id %in% pull(surface_dmc_samples, sample.id)) |>
@@ -103,13 +102,11 @@ samples_of_interest <- edna_raw |>
 
 
 # implement filtering criteria above
-## (data dimensions: 908 x 8865; 908 obs, 8864 ASVs)
 edna_filtered <- edna_raw |>
   select(sample.id, all_of(cols_of_interest)) |>
   filter(sample.id %in% samples_of_interest)
 
 # identify stations with only one observation (i.e. sample at one depth only)
-## (removing 8 samples)
 samples_to_drop <- edna_filtered |>
   separate(sample.id, 
            into = c('cruise', 'line', 'sta', 'depth'),
@@ -121,10 +118,24 @@ samples_to_drop <- edna_filtered |>
   pull(sample.id)
 
 # remove single-depth samples and asvs present in under 1% of remaining samples
-## (data dimensions: 900 x 8865; 900 obs, 8864 ASVs)
 edna_filtered %<>% 
   filter(!(str_trunc(sample.id, 18, ellipsis = '') %in% samples_to_drop)) |>
   select(where(~mean(.x > 0) > 0.01))
+
+# IDs of final set of samples
+samples_retained <- filter(edna_raw, sample.id %in% edna_filtered$sample.id) |>
+  pull(sample.name.orig)
+
+# metadata retrieval
+sample_metadata <- metadata %>%
+  filter(sample.name %in% samples_retained) |>
+  select(sample.name, sample.num, cruise, sta.id, datetime, lat.dec, lon.dec, depthm) |>
+  arrange(sample.name)
+attr(sample_metadata, 'spec') <- NULL
+attr(sample_metadata, 'problems') <- NULL
+
+# annotation retrieval
+asv_taxa <- taxa %>% filter(short.id %in% colnames(edna_filtered))
 
 # determine limit for z.warning: check maximum column sparsity (prop. zeroes)
 z.max <- edna_filtered |> 
@@ -151,8 +162,6 @@ edna_imputed <- edna_filtered |>
   bind_cols(imputation_out) |>
   left_join(surface_dmc_samples, by = 'sample.id') |>
   select(sample.id, depth.fac, starts_with('asv'))
-
-
 
 # save imputed data
 fs::dir_create(paste(out_dir, '_imputed/', sep = ''))
@@ -202,7 +211,6 @@ gs_rslt <- sapply(w_vec, function(w){
 })
 
 # optimal weight
-# (max average alpha diversity at surface weight 0.39, max Chlorophyll weight 0.61
 w_opt <- w_vec[which.max(gs_rslt)]
 
 # average first over depth, then over station, then over transect ( x_{ij} )
@@ -243,15 +251,7 @@ edna <- edna_clr |>
   ungroup() |>
   select(cruise, starts_with('asv'))
 
-# filter metadata to samples of interest
-sample_metadata <- metadata %>% 
-  filter(sample.name %in% samples_of_interest) |>
-  rename(sample.id = sample.name)
-attr(sample_metadata, 'spec') <- NULL
-attr(sample_metadata, 'problems') <- NULL
-
-# filter asv taxonomy to asvs of interest
-asv_taxa <- taxa %>% filter(short.id %in% colnames(edna))
+## DATA EXPORT -----------------------------------------------------------------
 
 # export processed data
 save(list = c('sample_metadata', 

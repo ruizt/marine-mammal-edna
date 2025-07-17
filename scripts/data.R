@@ -2,19 +2,40 @@ library(tidyverse)
 out_dir <- '_tbl/'
 
 load('data/processed/ncog16s.RData')
-ann_16s <- asv_taxa
 data_16s <- edna
 metadata_16s <- sample_metadata
+ann_16s <- asv_taxa |> 
+  rename(domain = d,
+         phylum = p,
+         class = c,
+         order = o,
+         family = f,
+         genus = g,
+         species = s)
 
 load('data/processed/ncog18sv4.RData')
-ann_18sv4 <- asv_taxa
 data_18sv4 <- edna
 metadata_18sv4 <- sample_metadata
+ann_18sv4 <- asv_taxa |> 
+  rename(domain = d,
+         phylum = p,
+         class = c,
+         order = o,
+         family = f,
+         genus = g,
+         species = s)
 
 load('data/processed/ncog18sv9.RData')
-ann_18sv9 <- asv_taxa
 data_18sv9 <- edna
 metadata_18sv9 <- sample_metadata
+ann_18sv9 <- asv_taxa |> 
+  rename(domain = d,
+         phylum = p,
+         class = c,
+         order = o,
+         family = f,
+         genus = g,
+         species = s)
 
 load('data/processed/density-estimates.RData')
 load('data/processed/sightings.RData')

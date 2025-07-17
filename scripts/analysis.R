@@ -8,7 +8,7 @@ source('scripts/processing/processing-density.R')
 source('scripts/processing/processing-sightings.R')
 source('scripts/processing/validation-partitions.R')
 
-## DENSITY MODELING ------------------------------------------------------------
+## STATISTICAL MODELING --------------------------------------------------------
 
 # perform stability selection to identify asvs of interest
 source('scripts/analysis/stability-selection-18sv9.R')

@@ -17,7 +17,7 @@ fs::dir_create(out_dir)
 paste(data_dir, 'ncog18sv9.RData', sep = '') |> load()
 
 cruise_meta_18sv9 <- sample_metadata |>
-  select(sample.id, cruise, sta.id, datetime, depthm) |>
+  select(sample.name, cruise, sta.id, datetime, depthm) |>
   mutate(datetime = mdy_hm(datetime)) |>
   separate(sta.id, into = c('line', 'station'), sep = ' ') |>
   group_by(cruise) |>
@@ -28,7 +28,7 @@ cruise_meta_18sv9 <- sample_metadata |>
             n.samples = n())
 
 ncog_summary_18sv9 <- sample_metadata |>
-  select(sample.id, cruise, sta.id, datetime, depthm) |>
+  select(sample.name, cruise, sta.id, datetime, depthm) |>
   mutate(datetime = mdy_hm(datetime)) |>
   separate(sta.id, into = c('line', 'station'), sep = ' ') |>
   count(cruise, line) |>
@@ -49,7 +49,7 @@ ncog_summary_18sv9 <- sample_metadata |>
 paste(data_dir, 'ncog18sv4.RData', sep = '') |> load()
 
 cruise_meta_18sv4 <- sample_metadata |>
-  select(sample.id, cruise, sta.id, datetime, depthm) |>
+  select(sample.name, cruise, sta.id, datetime, depthm) |>
   mutate(datetime = mdy_hm(datetime)) |>
   separate(sta.id, into = c('line', 'station'), sep = ' ') |>
   group_by(cruise) |>
@@ -60,7 +60,7 @@ cruise_meta_18sv4 <- sample_metadata |>
             n.samples = n())
 
 ncog_summary_18sv4 <- sample_metadata |>
-  select(sample.id, cruise, sta.id, datetime, depthm) |>
+  select(sample.name, cruise, sta.id, datetime, depthm) |>
   mutate(datetime = mdy_hm(datetime)) |>
   separate(sta.id, into = c('line', 'station'), sep = ' ') |>
   count(cruise, line) |>
@@ -81,7 +81,7 @@ ncog_summary_18sv4 <- sample_metadata |>
 paste(data_dir, 'ncog16s.RData', sep = '') |> load()
 
 cruise_meta_16s <- sample_metadata |>
-  select(sample.id, cruise, sta.id, datetime, depthm) |>
+  select(sample.name, cruise, sta.id, datetime, depthm) |>
   mutate(datetime = mdy_hm(datetime)) |>
   separate(sta.id, into = c('line', 'station'), sep = ' ') |>
   group_by(cruise) |>
@@ -92,7 +92,7 @@ cruise_meta_16s <- sample_metadata |>
             n.samples = n())
 
 ncog_summary_16s <- sample_metadata |>
-  select(sample.id, cruise, sta.id, datetime, depthm) |>
+  select(sample.name, cruise, sta.id, datetime, depthm) |>
   mutate(datetime = mdy_hm(datetime)) |>
   separate(sta.id, into = c('line', 'station'), sep = ' ') |>
   count(cruise, line) |>
@@ -120,6 +120,8 @@ ncog_summary_short <- ncog_summary |>
   select(-n.samples) |>
   pivot_longer(where(is.integer)) |>
   drop_na() |>
+  group_by(year, season) |>
+  mutate(start.date = min(start.date), end.date = max(end.date)) |>
   group_by(marker, year, season, start.date, end.date) |>
   summarize(n.samples = sum(value, na.rm = T),
             n.lines = n(),
@@ -128,13 +130,12 @@ ncog_summary_short <- ncog_summary |>
   select(year, season, ends_with('date'), ends_with('16S'), ends_with('18SV4'),
          ends_with('18SV9'))
   
-
 # load sightings data
 load('data/processed/sightings.RData')
 
 # aggregate
 sighting_counts <- sightings |>
-  count(year, season, species) |>
+  count(year, season, cruise, species) |>
   mutate(species = factor(species,
                           levels = c('bm', 'bp', 'mn'),
                           labels = c('Blue',
@@ -144,11 +145,9 @@ sighting_counts <- sightings |>
   mutate(across(where(is.integer), ~tidyr::replace_na(.x, replace = 0L)))
 
 # add date ranges
-sighting_summary <- sightings |>
-  group_by(year, season) |>
-  summarize(first.sighting = min(date(datetime)),
-            last.sighting = max(date(datetime))) |>
-  left_join(sighting_counts)
+sighting_summary <- effort_dates |>
+  left_join(sighting_counts, join_by(cruise)) |>
+  select(year, season, start.date, end.date, Fin, Humpback, Blue)
 
 ## SUPP TABLES 3a-c ------------------------------------------------------------
 
