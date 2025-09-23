@@ -109,16 +109,8 @@ fig_map <- ncog_map + sighting_map +
   plot_layout(nrow = 1) + 
   plot_annotation(tag_levels = 'A')
 
-ggsave(fig_map, file = paste(out_dir, 'fig1-map.png', sep = ''),
-       width = 8, height = 4, units = 'in', dpi = 400)
-
-# ncog_map_slide <- ncog_map + labs(title = 'A. eDNA sampling')
-# sighting_map_slide <- sighting_map + labs(title = 'B. Whale sightings')
-# fig_map_slide <- ncog_map_slide + sighting_map_slide +
-#   plot_layout(nrow = 1)
-# 
-# ggsave(fig_map_slide, file = paste(out_dir, 'fig1-map-slide.png', sep = ''),
-#        width = 8, height = 4, units = 'in', dpi = 400)
+ggsave(fig_map, file = paste(out_dir, 'fig1.tiff', sep = ''),
+       width = 7.5, height = 4, units = 'in', dpi = 300)
 
 ## FIGURE 2: TIME SERIES -------------------------------------------------------
 
@@ -148,12 +140,14 @@ p1 <- density_data |>
   ggplot(aes(x = cruise.ym, y = estimate)) +
   facet_wrap(~species, nrow = 3) +
   geom_path() +
+  geom_point() +
   theme_bw() +
   labs(x = NULL, y = 'Estimated density', title = NULL) +
   theme(panel.grid = element_line(linewidth = 0.1, color = 'black'),
         panel.grid.minor = element_blank(),
         panel.grid.major.x = element_blank(),
         text = element_text(size = 11)) +
+  geom_errorbar(aes(ymin = estimate - se, ymax = estimate + se), alpha = 0.25) +
   geom_ribbon(aes(ymin = estimate - se, ymax = estimate + se), alpha = 0.25)
 
 
@@ -180,11 +174,8 @@ p2 <- dens_raw |>
 
 p1 + p2 + plot_layout(ncol = 2, widths = c(2, 1))
 
-paste(out_dir, 'fig2-timeseries.png', sep = '') |>
-  ggsave(width = 5, height = 4, dpi = 400, units = 'in')
-
-# paste(out_dir, 'fig2-timeseries-slide.png', sep = '') |>
-#   ggsave(width = 6, height = 3, dpi = 400, units = 'in')
+paste(out_dir, 'fig2.tiff', sep = '') |>
+  ggsave(width = 5, height = 4, dpi = 300, units = 'in')
 
 ## FIGURE 3: PREDICTIONS ---------------------------------------------------------
 
@@ -304,8 +295,8 @@ fig_predictions <- p1 + p2_ann +
   plot_layout(nrow = 1, ncol = 2, widths = c(1, 1))
 
 # export
-ggsave(fig_predictions, filename = paste(out_dir, 'fig3-predictions.png', sep = ''),
-       width = 7, height = 4, units = 'in', dpi = 400)
+ggsave(fig_predictions, filename = paste(out_dir, 'fig3.tiff', sep = ''),
+       width = 7, height = 4, units = 'in', dpi = 300)
 
 
 ## SUPPLEMENTARY FIGURE 1: MODEL DIAGNOSTICS -----------------------------------
@@ -407,8 +398,8 @@ resid_pacf
 # panel layout
 resid_diagnostics <- resid_fit + resid_pacf + plot_layout(nrow = 1, widths = c(1, 1)) +
   plot_annotation(tag_levels = 'A')
-ggsave(resid_diagnostics, filename = paste(out_dir, 'sfig1-resid.png', sep = ''),
-       width = 8, height = 4, units = 'in', dpi = 400)
+ggsave(resid_diagnostics, filename = paste(out_dir, 'sfig1.tiff', sep = ''),
+       width = 7.5, height = 4, units = 'in', dpi = 300)
 
 
 
