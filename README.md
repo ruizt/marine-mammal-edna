@@ -1,12 +1,12 @@
 # predicting marine mammal density from eDNA
 
-Code repository for: *Microbial communities predict density of blue, fin, and humpback whales in the southern California Current Ecosystem.*
+Code repository for: *Microbial and small zooplankton communities predict density of baleen whales in the southern California Current Ecosystem.*
 
 Citation:
 
-> E.V. Satterthwaite, T.D. Ruiz, K.G. Chan, N. Patrick, M.N. Alksne, N.V. Patin, J. Dinasquet, R.H. Lampe, A.O. Shelton, L. Thomas, B. Semmens. Microbial communities predict density of blue, fin, and humpback whales in the southern California Current Ecosystem
+> E.V. Satterthwaite, T.D. Ruiz, N.V. Patin, M.N. Alksne, L. Thomas, J. Dinasquet, R.H. Lampe, K.G. Chan, N.A. Patrick, A.E. Allen, S. Baumann-Pickering, B.X. Semmens. Microbial and small zooplankton communities predict density of baleen whales in the southern California Current Ecosystem.
 
-Repository contributors: T.D. Ruiz, N. Patrick, K.G. Chan
+Repository contributors: T.D. Ruiz, N.A. Patrick, K.G. Chan
 
 ## Notes
 
