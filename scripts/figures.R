@@ -78,7 +78,14 @@ ncog_map <- ggplot(aes(x = long, y = lat), data = stations) +
   theme_bw() +
   theme(panel.grid.major = element_line(color = 'black', linewidth = 0.1),
         panel.grid.minor = element_blank()) +
-  labs(x = NULL, y = NULL)
+  labs(x = NULL, y = NULL) +
+  ggspatial::annotation_north_arrow(
+    location = "br",
+    which_north = "true",
+    pad_x = unit(0.5, "cm"),
+    pad_y = unit(0.5, "cm"),
+    style = ggspatial::north_arrow_fancy_orienteering
+  )
 
 # read in sighting locations
 paste(data_dir, 'sightings.RData', sep = '') |> load()
@@ -103,7 +110,14 @@ sighting_map <- ggplot(aes(x = long, y = lat), data = visual_sightings) +
   theme_bw() +
   theme(panel.grid.major = element_line(color = 'black', linewidth = 0.1),
         panel.grid.minor = element_blank()) +
-  labs(x = NULL, y = NULL)
+  labs(x = NULL, y = NULL) +
+  ggspatial::annotation_north_arrow(
+    location = "br",
+    which_north = "true",
+    pad_x = unit(0.5, "cm"),
+    pad_y = unit(0.5, "cm"),
+    style = ggspatial::north_arrow_fancy_orienteering
+  )
 
 fig_map <- ncog_map + sighting_map + 
   plot_layout(nrow = 1) + 
@@ -142,7 +156,9 @@ p1 <- density_data |>
   geom_path() +
   geom_point() +
   theme_bw() +
-  labs(x = NULL, y = 'Estimated density', title = NULL) +
+  labs(x = NULL,
+       y = expression("Estimated density (individuals per 1000 km"^2*")"),
+       title = NULL) +
   theme(panel.grid = element_line(linewidth = 0.1, color = 'black'),
         panel.grid.minor = element_blank(),
         panel.grid.major.x = element_blank(),
@@ -247,7 +263,9 @@ p1 <- bind_rows(pred_pts, obs_pts) |>
   guides(linetype = guide_legend(title = NULL, position = 'top', nrow = 2),
          color = guide_legend(title = NULL, position = 'top', nrow = 2),
          fill = guide_none()) +
-  labs(x = 'Year', y = 'Density', title = NULL) +
+  labs(x = 'Year', 
+       y = expression("Density (individuals per 1000 km"^2*")"),
+       title = NULL) +
   theme(panel.grid = element_line(linewidth = 0.1, color = 'black'),
         panel.grid.minor = element_blank(),
         panel.grid.major.x = element_blank(),
