@@ -2,12 +2,14 @@
 # Verify that key data files load without error and have expected structure.
 # Skipped automatically when files are absent.
 
+p <- function(...) here::here(...)  # anchor all paths to project root
+
 skip_if_no_data <- function(path) {
-  testthat::skip_if_not(file.exists(path), paste("Data file not present:", path))
+  testthat::skip_if_not(file.exists(p(path)), paste("Data file not present:", path))
 }
 
 test_that("example data loads and has expected structure", {
-  load("data/example-data-16s.RData")
+  load(p("data/example-data-16s.RData"))
   expect_s3_class(example_16s, "data.frame")
   expect_s3_class(example_density, "data.frame")
   expect_equal(nrow(example_16s), 27L)
@@ -21,7 +23,7 @@ test_that("example data loads and has expected structure", {
 
 test_that("16S eDNA data loads and has expected structure", {
   skip_if_no_data("data/ncog16s.RData")
-  load("data/ncog16s.RData")
+  load(p("data/ncog16s.RData"))
   expect_s3_class(edna, "data.frame")
   expect_true("cruise" %in% names(edna))
   expect_gt(sum(startsWith(names(edna), "asv")), 1000L)
@@ -29,7 +31,7 @@ test_that("16S eDNA data loads and has expected structure", {
 
 test_that("density estimates load and have expected structure", {
   skip_if_no_data("data/density-estimates.RData")
-  load("data/density-estimates.RData")
+  load(p("data/density-estimates.RData"))
   expect_s3_class(dens, "data.frame")
   expect_true(all(c("cruise", "bm", "bp", "mn") %in% names(dens)))
   expect_s3_class(dens_raw, "data.frame")
@@ -39,7 +41,7 @@ test_that("density estimates load and have expected structure", {
 })
 
 test_that("stability selection results in example data are well-formed", {
-  load("data/example-data-16s.RData")
+  load(p("data/example-data-16s.RData"))
   expect_s3_class(sel_freq_bm, "data.frame")
   expect_true(all(c("species", "eta", "ncomp", "sel.asv", "n") %in%
                     names(sel_freq_bm)))
