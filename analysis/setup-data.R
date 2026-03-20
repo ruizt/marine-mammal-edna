@@ -23,10 +23,10 @@ CHECKSUMS <- list(
   "ncog18sv4.RData"         = "080b304353ca6bda357518ed88a5b34e",
   "ncog18sv9.RData"         = "c2231ff6c90df2b680e5e487fdab88a8",
   "density-estimates.RData" = "8bcd23bb6bc207784b18a711b043b659",
-  "sightings.RData"         = "4a67a2b9c76b3e1e8fadfb2c90e12d5f",
-  "sample_table.Rds"        = NULL,  # v1.1.0 addition; update checksum after publication
-  "region_table.Rds"        = NULL,
-  "obs_table.Rds"           = NULL
+  "sightings.RData"         = "66c23555557fc5cddb85a3df8a48c98c",
+  "sample_table.Rds"        = "55d087e492f5de7f8cbc17a5d7fd3a7f",
+  "region_table.Rds"        = "3ec509e04ee47701e3a46703c929e25a",
+  "obs_table.Rds"           = "9bf6c4da12d354c172cad05af718815c"
 )
 
 PARTITION_FILES <- list(
