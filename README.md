@@ -12,6 +12,13 @@ Repository contributors: T.D. Ruiz, N.A. Patrick, K.G. Chan, L. Thomas
 
 ## Quick start
 
+### Installation
+
+```r
+# install.packages("devtools")
+devtools::install_github("ruizt/marine-mammal-edna")
+```
+
 ### For methods adopters
 
 The `vignettes/` directory contains self-contained walkthroughs of the analysis pipeline:
@@ -106,3 +113,9 @@ Map figures use coastline shapefiles from GSHHG Release v2.3.7 ([https://www.soe
 R version 4.4.3 (2025-02-28) · RStudio 2024.12.1+563 · macOS Sequoia 15.3.2
 
 Dependencies are listed in `DESCRIPTION`. Key packages: `spls`, `pls`, `tidyverse`, `collapse`, `sf`, `patchwork`, `Distance`.
+
+---
+
+## Acknowledgments
+
+Package and test infrastructure assisted by [Posit AI](https://positai.com) (March 2026).
