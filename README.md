@@ -91,18 +91,18 @@ Raw eDNA sequencing data (ASV count tables) are not included in this repository 
 │
 ├── analysis/                 # Executable analysis scripts
 │   ├── run-all.R             # Top-level orchestration
-│   ├── 0-setup-data.R        # Download data from Zenodo
-│   ├── processing/           # Step 1: raw data processing (requires unpublished raw data)
-│   │   └── 1a–1e-*.R
-│   ├── line-transect/        # Distance-sampling density estimation → data/density-estimates.RData
-│   │   └── line-transect.R
+│   ├── 1-setup-data.R        # Download data from Zenodo
+│   ├── 0_line-transect/      # Step 0a: distance-sampling density estimation
+│   │   └── 0a-line-transect.R
+│   ├── 0_processing/         # Steps 0b–0g: raw data processing (requires unpublished raw data)
+│   │   └── 0b–0g-*.R
 │   ├── 2a–2c-stability-selection-*.R   # Step 2: sPLS stability selection (a/b/c = 16S/18SV4/18SV9)
 │   ├── 3a–3c-nested-validation-*.R     # Step 3: nested CV to select stable sets
 │   ├── 4a–4c-model-fitting-*.R         # Step 4: PLS model fitting
 │   ├── 5-naive-preds.R                 # Step 5: naive baseline predictions
-│   ├── 7a-figures.R                    # Step 7: manuscript outputs
-│   ├── 7b-tables.R
-│   ├── 7c-data.R
+│   ├── 6a-figures.R                    # Step 6: manuscript outputs
+│   ├── 6b-tables.R
+│   ├── 6c-data.R
 │   └── create-example-data.R # Developer: generates bundled example dataset
 │
 ├── vignettes/                # Narrative walkthroughs

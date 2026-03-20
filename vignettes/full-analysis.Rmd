@@ -30,15 +30,15 @@ library(here)
 
 | Step | Scripts | Key outputs |
 |------|---------|-------------|
-| 1 | `processing/1a–1e-*.R` | `data/*.RData` (requires unpublished raw data) |
-| — | `line-transect/line-transect.R` | `data/density-estimates.RData` |
+| 0a | `0_line-transect/0a-line-transect.R` | `data/density-estimates.RData` |
+| 0b–0g | `0_processing/0b–0g-*.R` | `data/*.RData` (requires unpublished raw data) |
 | 2 | `2a–2c-stability-selection-*.R` | `rslt/stability-selection/*/sel-freq.rds` |
 | 3 | `3a–3c-nested-validation-*.R` | `rslt/stability-selection/*/stable-sets.rds` |
 | 4 | `4a–4c-model-fitting-*.R` | `rslt/models/fitted-models-*.RData` |
 | 5 | `5-naive-preds.R` | `rslt/models/naive-preds.rds` |
-| 7 | `7a–7c-figures/tables/data.R` | manuscript figures and tables |
+| 6 | `6a–6c-figures/tables/data.R` | manuscript figures and tables |
 
-Within steps 2–4, scripts `a/b/c` correspond to markers 16S, 18S V4, and 18S V9 respectively. `line-transect/line-transect.R` produces the whale density response variable; it can be run at any point before the modeling steps, and its output is also available directly from Zenodo.
+Within steps 2–4, scripts `a/b/c` correspond to markers 16S, 18S V4, and 18S V9 respectively. Step 0a produces the whale density response variable; it can be run at any point before step 2, and its output is also available directly from Zenodo.
 
 ## Stability selection and nested validation
 

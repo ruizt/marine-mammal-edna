@@ -89,21 +89,21 @@ cat("Grid size:", length(eta_vals), "eta x", length(ncomp_vals),
 partitions <- loo_partitions(whales_ex)
 
 # ~12,375 sPLS fits; ~3 minutes on the 500-ASV example data
-sel_freq_bm <- run_stability_selection(
-  whales_ex, response = "bm",
-  eta_vals, ncomp_vals, partitions
-)
-```
-
-Pre-cached `sel_freq_bm` was loaded above from `example-data-16s.RData`. See `analysis/create-example-data.R` for the caching code.
-
-### Selection frequencies
-
-`sel_freq_bm` has one row per (eta, ncomp, ASV) combination, recording how many of the 25 LOO partitions selected that ASV. We can visualize the distribution at a single hyperparameter configuration:
-
-```{r sel-freq-plot, fig.cap = "Selection frequency of the 30 most-selected ASVs at ncomp = 4, eta ≈ 0.7. The dashed line marks the pi.max = 0.8 stability threshold."}
-sel_freq_bm |>
-  filter(ncomp == 4, abs(eta - 0.7) < 0.01) |>
+├── analysis/                 # Executable analysis scripts
+│   ├── run-all.R             # Top-level orchestration
+│   ├── 1-setup-data.R        # Download data from Zenodo
+│   ├── 0_line-transect/      # Step 0a: distance-sampling density estimation
+│   │   └── 0a-line-transect.R
+│   ├── 0_processing/         # Steps 0b–0g: raw data processing (requires unpublished raw data)
+│   │   └── 0b–0g-*.R
+│   ├── 2a–2c-stability-selection-*.R   # Step 2: sPLS stability selection (a/b/c = 16S/18SV4/18SV9)
+│   ├── 3a–3c-nested-validation-*.R     # Step 3: nested CV to select stable sets
+│   ├── 4a–4c-model-fitting-*.R         # Step 4: PLS model fitting
+│   ├── 5-naive-preds.R                 # Step 5: naive baseline predictions
+│   ├── 6a-figures.R                    # Step 6: manuscript outputs
+│   ├── 6b-tables.R
+│   ├── 6c-data.R
+│   └── create-example-data.R # Developer: generates bundled example dataset
   slice_max(n, n = 30) |>
   mutate(asv  = fct_reorder(asv, n),
          freq = n / nrow(whales_ex)) |>

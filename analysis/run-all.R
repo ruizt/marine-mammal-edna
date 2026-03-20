@@ -1,15 +1,16 @@
-## DATA PROCESSING -------------------------------------------------------------
+## LINE TRANSECT AND DATA PROCESSING -------------------------------------------
 #
-# Requires unpublished raw data; outputs stored in data/
-# Processed outputs are available from https://doi.org/10.5281/zenodo.19139338
-# and can be downloaded automatically via analysis/0-setup-data.R
+# Produces density-estimates.RData and processed eDNA/sightings data.
+# Processing scripts (0b-0g) require unpublished raw data; their outputs are
+# available from https://doi.org/10.5281/zenodo.19139338 via 1-setup-data.R.
 
-source('analysis/processing/1a-processing-16s.R')
-source('analysis/processing/1b-processing-18sv4.R')
-source('analysis/processing/1c-processing-18sv9.R')
-source('analysis/processing/1d-processing-density.R')
-source('analysis/processing/1e-processing-sightings.R')
-source('analysis/processing/1f-validation-partitions.R')
+source('analysis/0_line-transect/0a-line-transect.R')
+source('analysis/0_processing/0b-processing-16s.R')
+source('analysis/0_processing/0c-processing-18sv4.R')
+source('analysis/0_processing/0d-processing-18sv9.R')
+source('analysis/0_processing/0e-processing-density.R')
+source('analysis/0_processing/0f-processing-sightings.R')
+source('analysis/0_processing/0g-validation-partitions.R')
 
 ## STATISTICAL MODELING --------------------------------------------------------
 
@@ -32,12 +33,8 @@ source('analysis/4c-model-fitting-18sv9.R')
 
 source('analysis/5-naive-preds.R')
 
-## LINE TRANSECT ANALYSIS ------------------------------------------------------
-
-source('analysis/line-transect/line-transect.R')
-
 ## RESULTS ---------------------------------------------------------------------
 
-source('analysis/7a-figures.R')
-source('analysis/7b-tables.R')
-source('analysis/7c-data.R')
+source('analysis/6a-figures.R')
+source('analysis/6b-tables.R')
+source('analysis/6c-data.R')

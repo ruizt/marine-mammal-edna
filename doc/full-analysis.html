@@ -373,14 +373,14 @@ the Zenodo-archived processed data.</p>
 </thead>
 <tbody>
 <tr class="odd">
-<td>1</td>
-<td><code>processing/1a–1e-*.R</code></td>
-<td><code>data/*.RData</code> (requires unpublished raw data)</td>
+<td>0a</td>
+<td><code>0_line-transect/0a-line-transect.R</code></td>
+<td><code>data/density-estimates.RData</code></td>
 </tr>
 <tr class="even">
-<td>—</td>
-<td><code>line-transect/line-transect.R</code></td>
-<td><code>data/density-estimates.RData</code></td>
+<td>0b–0g</td>
+<td><code>0_processing/0b–0g-*.R</code></td>
+<td><code>data/*.RData</code> (requires unpublished raw data)</td>
 </tr>
 <tr class="odd">
 <td>2</td>
@@ -403,17 +403,16 @@ the Zenodo-archived processed data.</p>
 <td><code>rslt/models/naive-preds.rds</code></td>
 </tr>
 <tr class="odd">
-<td>7</td>
-<td><code>7a–7c-figures/tables/data.R</code></td>
+<td>6</td>
+<td><code>6a–6c-figures/tables/data.R</code></td>
 <td>manuscript figures and tables</td>
 </tr>
 </tbody>
 </table>
 <p>Within steps 2–4, scripts <code>a/b/c</code> correspond to markers
-16S, 18S V4, and 18S V9 respectively.
-<code>line-transect/line-transect.R</code> produces the whale density
-response variable; it can be run at any point before the modeling steps,
-and its output is also available directly from Zenodo.</p>
+16S, 18S V4, and 18S V9 respectively. Step 0a produces the whale density
+response variable; it can be run at any point before step 2, and its
+output is also available directly from Zenodo.</p>
 </div>
 <div id="stability-selection-and-nested-validation" class="section level2">
 <h2>Stability selection and nested validation</h2>
