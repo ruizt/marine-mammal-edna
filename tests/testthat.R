@@ -1,4 +1,4 @@
 library(testthat)
-library(marineedna)
+library(satterthwaite2026)
 
-test_check("marineedna")
+test_check("satterthwaite2026")
