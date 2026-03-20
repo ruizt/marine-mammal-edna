@@ -23,8 +23,8 @@ devtools::install_github("ruizt/marine-mammal-edna")
 
 The `vignettes/` directory contains self-contained walkthroughs of the analysis pipeline:
 
-- **`vignettes/single-iteration.Rmd`** — demonstrates the full pipeline (stability selection → model fitting → interpretation) for one eDNA marker (16S) and one whale species (blue whale) using a bundled 500-ASV example dataset. No data download required.
-- **`vignettes/full-analysis.Rmd`** — covers all three markers × three species combinations from the paper. Requires processed data (see below).
+- **[Single iteration](https://htmlpreview.github.io/?https://github.com/ruizt/marine-mammal-edna/blob/main/doc/single-iteration.html)** (`vignettes/single-iteration.Rmd`) — demonstrates the full pipeline (stability selection → model fitting → interpretation) for one eDNA marker (16S) and one whale species (blue whale) using a bundled 500-ASV example dataset. No data download required.
+- **[Full analysis](https://htmlpreview.github.io/?https://github.com/ruizt/marine-mammal-edna/blob/main/doc/full-analysis.html)** (`vignettes/full-analysis.Rmd`) — covers all three markers × three species combinations from the paper. Requires processed data (see below).
 - **`vignettes/line-transect.qmd`** — documents the distance-sampling analysis used to estimate whale density from the CalCOFI survey data.
 
 ### For paper reproducers
