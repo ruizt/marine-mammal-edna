@@ -1,8 +1,6 @@
 # satterthwaite2026
 
-Code repository for: *Microbial and small zooplankton communities predict density of baleen whales in the southern California Current Ecosystem.*
-
-Citation:
+Code repository for:
 
 > E.V. Satterthwaite, T.D. Ruiz, N.V. Patin, M.N. Alksne, L. Thomas, J. Dinasquet, R.H. Lampe, K.G. Chan, N.A. Patrick, A.E. Allen, S. Baumann-Pickering, B.X. Semmens. Microbial and small zooplankton communities predict density of baleen whales in the southern California Current Ecosystem. *Forthcoming in PLOS One.*
 
