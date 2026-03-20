@@ -1,8 +1,8 @@
 ---
-title: "Predicting whale density from eDNA: a single-iteration walkthrough"
+title: "Predicting whale density from eDNA: a single-model walkthrough"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Predicting whale density from eDNA: a single-iteration walkthrough}
+  %\VignetteIndexEntry{Predicting whale density from eDNA: a single-model walkthrough}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---

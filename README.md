@@ -48,7 +48,7 @@ fit <- fit_pls_stable(data, response = "bm",
                       ncomp = candidates$ncomp[[1]])
 ```
 
-The [**single-iteration walkthrough**](https://htmlpreview.github.io/?https://github.com/ruizt/marine-mammal-edna/blob/main/doc/single-iteration.html) (`vignettes/single-iteration.Rmd`) demonstrates use for one eDNA marker (16S) and one whale species (blue whale) using a bundled 500-ASV example dataset.
+The [**single-model walkthrough**](https://htmlpreview.github.io/?https://github.com/ruizt/marine-mammal-edna/blob/main/doc/single-iteration.html) (`vignettes/single-iteration.Rmd`) demonstrates use for one eDNA marker (16S) and one whale species (blue whale) using a bundled 500-ASV example dataset.
 
 ### For reproducibility
 
@@ -63,8 +63,8 @@ git clone https://github.com/ruizt/marine-mammal-edna
 2.  Download processed data from Zenodo (v1.1.0, [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19139338.svg)](https://doi.org/10.5281/zenodo.19139338)):
 
 ``` r
-source('analysis/setup-data.R')               # ~16 MB core files
-# source('analysis/setup-data.R'); setup_data(partitions = TRUE)  # +5.5 GB partitions
+source('analysis/1-setup-data.R')               # ~16 MB core files
+# source('analysis/1-setup-data.R'); setup_data(partitions = TRUE)  # +5.5 GB partitions
 ```
 
 3.  Run the full analysis pipeline (note: stability selection and nested validation take approximately 3 hours per marker):
@@ -73,42 +73,48 @@ source('analysis/setup-data.R')               # ~16 MB core files
 source('analysis/run-all.R')
 ```
 
+The [**full analysis vignette**](https://htmlpreview.github.io/?https://github.com/ruizt/marine-mammal-edna/blob/main/doc/full-analysis.html) (`vignettes/full-analysis.Rmd`) narrates each stage of `run-all.R` and shows summary tables of the key results.
+
 Raw eDNA sequencing data (ASV count tables) are not included in this repository or the Zenodo archive but may be requested from the authors.
 
 ------------------------------------------------------------------------
 
 ## Repository structure
 
-```         
-├── R/                        # Package functions
-│   ├── stability_selection.R # sPLS stability selection
-│   ├── model_fitting.R       # PLS model fitting and metrics
-│   └── utils.R               # Shared utilities (eta grid, LOO partitions)
+```
+├── R/                          # Package functions
+│   ├── stability_selection.R   # run_stability_selection(), extract_stable_sets()
+│   ├── model_fitting.R         # fit_pls_stable()
+│   └── utils.R                 # eta_grid(), loo_partitions()
 │
-├── analysis/                 # Executable analysis scripts
-│   ├── run-all.R             # Top-level orchestration
-│   ├── setup-data.R          # Download data from Zenodo
-│   ├── processing/           # Raw data processing (requires unpublished raw data)
-│   ├── stability-selection-*.R
-│   ├── nested-validation-*.R
-│   ├── model-fitting-*.R
-│   ├── naive-preds.R
-│   ├── line-transect.R       # Line transect density estimation
-│   ├── figures.R
-│   ├── tables.R
-│   └── create-example-data.R # Backend: generates bundled example dataset
+├── analysis/                   # Executable analysis scripts
+│   ├── run-all.R               # Top-level orchestration
+│   ├── 1-setup-data.R          # Download data from Zenodo
+│   ├── 0_line-transect/        # Step 0a: distance-sampling density estimation
+│   │   └── 0a-line-transect.R  #   → data/density-estimates.RData
+│   ├── 0_processing/           # Steps 0b–0g: raw data processing (requires unpublished raw data)
+│   │   └── 0b–0g-*.R           #   → data/*.RData
+│   ├── 2a–2c-stability-selection-*.R  # Step 2: sPLS stability selection
+│   ├── 3a–3c-nested-validation-*.R    # Step 3: nested CV stable set selection
+│   ├── 4a–4c-model-fitting-*.R        # Step 4: PLS model fitting
+│   ├── 5-naive-preds.R                # Step 5: naive baseline predictions
+│   ├── 6a-figures.R                   # Step 6: manuscript outputs
+│   ├── 6b-tables.R
+│   ├── 6c-data.R
+│   └── create-example-data.R   # Developer: generates bundled example dataset
 │
-├── vignettes/                # Narrative walkthroughs
-│   ├── single-iteration.Rmd  # Pipeline walkthrough (one marker, one species)
-│   └── line-transect.qmd     # Supplement: distance-sampling analysis
+├── vignettes/                  # Narrative walkthroughs
+│   ├── single-iteration.Rmd    # Single-model walkthrough (package API)
+│   ├── full-analysis.Rmd       # Full pipeline guide (paper reproduction)
+│   └── line-transect.qmd       # Distance-sampling supplement
 │
-├── tests/testthat/           # IO and unit tests
+├── tests/testthat/             # IO and unit tests
 │
-├── data/                     # Data directory (gitignored except example data)
+├── data/                       # Data directory (gitignored except example data)
 │   ├── example-data-16s.RData  # Bundled 500-ASV example dataset
 │   └── gshhg.RData             # Coastline shapefiles for maps
 │
-└── rslt/                     # Analysis outputs
+└── rslt/                       # Analysis outputs
     ├── stability-selection/
     ├── nested-validation/
     └── models/
@@ -121,7 +127,7 @@ Raw eDNA sequencing data (ASV count tables) are not included in this repository 
 Processed data are archived on Zenodo (v1.1.0): [10.5281/zenodo.19139338](https://doi.org/10.5281/zenodo.19139338). These can be downloaded via the instructions above.
 
 | File | Description |
-|-------------------------|----------------------------------------------|
+|----|----|
 | `ncog16s.RData` | Processed 16S eDNA ASV table |
 | `ncog18sv4.RData` | Processed 18S V4 eDNA ASV table |
 | `ncog18sv9.RData` | Processed 18S V9 eDNA ASV table |
@@ -133,7 +139,7 @@ Processed data are archived on Zenodo (v1.1.0): [10.5281/zenodo.19139338](https:
 | `_partitions.zip` | LOO cross-validation partitions (\~3.1 GB) |
 | `_combined-partitions.zip` | Combined eDNA + density partitions (\~2.4 GB) |
 
-Map figures use coastline shapefiles from GSHHG Release v2.3.7 (<https://www.soest.hawaii.edu/pwessel/gshhg/>): 
+Map figures use coastline shapefiles from GSHHG Release v2.3.7 (<https://www.soest.hawaii.edu/pwessel/gshhg/>):
 
 > Wessel, P., and W. H. F. Smith (1996), A global, self-consistent, hierarchical, high-resolution shoreline database, J. Geophys. Res., 101(B4), 8741–8743, <doi:10.1029/96JB00104>.
 
