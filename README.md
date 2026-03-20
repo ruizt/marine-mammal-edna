@@ -20,7 +20,7 @@ This repository is structured as an R package but also, separately from package 
 
 Further instructions for each are below.
 
-### For methods adopters
+### For methodology
 
 To use the methodology, install the package.
 
@@ -52,7 +52,7 @@ fit <- fit_pls_stable(data, response = "bm",
 
 The [**single-iteration walkthrough**](https://htmlpreview.github.io/?https://github.com/ruizt/marine-mammal-edna/blob/main/doc/single-iteration.html) (`vignettes/single-iteration.Rmd`) demonstrates use for one eDNA marker (16S) and one whale species (blue whale) using a bundled 500-ASV example dataset.
 
-### For paper reproducers
+### For reproducibility
 
 The full analysis from the paper implemented in a series of scripts stored in the `analysis` directory. Steps to reproduce the results of the paper in full are:
 
@@ -75,8 +75,6 @@ source('analysis/setup-data.R')               # ~16 MB core files
 source('analysis/run-all.R')
 ```
 
-The **[full analysis vignette](https://htmlpreview.github.io/?https://github.com/ruizt/marine-mammal-edna/blob/main/doc/full-analysis.html)** (`vignettes/full-analysis.Rmd`) narrates each stage of `run-all.R` and shows summary tables of the key results.
-
 Raw eDNA sequencing data (ASV count tables) are not included in this repository or the Zenodo archive but may be requested from the authors.
 
 ------------------------------------------------------------------------
@@ -91,23 +89,19 @@ Raw eDNA sequencing data (ASV count tables) are not included in this repository 
 │
 ├── analysis/                 # Executable analysis scripts
 │   ├── run-all.R             # Top-level orchestration
-│   ├── 1-setup-data.R        # Download data from Zenodo
-│   ├── 0_line-transect/      # Step 0a: distance-sampling density estimation
-│   │   └── 0a-line-transect.R
-│   ├── 0_processing/         # Steps 0b–0g: raw data processing (requires unpublished raw data)
-│   │   └── 0b–0g-*.R
-│   ├── 2a–2c-stability-selection-*.R   # Step 2: sPLS stability selection (a/b/c = 16S/18SV4/18SV9)
-│   ├── 3a–3c-nested-validation-*.R     # Step 3: nested CV to select stable sets
-│   ├── 4a–4c-model-fitting-*.R         # Step 4: PLS model fitting
-│   ├── 5-naive-preds.R                 # Step 5: naive baseline predictions
-│   ├── 6a-figures.R                    # Step 6: manuscript outputs
-│   ├── 6b-tables.R
-│   ├── 6c-data.R
-│   └── create-example-data.R # Developer: generates bundled example dataset
+│   ├── setup-data.R          # Download data from Zenodo
+│   ├── processing/           # Raw data processing (requires unpublished raw data)
+│   ├── stability-selection-*.R
+│   ├── nested-validation-*.R
+│   ├── model-fitting-*.R
+│   ├── naive-preds.R
+│   ├── line-transect.R       # Line transect density estimation
+│   ├── figures.R
+│   ├── tables.R
+│   └── create-example-data.R # Backend: generates bundled example dataset
 │
 ├── vignettes/                # Narrative walkthroughs
-│   ├── single-iteration.Rmd  # Package API walkthrough (one marker, one species)
-│   ├── full-analysis.Rmd     # Paper reproduction guide (narrates run-all.R)
+│   ├── single-iteration.Rmd  # Pipeline walkthrough (one marker, one species)
 │   └── line-transect.qmd     # Supplement: distance-sampling analysis
 │
 ├── tests/testthat/           # IO and unit tests
@@ -126,10 +120,10 @@ Raw eDNA sequencing data (ASV count tables) are not included in this repository 
 
 ## Data
 
-Processed data are archived on Zenodo (v1.1.0): [10.5281/zenodo.19139338](https://doi.org/10.5281/zenodo.19139338). These can be downloaded via
+Processed data are archived on Zenodo (v1.1.0): [10.5281/zenodo.19139338](https://doi.org/10.5281/zenodo.19139338). These can be downloaded via the instructions above.
 
 | File | Description |
-|----|----|
+|-------------------------|----------------------------------------------|
 | `ncog16s.RData` | Processed 16S eDNA ASV table |
 | `ncog18sv4.RData` | Processed 18S V4 eDNA ASV table |
 | `ncog18sv9.RData` | Processed 18S V9 eDNA ASV table |
