@@ -8,7 +8,7 @@ Repository contributors: T.D. Ruiz, N.A. Patrick, K.G. Chan, L. Thomas
 
 ------------------------------------------------------------------------
 
-## About
+## Usage
 
 This repository is structured as an R package but also, separately from package data and functions, contains scripts to reproduce the results of the paper. Thus it serves two distinct purposes.
 
@@ -135,7 +135,7 @@ Processed data are archived on Zenodo (v1.1.0): [10.5281/zenodo.19139338](https:
 
 Map figures use coastline shapefiles from GSHHG Release v2.3.7 (<https://www.soest.hawaii.edu/pwessel/gshhg/>): 
 
-\> Wessel, P., and W. H. F. Smith (1996), A global, self-consistent, hierarchical, high-resolution shoreline database, J. Geophys. Res., 101(B4), 8741–8743, <doi:10.1029/96JB00104>.
+> Wessel, P., and W. H. F. Smith (1996), A global, self-consistent, hierarchical, high-resolution shoreline database, J. Geophys. Res., 101(B4), 8741–8743, <doi:10.1029/96JB00104>.
 
 ------------------------------------------------------------------------
 
