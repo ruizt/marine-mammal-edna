@@ -28,21 +28,23 @@ library(here)
 
 `run-all.R` runs five stages in sequence. Data processing requires the unpublished raw sequencing data; all other stages work from the Zenodo-archived processed data.
 
-| Stage | Scripts | Key outputs in `rslt/` |
-|-------|---------|------------------------|
-| Data processing | `processing/processing-*.R` | `data/*.RData` |
-| Stability selection | `stability-selection-*.R` | `stability-selection/*/sel-freq.rds` |
-| Nested validation | `nested-validation-*.R` | `stability-selection/*/stable-sets.rds` |
-| Model fitting | `model-fitting-*.R` | `models/fitted-models-*.RData` |
-| Naive baselines | `naive-preds.R` | `models/naive-preds.rds` |
+| Step | Scripts | Key outputs |
+|------|---------|-------------|
+| 1 | `processing/1a–1f-*.R` | `data/*.RData` (requires unpublished raw data) |
+| 2 | `2a–2c-stability-selection-*.R` | `rslt/stability-selection/*/sel-freq.rds` |
+| 3 | `3a–3c-nested-validation-*.R` | `rslt/stability-selection/*/stable-sets.rds` |
+| 4 | `4a–4c-model-fitting-*.R` | `rslt/models/fitted-models-*.RData` |
+| 5 | `5-naive-preds.R` | `rslt/models/naive-preds.rds` |
+| 6 | `6-line-transect.R` | `data/density-estimates.RData` |
+| 7 | `7a–7c-figures/tables/data.R` | manuscript figures and tables |
 
-The line-transect density estimation (`line-transect.R`, see [supplement](https://github.com/ruizt/marine-mammal-edna/blob/main/doc/line-transect.pdf)) is independent of the eDNA modeling pipeline and produces the response variable stored in `data/density-estimates.RData`.
+Within steps 2–4, scripts `a/b/c` correspond to markers 16S, 18S V4, and 18S V9 respectively. Step 6 (`6-line-transect.R`) produces the whale density response variable used in all eDNA models; it can be run at any point after data setup, and its output is also available directly from Zenodo.
 
 ## Stability selection and nested validation
 
-Each `stability-selection-*.R` script fits sPLS across 55 eta × 9 ncomp hyperparameter configurations and 25 LOO subsamples — about 12,375 model fits per species, repeated for three species (~3 hours per marker). Selection frequencies are written to `rslt/stability-selection/<marker>/sel-freq.rds`.
+Each `2*-stability-selection-*.R` script fits sPLS across 55 eta × 9 ncomp hyperparameter configurations and 25 LOO subsamples — about 12,375 model fits per species, repeated for three species (~3 hours per marker). Selection frequencies are written to `rslt/stability-selection/<marker>/sel-freq.rds`.
 
-Each `nested-validation-*.R` script then runs an outer LOO loop over the candidate stable sets identified in the previous stage, selecting the candidate that minimizes out-of-sample RMSPE. The winning candidate for each species is written to `rslt/stability-selection/<marker>/stable-sets.rds`.
+Each `3*-nested-validation-*.R` script then runs an outer LOO loop over the candidate stable sets identified in the previous stage, selecting the candidate that minimizes out-of-sample RMSPE. The winning candidate for each species is written to `rslt/stability-selection/<marker>/stable-sets.rds`.
 
 ```{r load-stable-sets}
 ss_16s   <- read_rds(here("rslt/stability-selection/16s/stable-sets.rds"))

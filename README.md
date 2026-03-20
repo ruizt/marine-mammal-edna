@@ -91,16 +91,18 @@ Raw eDNA sequencing data (ASV count tables) are not included in this repository 
 │
 ├── analysis/                 # Executable analysis scripts
 │   ├── run-all.R             # Top-level orchestration
-│   ├── setup-data.R          # Download data from Zenodo
-│   ├── processing/           # Raw data processing (requires unpublished raw data)
-│   ├── stability-selection-*.R
-│   ├── nested-validation-*.R
-│   ├── model-fitting-*.R
-│   ├── naive-preds.R
-│   ├── line-transect.R       # Line transect density estimation
-│   ├── figures.R
-│   ├── tables.R
-│   └── create-example-data.R # Backend: generates bundled example dataset
+│   ├── 0-setup-data.R        # Download data from Zenodo
+│   ├── processing/           # Step 1: raw data processing (requires unpublished raw data)
+│   │   └── 1a–1f-*.R
+│   ├── 2a–2c-stability-selection-*.R   # Step 2: sPLS stability selection (a/b/c = 16S/18SV4/18SV9)
+│   ├── 3a–3c-nested-validation-*.R     # Step 3: nested CV to select stable sets
+│   ├── 4a–4c-model-fitting-*.R         # Step 4: PLS model fitting
+│   ├── 5-naive-preds.R                 # Step 5: naive baseline predictions
+│   ├── 6-line-transect.R               # Step 6: distance-sampling density estimation
+│   ├── 7a-figures.R                    # Step 7: manuscript outputs
+│   ├── 7b-tables.R
+│   ├── 7c-data.R
+│   └── create-example-data.R # Developer: generates bundled example dataset
 │
 ├── vignettes/                # Narrative walkthroughs
 │   ├── single-iteration.Rmd  # Package API walkthrough (one marker, one species)

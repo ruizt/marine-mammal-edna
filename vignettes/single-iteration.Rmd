@@ -58,7 +58,7 @@ cat("n =", nrow(whales_ex), "cruises,  p =",
     sum(startsWith(names(whales_ex), "asv")), "ASVs\n")
 ```
 
-The response variable — `bm` — is the log-ratio of blue whale density relative to a seasonal mean, specifically $\log(\hat{D} / \bar{D}_\text{season})$ where $\hat{D}$ is the LOO-cross-validated line-transect density estimate (individuals km⁻²) and $\bar{D}_\text{season}$ is the seasonal mean across all cruises. This centering removes gross seasonal trends and focuses the model on finer-scale variation.
+The response variable — `bm` — is the log-ratio of blue whale density relative to a seasonal mean, specifically $\log(\hat{D} / \bar{D}_\text{season})$ where $\hat{D}$ is the LOO-cross-validated line-transect density estimate (individuals km⁻²) and $\bar{D}_\text{season}$ is the seasonal mean across all cruises. This centering removes gross seasonal trends and focuses the model on interseasonal variation.
 
 ```{r response-dist, fig.cap = "Distribution of log-ratio blue whale density across 25 cruises."}
 ggplot(whales_ex, aes(x = bm)) +
@@ -216,19 +216,11 @@ fit_df |>
   ggplot(aes(x = dens.obs, y = dens.fit)) +
   geom_point() +
   geom_abline(linetype = "dashed") +
-  labs(x = "Observed density (ind. km\u207b\u00b2)",
-       y = "Fitted density (ind. km\u207b\u00b2)",
+  labs(x = "Observed density (ind. km\u00b2)",
+       y = "Fitted density (ind. km\u00b2)",
        title = "Blue whale — 16S model")
 ```
-
-## Next steps
-
-- `vignette("full-analysis")` — applies this pipeline to all three markers and three whale species, and compares results across the 9 (marker × species) combinations.
-- `vignette("line-transect")` — documents how the observed density estimates used as the response variable were derived from CalCOFI visual survey data.
-- `analysis/nested-validation-16s.R` — shows how nested cross-validation selects the best candidate stable set; `analysis/model-fitting-16s.R` — the full-data model fitting for paper reproduction.
 
 ## References
 
 Meinshausen, N., & Bühlmann, P. (2010). Stability selection. *Journal of the Royal Statistical Society: Series B*, 72(4), 417–473.
-
-Satterthwaite, E.V., Ruiz, T.D., et al. Microbial and small zooplankton communities predict density of baleen whales in the southern California Current Ecosystem.

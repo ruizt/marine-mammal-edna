@@ -12,6 +12,7 @@
 library(readxl)
 library(Distance)
 library(tidyverse)
+library(lubridate)
 library(kableExtra)
 library(ggplot2)
 set.seed(71246)
@@ -241,4 +242,91 @@ tmp2 <- tmp %>%
 print(tmp2)
 
 sessionInfo()
+
+## EXTRACT AND SAVE DENSITY ESTIMATES ------------------------------------------
+#
+# Produces data/density-estimates.RData with objects:
+#   dens_raw   75 x 11  per-cruise density estimates by species (raw scale)
+#   dens_means  4 x 4   seasonal log-means used to de-trend
+#   dens       25 x 4   log-ratio density for the eDNA-matched cruises
+#
+# Logic mirrors analysis/processing/processing-density.R; the only difference
+# is that density estimates are drawn from `fits` (Distance package objects)
+# rather than from the MCDS software CSV outputs.
+
+# Extract per-cruise density from each fitted model
+dens_in <- lapply(names(fits), function(sp) {
+  summary(fits[[sp]])$dht$individuals$D |>
+    as_tibble() |>
+    filter(Label != "Total") |>
+    mutate(species = tolower(sp))
+}) |>
+  bind_rows() |>
+  rename_with(tolower) |>
+  mutate(
+    cruise = str_remove(label, "CC"),
+    yr     = ym(cruise) |> year(),
+    qtr    = ym(cruise) |> quarter()
+  ) |>
+  select(cruise, yr, qtr, species, estimate, se, cv, lcl, ucl, df)
+
+# Assign seasons; adjust quarter label for cruises that fall in split quarters
+# (matches processing/processing-density.R logic)
+inspect <- dens_in |> count(yr, qtr) |> filter(n != 3)
+qtr_replace <- inner_join(dens_in, inspect, join_by(yr, qtr)) |>
+  distinct(cruise, yr, qtr) |>
+  arrange(cruise) |>
+  group_by(yr, qtr) |>
+  slice_max(cruise) |>
+  mutate(qtr.rep = qtr + 1) |>
+  ungroup()
+
+dens_raw <- left_join(dens_in, qtr_replace, join_by(cruise, yr, qtr)) |>
+  mutate(
+    season = if_else(is.na(qtr.rep), qtr, qtr.rep) |>
+      factor(labels = c("winter", "spring", "summer", "fall"))
+  ) |>
+  select(-qtr.rep)
+
+# Impute zeros with uniform random values up to the seasonal minimum
+set.seed(30924)
+dens_wide <- dens_raw |>
+  select(cruise, yr, qtr, season, species, estimate) |>
+  pivot_wider(names_from = species, values_from = estimate)
+
+dens_imputed <- dens_wide |>
+  group_by(season) |>
+  summarize(across(c(bm, bp, mn),
+                   list(min = \(x) min(x[x > 0], na.rm = TRUE)),
+                   .names = "{.col}.{.fn}")) |>
+  right_join(dens_wide, join_by(season)) |>
+  mutate(
+    bm.imp = if_else(bm == 0, runif(n(), 0, bm.min), bm),
+    bp.imp = if_else(bp == 0, runif(n(), 0, bp.min), bp),
+    mn.imp = if_else(mn == 0, runif(n(), 0, mn.min), mn)
+  ) |>
+  select(cruise, yr, qtr, season, bm, bp, mn, bm.imp, bp.imp, mn.imp)
+
+# Seasonal log-means (de-trending baseline)
+dens_means <- dens_imputed |>
+  select(cruise, season, ends_with("imp")) |>
+  group_by(season) |>
+  summarize(across(ends_with("imp"),
+                   list(mean = \(x) mean(log(x), na.rm = TRUE)),
+                   .names = "log.{.col}.{.fn}"))
+
+# Log-ratio density: log(y_i / g_season(i))
+dens <- dens_means |>
+  right_join(dens_imputed, join_by(season)) |>
+  mutate(
+    cruise = cruise,
+    bm = log(bm.imp) - log.bm.imp.mean,
+    bp = log(bp.imp) - log.bp.imp.mean,
+    mn = log(mn.imp) - log.mn.imp.mean,
+    .keep = "none"
+  )
+
+save(dens_raw, dens_means, dens,
+     file = here::here("data/density-estimates.RData"))
+cat("Saved: data/density-estimates.RData\n")
 

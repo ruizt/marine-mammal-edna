@@ -360,61 +360,72 @@ requires the unpublished raw sequencing data; all other stages work from
 the Zenodo-archived processed data.</p>
 <table>
 <colgroup>
-<col width="17%" />
-<col width="22%" />
-<col width="60%" />
+<col width="21%" />
+<col width="32%" />
+<col width="46%" />
 </colgroup>
 <thead>
 <tr class="header">
-<th>Stage</th>
+<th>Step</th>
 <th>Scripts</th>
-<th>Key outputs in <code>rslt/</code></th>
+<th>Key outputs</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td>Data processing</td>
-<td><code>processing/processing-*.R</code></td>
-<td><code>data/*.RData</code></td>
+<td>1</td>
+<td><code>processing/1a–1f-*.R</code></td>
+<td><code>data/*.RData</code> (requires unpublished raw data)</td>
 </tr>
 <tr class="even">
-<td>Stability selection</td>
-<td><code>stability-selection-*.R</code></td>
-<td><code>stability-selection/*/sel-freq.rds</code></td>
+<td>2</td>
+<td><code>2a–2c-stability-selection-*.R</code></td>
+<td><code>rslt/stability-selection/*/sel-freq.rds</code></td>
 </tr>
 <tr class="odd">
-<td>Nested validation</td>
-<td><code>nested-validation-*.R</code></td>
-<td><code>stability-selection/*/stable-sets.rds</code></td>
+<td>3</td>
+<td><code>3a–3c-nested-validation-*.R</code></td>
+<td><code>rslt/stability-selection/*/stable-sets.rds</code></td>
 </tr>
 <tr class="even">
-<td>Model fitting</td>
-<td><code>model-fitting-*.R</code></td>
-<td><code>models/fitted-models-*.RData</code></td>
+<td>4</td>
+<td><code>4a–4c-model-fitting-*.R</code></td>
+<td><code>rslt/models/fitted-models-*.RData</code></td>
 </tr>
 <tr class="odd">
-<td>Naive baselines</td>
-<td><code>naive-preds.R</code></td>
-<td><code>models/naive-preds.rds</code></td>
+<td>5</td>
+<td><code>5-naive-preds.R</code></td>
+<td><code>rslt/models/naive-preds.rds</code></td>
+</tr>
+<tr class="even">
+<td>6</td>
+<td><code>6-line-transect.R</code></td>
+<td><code>data/density-estimates.RData</code></td>
+</tr>
+<tr class="odd">
+<td>7</td>
+<td><code>7a–7c-figures/tables/data.R</code></td>
+<td>manuscript figures and tables</td>
 </tr>
 </tbody>
 </table>
-<p>The line-transect density estimation (<code>line-transect.R</code>,
-see <a href="https://github.com/ruizt/marine-mammal-edna/blob/main/doc/line-transect.pdf">supplement</a>)
-is independent of the eDNA modeling pipeline and produces the response
-variable stored in <code>data/density-estimates.RData</code>.</p>
+<p>Within steps 2–4, scripts <code>a/b/c</code> correspond to markers
+16S, 18S V4, and 18S V9 respectively. Step 6
+(<code>6-line-transect.R</code>) produces the whale density response
+variable used in all eDNA models; it can be run at any point after data
+setup, and its output is also available directly from Zenodo.</p>
 </div>
 <div id="stability-selection-and-nested-validation" class="section level2">
 <h2>Stability selection and nested validation</h2>
-<p>Each <code>stability-selection-*.R</code> script fits sPLS across 55
-eta × 9 ncomp hyperparameter configurations and 25 LOO subsamples —
+<p>Each <code>2*-stability-selection-*.R</code> script fits sPLS across
+55 eta × 9 ncomp hyperparameter configurations and 25 LOO subsamples —
 about 12,375 model fits per species, repeated for three species (~3
 hours per marker). Selection frequencies are written to
 <code>rslt/stability-selection/&lt;marker&gt;/sel-freq.rds</code>.</p>
-<p>Each <code>nested-validation-*.R</code> script then runs an outer LOO
-loop over the candidate stable sets identified in the previous stage,
-selecting the candidate that minimizes out-of-sample RMSPE. The winning
-candidate for each species is written to
+<p>Each <code>3*-nested-validation-*.R</code> script then runs an outer
+LOO loop over the candidate stable sets identified in the previous
+stage, selecting the candidate that minimizes out-of-sample RMSPE. The
+winning candidate for each species is written to
 <code>rslt/stability-selection/&lt;marker&gt;/stable-sets.rds</code>.</p>
 <div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>ss_16s   <span class="ot">&lt;-</span> <span class="fu">read_rds</span>(<span class="fu">here</span>(<span class="st">&quot;rslt/stability-selection/16s/stable-sets.rds&quot;</span>))</span>
 <span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>ss_18sv4 <span class="ot">&lt;-</span> <span class="fu">read_rds</span>(<span class="fu">here</span>(<span class="st">&quot;rslt/stability-selection/18sv4/stable-sets.rds&quot;</span>))</span>
