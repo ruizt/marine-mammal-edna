@@ -17,14 +17,21 @@ knitr::opts_chunk$set(
 
 This vignette walks through the complete analysis pipeline using one eDNA marker (16S rRNA) and one whale species (blue whale, *Balaenoptera musculus*). The goal is to show the methodology in full — from eDNA feature selection through model fitting to prediction — using a small bundled dataset that requires no additional downloads.
 
+The pipeline is implemented in three stages, each with a dedicated package function:
+
+| Stage | Function | Description |
+|-------|----------|-------------|
+| Stability selection | `run_stability_selection()` | Fits sPLS across hyperparameter grid and LOO subsamples; returns per-ASV selection frequencies |
+| Stable set extraction | `extract_stable_sets()` | Applies the Meinshausen-Bühlmann criterion to identify consistently-selected features |
+| Model fitting | `fit_pls_stable()` | Fits PLS regression restricted to the stable feature set |
+
 For the complete analysis across all three markers and species, see `vignette("full-analysis")`. For the line-transect density estimation underlying the response variable, see `vignette("line-transect")`.
 
 ## Setup
 
 ```{r libraries, message = FALSE, warning = FALSE}
+library(satterthwaite2026)
 library(tidyverse)
-library(spls)
-library(pls)
 library(here)
 ```
 
@@ -68,53 +75,39 @@ The core feature selection method is sparse PLS (sPLS) stability selection (Mein
 sPLS has two key hyperparameters: `eta` (sparsity, higher = fewer features selected) and `K` (number of PLS components). We search over a grid covering the interesting range:
 
 ```{r grid}
-eta_vals  <- eta_grid(n = 55)   # 55 values from ~0.4 to ~0.93 on a log scale
+eta_vals   <- eta_grid(n = 55)   # 55 values from ~0.4 to ~0.93 on a log scale
 ncomp_vals <- 4:12
-cat("Grid size:", length(eta_vals), "eta x", length(ncomp_vals), 
+cat("Grid size:", length(eta_vals), "eta x", length(ncomp_vals),
     "ncomp =", length(eta_vals) * length(ncomp_vals), "combinations\n")
 ```
 
 ### Running stability selection
 
-For each (eta, ncomp) combination, we fit sPLS to each of the 25 LOO training sets and record which ASVs are selected. The code below shows the full computation; it takes approximately 3 minutes on the 500-ASV example data and is **not evaluated** here — results are loaded from cache in the next step.
+`run_stability_selection()` fits sPLS to each LOO training subset at every (eta, ncomp) combination and tallies how often each ASV is selected. The code below shows the full computation; it takes approximately 3 minutes on the 500-ASV example data and is **not evaluated** here — results are loaded from cache in the next step.
 
 ```{r stability-selection-code, eval = FALSE}
-partitions_ex <- loo_partitions(whales_ex)
-
-model_grid_bm <- expand_grid(
-  species = "bm", ncomp = ncomp_vals, eta = eta_vals
-)
+partitions <- loo_partitions(whales_ex)
 
 # ~12,375 sPLS fits; ~3 minutes on the 500-ASV example data
-sel_asvs_bm_raw <- pmap(model_grid_bm, function(species, ncomp, eta) {
-  fit_spls_partition(species, eta, ncomp, data = whales_ex,
-                     partitions = partitions_ex)
-}) |> bind_rows()
-
-sel_freq_bm <- selection_frequencies(sel_asvs_bm_raw)
-
-avg_n_bm <- sel_asvs_bm_raw |>
-  mutate(n.asv = map_int(sel.asv, length)) |>
-  fgroup_by(species, ncomp, eta) |>
-  fselect(n.asv) |>
-  fmean()
+sel_freq_bm <- run_stability_selection(
+  whales_ex, response = "bm",
+  eta_vals, ncomp_vals, partitions
+)
 ```
 
-Pre-cached versions of `sel_freq_bm`, `avg_n_bm`, and `candidate_sets_bm` were loaded above from `example-data-16s.RData`. See `analysis/create-example-data.R` for the caching code.
-
-> **Note on example vs. full data:** The stability selection false-positive bound is $q_\text{max} = \sqrt{0.6p}$, where $p$ is the total feature count. With $p = 500$ (this example), $q_\text{max} \approx 17$, compared to $q_\text{max} \approx 61$ in the full 16S analysis ($p = 6{,}234$). Stable sets from the example are therefore more conservative (15–25 ASVs vs. 35–48 in the full analysis), but all selected features are confirmed to be genuine stable features from the full analysis. Sensitivity to data perturbations is a known property of stability selection; see the paper for discussion.
+Pre-cached `sel_freq_bm` was loaded above from `example-data-16s.RData`. See `analysis/create-example-data.R` for the caching code.
 
 ### Selection frequencies
 
-For each (eta, ncomp) configuration, we can visualize how consistently each ASV is selected. Here we look at a single configuration near the center of the grid:
+`sel_freq_bm` has one row per (eta, ncomp, ASV) combination, recording how many of the 25 LOO partitions selected that ASV. We can visualize the distribution at a single hyperparameter configuration:
 
-```{r sel-freq-plot, fig.cap = "Selection frequency of the 30 most-selected ASVs at ncomp = 4, eta = 0.7. The dashed line marks the pi.max = 0.8 stability threshold."}
+```{r sel-freq-plot, fig.cap = "Selection frequency of the 30 most-selected ASVs at ncomp = 4, eta ≈ 0.7. The dashed line marks the pi.max = 0.8 stability threshold."}
 sel_freq_bm |>
   filter(ncomp == 4, abs(eta - 0.7) < 0.01) |>
   slice_max(n, n = 30) |>
-  mutate(sel.asv = fct_reorder(sel.asv, n),
+  mutate(asv  = fct_reorder(asv, n),
          freq = n / nrow(whales_ex)) |>
-  ggplot(aes(x = freq, y = sel.asv)) +
+  ggplot(aes(x = freq, y = asv)) +
   geom_col() +
   geom_vline(xintercept = 0.8, linetype = "dashed", colour = "red") +
   labs(x = "Selection frequency", y = NULL,
@@ -123,46 +116,52 @@ sel_freq_bm |>
 
 ### Stable feature sets
 
-`extract_stable_sets()` scans over all eta intervals and identifies configurations where the average number of selected features ($\bar{q}$) satisfies the false-positive bound. `candidate_sets_bm` contains all such configurations:
+`extract_stable_sets()` scans over all eta intervals and identifies configurations where the mean number of selected features satisfies the Meinshausen-Bühlmann false-positive bound. It infers the eta grid and mean selection counts directly from `sel_freq_bm`:
 
 ```{r candidate-sets}
-candidate_sets_bm |> select(species, ncomp, eta.min, eta.max, n.asv)
+p <- sum(startsWith(names(whales_ex), "asv"))
+candidates <- extract_stable_sets(sel_freq_bm, p = p)
+candidates |> select(ncomp, eta.min, eta.max, n_stable)
 ```
 
 The full analysis uses nested cross-validation (`analysis/nested-validation-16s.R`) to select the best-performing candidate. Here we take the most conservative candidate (narrowest eta interval, implying the tightest false-positive control):
 
 ```{r select-stable-set}
-best_candidate <- candidate_sets_bm |>
+best <- candidates |>
   mutate(interval_width = eta.max - eta.min) |>
   slice_min(interval_width, with_ties = FALSE)
 
-stable_bm <- best_candidate$ss[[1]]
-cat("Stable set: ncomp =", best_candidate$ncomp,
-    " | eta [", round(best_candidate$eta.min, 3), ",",
-    round(best_candidate$eta.max, 3), "]",
-    " |", length(stable_bm), "ASVs\n")
+stable_asvs <- best$stable_asvs[[1]]
+cat("Stable set: ncomp =", best$ncomp,
+    " | eta [", round(best$eta.min, 3), ",",
+    round(best$eta.max, 3), "]",
+    " |", length(stable_asvs), "ASVs\n")
 ```
 
 For reference, `all_stable` contains the 93 ASVs identified as stable for any species in the full 16S analysis. The fraction of the example stable set that is a genuine stable feature:
 
 ```{r recovery}
-cat(sum(stable_bm %in% all_stable), "/", length(stable_bm),
+cat(sum(stable_asvs %in% all_stable), "/", length(stable_asvs),
     "selected ASVs confirmed stable in full analysis\n")
 ```
 
+> **Note on example vs. full data:** The stability selection false-positive bound is $q_\text{max} = \sqrt{0.6p}$, where $p$ is the total feature count. With $p = 500$ (this example), $q_\text{max} \approx 17$, compared to $q_\text{max} \approx 61$ in the full 16S analysis ($p = 6{,}234$). Stable sets from the example are therefore more conservative (15–25 ASVs vs. 35–48 in the full analysis), but all selected features are confirmed to be genuine stable features from the full analysis.
+
 ## Model fitting
 
-With the stable feature set identified, we fit a standard (non-sparse) PLS regression model using all 25 observations:
+`fit_pls_stable()` takes the joined data, the response name, the selected ASV names, and the number of components — it handles subsetting and model fitting in one step:
 
 ```{r model-fit}
-data_bm <- subset_to_stable(whales_ex, stable_bm, species = "bm")
-fit_bm  <- fit_pls(data_bm, ncomp = best_candidate$ncomp)
+fit_bm <- fit_pls_stable(
+  whales_ex, response = "bm",
+  stable_asvs = stable_asvs, ncomp = best$ncomp
+)
 ```
 
 PLS component loadings describe the linear combination of ASV abundances most associated with whale density. The regression coefficients summarise each feature's net contribution after accounting for all components:
 
 ```{r coefficients, fig.cap = "PLS regression coefficients for blue whale density. Positive values indicate ASVs whose abundance increases with blue whale density."}
-coefs <- coef(fit_bm)[, , paste(best_candidate$ncomp, "comps")] |>
+coefs <- coef(fit_bm)[, , paste(best$ncomp, "comps")] |>
   enframe(name = "asv", value = "coef") |>
   mutate(direction = if_else(coef > 0, "positive", "negative"))
 
@@ -172,7 +171,7 @@ coefs |>
   ggplot(aes(x = coef, y = asv, fill = direction)) +
   geom_col(show.legend = FALSE) +
   labs(x = "PLS coefficient", y = NULL,
-       title = paste("Top 20 coefficients —", length(stable_bm), "ASV model"))
+       title = paste("Top 20 coefficients —", length(stable_asvs), "ASV model"))
 ```
 
 ### Model metrics
@@ -180,8 +179,8 @@ coefs |>
 Fitted values on the log-ratio scale and back-transformed predictions on the original density scale:
 
 ```{r fitted-values}
-lr_obs <- pull(data_bm, y)
-lr_fit <- fitted(fit_bm)[, , paste(best_candidate$ncomp, "comps")]
+lr_obs <- whales_ex$bm
+lr_fit <- fitted(fit_bm)[, , paste(best$ncomp, "comps")]
 
 # Back-transform: dens = exp(lr.fit + seasonal_mean)
 dens_means_long <- dens_means |>
@@ -198,8 +197,7 @@ fit_df <- tibble(cruise = whales_ex$cruise, lr.obs = lr_obs, lr.fit = lr_fit) |>
          dens.resid = dens.obs - dens.fit)
 
 n_obs  <- nrow(fit_df)
-ncomp  <- best_candidate$ncomp
-
+ncomp  <- best$ncomp
 adj_rsq_lr   <- 1 - ((n_obs - 1) / (n_obs - ncomp - 1)) *
                     var(fit_df$lr.resid)   / var(fit_df$lr.obs)
 adj_rsq_dens <- 1 - ((n_obs - 1) / (n_obs - ncomp - 1)) *
