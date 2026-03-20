@@ -1,8 +1,8 @@
 ---
-title: "Predicting whale density from eDNA: full analysis"
+title: "Full analysis pipeline"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Predicting whale density from eDNA: full analysis}
+  %\VignetteIndexEntry{Full analysis pipeline}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -11,99 +11,69 @@ vignette: >
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment  = "#>",
-  fig.width = 7, fig.height = 4.5
+  fig.width = 7, fig.height = 5
 )
 ```
 
-This vignette presents results for the complete analysis across all three eDNA markers (16S rRNA, 18S rRNA V4, 18S rRNA V9) and three baleen whale species (blue whale BM, fin whale BP, humpback whale MN) — nine (marker × species) model combinations in total. For a step-by-step walkthrough of the pipeline, see `vignette("single-iteration")`.
+This vignette narrates the full analysis pipeline in `analysis/run-all.R`, tracing the connection between scripts and paper results. For a step-by-step walkthrough of the methodology itself, see `vignette("single-iteration")`.
 
-**Requires:** processed data files in `data/`. Run `source("analysis/setup-data.R")` to download from Zenodo (v1.1.0; ~16 MB core files). Pre-computed results (stable sets, fitted models) are loaded from `rslt/` rather than recomputed; full reproduction takes approximately 3 hours per marker via `analysis/run-all.R`.
+**Prerequisites:** processed data in `data/` and pre-computed results in `rslt/`. Download data from Zenodo with `source("analysis/setup-data.R")`, then reproduce all results with `source("analysis/run-all.R")` (~9 hours total; stability selection and nested validation account for most of that).
 
 ```{r libraries, message = FALSE, warning = FALSE}
 library(tidyverse)
 library(here)
 ```
 
-## Study system and data
+## Pipeline overview
 
-The study uses eDNA collected at CalCOFI stations in the southern California Current Ecosystem across 25 quarterly cruises (2014–2020). At each cruise, water samples were filtered and amplified with three eDNA markers targeting different components of the microbial and zooplankton community. Simultaneously, blue, fin, and humpback whale density was estimated from visual line-transect surveys (see `vignette("line-transect")`).
+`run-all.R` runs five stages in sequence. Data processing requires the unpublished raw sequencing data; all other stages work from the Zenodo-archived processed data.
 
-```{r load-data}
-load(here("data/ncog16s.RData"))
-edna_16s  <- edna
-load(here("data/ncog18sv4.RData"))
-edna_18sv4 <- edna
-load(here("data/ncog18sv9.RData"))
-edna_18sv9 <- edna
-load(here("data/density-estimates.RData"))
-```
+| Stage | Scripts | Key outputs in `rslt/` |
+|-------|---------|------------------------|
+| Data processing | `processing/processing-*.R` | `data/*.RData` |
+| Stability selection | `stability-selection-*.R` | `stability-selection/*/sel-freq.rds` |
+| Nested validation | `nested-validation-*.R` | `stability-selection/*/stable-sets.rds` |
+| Model fitting | `model-fitting-*.R` | `models/fitted-models-*.RData` |
+| Naive baselines | `naive-preds.R` | `models/naive-preds.rds` |
 
-The three markers span a wide range of taxonomic targets and feature space sizes:
+The line-transect density estimation (`line-transect.R`, see [supplement](https://github.com/ruizt/marine-mammal-edna/blob/main/doc/line-transect.pdf)) is independent of the eDNA modeling pipeline and produces the response variable stored in `data/density-estimates.RData`.
 
-```{r feature-space}
-tribble(
-  ~Marker, ~Target, ~ASVs,
-  "16S rRNA",  "Bacteria and Archaea",          ncol(select(edna_16s,  starts_with("asv"))),
-  "18S V4",    "Protists and small zooplankton", ncol(select(edna_18sv4, starts_with("asv"))),
-  "18S V9",    "Protists and small zooplankton", ncol(select(edna_18sv9, starts_with("asv")))
-)
-```
+## Stability selection and nested validation
 
-After joining with density estimates, each marker dataset has 25 cruise observations:
+Each `stability-selection-*.R` script fits sPLS across 55 eta × 9 ncomp hyperparameter configurations and 25 LOO subsamples — about 12,375 model fits per species, repeated for three species (~3 hours per marker). Selection frequencies are written to `rslt/stability-selection/<marker>/sel-freq.rds`.
 
-```{r n-obs}
-whales_16s  <- inner_join(dens, edna_16s,   by = "cruise")
-whales_18sv4 <- inner_join(dens, edna_18sv4, by = "cruise")
-whales_18sv9 <- inner_join(dens, edna_18sv9, by = "cruise")
-cat("Observations per marker:", nrow(whales_16s), "\n")
-```
-
-## Stability selection results
-
-For each (marker, species) combination, stability selection was run across a grid of 55 eta × 9 ncomp = 495 hyperparameter configurations and 25 LOO subsamples. The best stable set was then chosen by nested cross-validation (see `analysis/stability-selection-*.R` and `analysis/nested-validation-*.R`).
+Each `nested-validation-*.R` script then runs an outer LOO loop over the candidate stable sets identified in the previous stage, selecting the candidate that minimizes out-of-sample RMSPE. The winning candidate for each species is written to `rslt/stability-selection/<marker>/stable-sets.rds`.
 
 ```{r load-stable-sets}
 ss_16s   <- read_rds(here("rslt/stability-selection/16s/stable-sets.rds"))
 ss_18sv4 <- read_rds(here("rslt/stability-selection/18sv4/stable-sets.rds"))
 ss_18sv9 <- read_rds(here("rslt/stability-selection/18sv9/stable-sets.rds"))
 
-stable_sets_all <- bind_rows(
-  mutate(ss_16s,   marker = "16S"),
+bind_rows(
+  mutate(ss_16s,   marker = "16S rRNA"),
   mutate(ss_18sv4, marker = "18S V4"),
   mutate(ss_18sv9, marker = "18S V9")
 ) |>
-  mutate(n.asv = map_int(ss, length),
-         species = recode(species, bm = "Blue", bp = "Fin", mn = "Humpback"))
-```
-
-The number of stable ASVs varies considerably across marker–species combinations, reflecting both the different community targets of each marker and the varying predictability of each species:
-
-```{r stable-set-sizes, fig.cap = "Number of stable ASVs per marker–species combination."}
-stable_sets_all |>
-  ggplot(aes(x = marker, y = n.asv, fill = species)) +
-  geom_col(position = "dodge") +
-  labs(x = "eDNA marker", y = "Stable ASVs", fill = "Species") +
-  scale_fill_brewer(palette = "Set2")
-```
-
-```{r stable-set-table}
-stable_sets_all |>
-  select(Marker = marker, Species = species, 
-         `ncomp` = ncomp, `Stable ASVs` = n.asv,
+  mutate(
+    species = recode(species, bm = "Blue", bp = "Fin", mn = "Humpback"),
+    n.asv   = map_int(ss, length)
+  ) |>
+  select(Marker = marker, Species = species,
+         ncomp, `Stable ASVs` = n.asv,
          `eta min` = eta.min, `eta max` = eta.max) |>
   arrange(Marker, Species) |>
-  knitr::kable(digits = 3)
+  knitr::kable(digits = 3, caption = "Stable feature sets selected by nested cross-validation.")
 ```
 
-The hyperparameter ranges (eta min/max) indicate the robustness of each stable set: wider intervals mean the same set was selected consistently over a broader range of sparsity levels.
+The `rmspe.dens` and `cor.dens` columns in `stable-sets.rds` are the nested CV performance estimates for each selected stable set — these are the out-of-sample metrics reported in the paper.
 
-## Model fitting and metrics
+## Model fitting
 
-Full-data PLS models were fit to each stable set. Results are loaded from `rslt/models/`:
+Each `model-fitting-*.R` script fits a full-data PLS model restricted to the stable feature set chosen for each species. Results are saved to `rslt/models/fitted-models-*.RData`, each containing a `model_metrics` summary and a `fit_df` of observed vs. fitted values.
 
 ```{r load-models}
 load(here("rslt/models/fitted-models-16s.RData"))
-metrics_16s  <- model_metrics; fit_df_16s  <- fit_df
+metrics_16s <- model_metrics; fit_df_16s <- fit_df
 
 load(here("rslt/models/fitted-models-18sv4.RData"))
 metrics_18sv4 <- model_metrics; fit_df_18sv4 <- fit_df
@@ -111,97 +81,49 @@ metrics_18sv4 <- model_metrics; fit_df_18sv4 <- fit_df
 load(here("rslt/models/fitted-models-18sv9.RData"))
 metrics_18sv9 <- model_metrics; fit_df_18sv9 <- fit_df
 
-all_metrics <- bind_rows(
-  mutate(metrics_16s,   marker = "16S"),
+bind_rows(
+  mutate(metrics_16s,   marker = "16S rRNA"),
   mutate(metrics_18sv4, marker = "18S V4"),
   mutate(metrics_18sv9, marker = "18S V9")
 ) |>
   mutate(species = recode(species, bm = "Blue", bp = "Fin", mn = "Humpback")) |>
   select(Marker = marker, Species = species, `Stable ASVs` = n.asv,
-         `Adj. R² (log-ratio)` = adj.rsq.lr,
-         `Adj. R² (density)`   = adj.rsq.dens,
-         `Cor. (density)`      = cor.dens,
-         `RMSPE (density)`     = rmspe.dens)
-```
-
-```{r metrics-table}
-all_metrics |>
+         `Adj. R² (density)` = adj.rsq.dens,
+         `Cor. (density)`    = cor.dens,
+         `RMSPE (density)`   = rmspe.dens) |>
   arrange(Marker, Species) |>
-  knitr::kable(digits = 3,
-               caption = "In-sample model fit across all 9 marker–species combinations.")
+  knitr::kable(digits = 3, caption = "In-sample model fit. Cor. and RMSPE are from nested LOO cross-validation.")
 ```
 
-In-sample adjusted R² is uniformly high (> 0.8 on the density scale), reflecting that PLS can find linear structure in the stable feature sets. Out-of-sample performance is better evaluated by the correlation and RMSPE columns, which are computed on leave-one-out held-out cruises during stability selection.
+Fitted values vs. observed across all nine marker–species combinations:
 
-```{r metrics-plot, fig.cap = "Correlation between predicted and observed whale density (LOO cross-validation during stability selection) by marker and species."}
-all_metrics |>
-  ggplot(aes(x = Marker, y = `Cor. (density)`, colour = Species, group = Species)) +
-  geom_line(linetype = "dashed", alpha = 0.5) +
-  geom_point(size = 3) +
-  scale_colour_brewer(palette = "Set2") +
-  ylim(0, 1) +
-  labs(y = "Correlation (density scale, LOO)",
-       title = "Predictive performance by marker and species")
-```
-
-## Predictions vs. observed
-
-Comparing fitted values to observed density across all marker–species combinations:
-
-```{r pred-obs-all, fig.height = 6, fig.cap = "Fitted vs. observed whale density for all nine (marker × species) combinations. Dashed line is 1:1."}
-all_fit_df <- bind_rows(
-  mutate(fit_df_16s,   marker = "16S"),
+```{r pred-obs, fig.cap = "Fitted vs. observed whale density. Dashed line is 1:1."}
+bind_rows(
+  mutate(fit_df_16s,   marker = "16S rRNA"),
   mutate(fit_df_18sv4, marker = "18S V4"),
   mutate(fit_df_18sv9, marker = "18S V9")
 ) |>
-  mutate(species = recode(species, bm = "Blue", bp = "Fin", mn = "Humpback"))
-
-all_fit_df |>
+  mutate(species = recode(species, bm = "Blue", bp = "Fin", mn = "Humpback")) |>
   ggplot(aes(x = dens.obs, y = dens.fit)) +
-  geom_point(size = 1.5, alpha = 0.7) +
+  geom_point(size = 1.2, alpha = 0.7) +
   geom_abline(linetype = "dashed") +
   facet_grid(species ~ marker, scales = "free") +
-  labs(x = "Observed (ind. km\u207b\u00b2)",
-       y = "Fitted (ind. km\u207b\u00b2)")
+  labs(x = "Observed (ind. km\u207b\u00b2)", y = "Fitted (ind. km\u207b\u00b2)")
 ```
 
-## Comparison with naive baselines
+## Naive baselines
 
-A key question is whether eDNA models do better than simple baselines that ignore eDNA entirely. Two baselines were computed for each species:
+`naive-preds.R` computes two species-level baselines for comparison: a lag predictor (previous cruise's density) and a seasonal-mean predictor (mean density for the same calendar quarter). The eDNA RMSPE reported above can be compared against these:
 
-- **Lag:** the density estimate from the previous cruise (autoregressive baseline)
-- **Seasonal mean:** the mean density for the same calendar quarter across all years
-
-```{r naive-comparison, fig.cap = "RMSPE for the eDNA models (best marker per species) vs. naive baselines. Lower is better."}
-naive_preds <- read_rds(here("rslt/models/naive-preds.rds"))
-
-# Best eDNA RMSPE per species across markers
-best_edna <- all_metrics |>
-  group_by(Species) |>
-  slice_min(`RMSPE (density)`) |>
-  select(Species, Marker, `RMSPE (density)`)
-
-naive_preds |>
-  mutate(Species = recode(species, bm = "Blue", bp = "Fin", mn = "Humpback")) |>
-  pivot_longer(c(rmspe.lag, rmspe.mean),
-               names_to = "Baseline", values_to = "RMSPE",
-               names_prefix = "rmspe.") |>
-  mutate(Baseline = recode(Baseline, lag = "Lag", mean = "Seasonal mean")) |>
-  left_join(rename(best_edna, `eDNA RMSPE` = `RMSPE (density)`),
-            by = "Species") |>
-  pivot_longer(c(RMSPE, `eDNA RMSPE`),
-               names_to = "Model", values_to = "rmspe") |>
-  mutate(Model = if_else(Model == "RMSPE", Baseline, paste0("eDNA (", Marker, ")"))) |>
-  ggplot(aes(x = Species, y = rmspe, fill = Model)) +
-  geom_col(position = "dodge") +
-  labs(y = "RMSPE (ind. km\u207b\u00b2)", fill = NULL) +
-  scale_fill_brewer(palette = "Set2")
+```{r naive}
+read_rds(here("rslt/models/naive-preds.rds")) |>
+  mutate(species = recode(species, bm = "Blue", bp = "Fin", mn = "Humpback")) |>
+  rename(Species = species,
+         `RMSPE (lag)`           = rmspe.lag,
+         `RMSPE (seasonal mean)` = rmspe.mean) |>
+  knitr::kable(digits = 4)
 ```
 
-The eDNA models substantially outperform both baselines for fin whale (BP) and show competitive performance for blue (BM) and humpback (MN) whale.
+## Figures and tables
 
-## References
-
-Satterthwaite, E.V., Ruiz, T.D., et al. Microbial and small zooplankton communities predict density of baleen whales in the southern California Current Ecosystem.
-
-Meinshausen, N., & Bühlmann, P. (2010). Stability selection. *Journal of the Royal Statistical Society: Series B*, 72(4), 417–473.
+`analysis/figures.R` and `analysis/tables.R` produce the manuscript figures and supplementary tables from the fitted model objects and density data. `analysis/data.R` exports any derived data objects used elsewhere. These scripts are the last stage in `run-all.R` and require all upstream results to be present in `rslt/`.
