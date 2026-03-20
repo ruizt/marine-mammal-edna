@@ -5,3 +5,14 @@
 .DS_Store
 _*
 .positai
+
+# Analysis data — downloaded from Zenodo via analysis/setup-data.R
+# (https://doi.org/10.5281/zenodo.19139338)
+data/ncog16s.RData
+data/ncog18sv4.RData
+data/ncog18sv9.RData
+data/density-estimates.RData
+data/sightings.RData
+data/sample_table.Rds
+data/region_table.Rds
+data/obs_table.Rds

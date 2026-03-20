@@ -6,44 +6,103 @@ Citation:
 
 > E.V. Satterthwaite, T.D. Ruiz, N.V. Patin, M.N. Alksne, L. Thomas, J. Dinasquet, R.H. Lampe, K.G. Chan, N.A. Patrick, A.E. Allen, S. Baumann-Pickering, B.X. Semmens. Microbial and small zooplankton communities predict density of baleen whales in the southern California Current Ecosystem.
 
-Repository contributors: T.D. Ruiz, N.A. Patrick, K.G. Chan
+Repository contributors: T.D. Ruiz, N.A. Patrick, K.G. Chan, L. Thomas
 
-## Notes
+---
 
-The file `~/scripts/analysis.R` is a high-level script showing the order of execution of individual steps in the analysis described in the paper: data processing, aggregation, and transformation; stability selection; nested validation; model fitting; figure and table generation. Please note:
+## Quick start
 
-- The scripts in `~/scripts/processing/` will not execute without the raw data files, which are not included with this repository. Raw data files are not necessary to reproduce the analysis, but may be requested from the authors along with an explanation of the purpose of the request.
-- The results of the scripts in `~/scripts/processing/` needed for further analysis **are** available in this repository and are stored in `~/data/processed/`, with the exception of the data partitions, which can be obtained from [10.5281/zenodo.15678927](https://doi.org/10.5281/zenodo.15678927).
-- To reproduce the analysis in the paper starting from processed data, unzip the files `_combined-partitions.zip` and `_partitions.zip` in the `~/data/processed/` directory. Then execute the scripts as shown in `~/scripts/analysis.R` (not including processing scripts). Outputs of analyses are stored in `~/rslt/`. Note that execution times are long (approximately 3 hours per script).
+### For methods adopters
 
-The map figures utilize shapefiles from GSHHG Release v2.3.7, URL [https://www.soest.hawaii.edu/pwessel/gshhg/](https://www.soest.hawaii.edu/pwessel/gshhg/) accessed December 2024.
-- Wessel, P., and W. H. F. Smith (1996), A global, self-consistent, hierarchical, high-resolution shoreline database, J. Geophys. Res., 101(B4), 8741–8743, doi:10.1029/96JB00104.
+The `vignettes/` directory contains self-contained walkthroughs of the analysis pipeline:
+
+- **`vignettes/single-iteration.Rmd`** — demonstrates the full pipeline (stability selection → model fitting → interpretation) for one eDNA marker (16S) and one whale species (blue whale) using a bundled 500-ASV example dataset. No data download required.
+- **`vignettes/full-analysis.Rmd`** — covers all three markers × three species combinations from the paper. Requires processed data (see below).
+- **`vignettes/line-transect.qmd`** — documents the distance-sampling analysis used to estimate whale density from the CalCOFI survey data.
+
+### For paper reproducers
+
+1. Download processed data from Zenodo (v1.1.0, [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19139338.svg)](https://doi.org/10.5281/zenodo.19139338)):
+
+```r
+source('analysis/setup-data.R')               # ~16 MB core files
+# source('analysis/setup-data.R'); setup_data(partitions = TRUE)  # +5.5 GB partitions
+```
+
+2. Run the full analysis pipeline (note: stability selection and nested validation take approximately 3 hours per marker):
+
+```r
+source('analysis/run-all.R')
+```
+
+Raw eDNA sequencing data (ASV count tables) are not included in this repository or the Zenodo archive but may be requested from the authors.
+
+---
+
+## Repository structure
+
+```
+├── R/                        # Package functions
+│   ├── stability_selection.R # sPLS stability selection
+│   ├── model_fitting.R       # PLS model fitting and metrics
+│   └── utils.R               # Shared utilities (eta grid, LOO partitions)
+│
+├── analysis/                 # Executable analysis scripts
+│   ├── run-all.R             # Top-level orchestration
+│   ├── setup-data.R          # Download data from Zenodo
+│   ├── processing/           # Raw data processing (requires unpublished raw data)
+│   ├── stability-selection-*.R
+│   ├── nested-validation-*.R
+│   ├── model-fitting-*.R
+│   ├── naive-preds.R
+│   ├── line-transect.R       # Line transect density estimation
+│   ├── figures.R
+│   ├── tables.R
+│   └── create-example-data.R # Backend: generates bundled example dataset
+│
+├── vignettes/                # Narrative walkthroughs
+│   ├── single-iteration.Rmd  # Short: one marker, one species
+│   ├── full-analysis.Rmd     # Long: all 3 markers × 3 species
+│   └── line-transect.qmd     # Supplement: distance-sampling analysis
+│
+├── tests/testthat/           # IO and unit tests
+│
+├── data/                     # Data directory (gitignored except example data)
+│   ├── example-data-16s.RData  # Bundled 500-ASV example dataset
+│   └── gshhg.RData             # Coastline shapefiles for maps
+│
+└── rslt/                     # Analysis outputs
+    ├── stability-selection/
+    ├── nested-validation/
+    └── models/
+```
+
+---
+
+## Data
+
+Processed data are archived on Zenodo (v1.1.0): [10.5281/zenodo.19139338](https://doi.org/10.5281/zenodo.19139338).
+
+| File | Description |
+|------|-------------|
+| `ncog16s.RData` | Processed 16S eDNA ASV table |
+| `ncog18sv4.RData` | Processed 18S V4 eDNA ASV table |
+| `ncog18sv9.RData` | Processed 18S V9 eDNA ASV table |
+| `density-estimates.RData` | Line-transect whale density estimates |
+| `sightings.RData` | CalCOFI whale sighting records |
+| `sample_table.Rds` | Survey effort data (line transect analysis) |
+| `region_table.Rds` | Cruise/region metadata (line transect analysis) |
+| `obs_table.Rds` | Individual sighting records (line transect analysis) |
+| `_partitions.zip` | LOO cross-validation partitions (~3.1 GB) |
+| `_combined-partitions.zip` | Combined eDNA + density partitions (~2.4 GB) |
+
+Map figures use coastline shapefiles from GSHHG Release v2.3.7 ([https://www.soest.hawaii.edu/pwessel/gshhg/](https://www.soest.hawaii.edu/pwessel/gshhg/)):
+> Wessel, P., and W. H. F. Smith (1996), A global, self-consistent, hierarchical, high-resolution shoreline database, J. Geophys. Res., 101(B4), 8741–8743, doi:10.1029/96JB00104.
+
+---
 
 ## Software
 
-RStudio Version 2024.12.1+563 (2024.12.1+563)
+R version 4.4.3 (2025-02-28) · RStudio 2024.12.1+563 · macOS Sequoia 15.3.2
 
-R version 4.4.3 (2025-02-28)
-
-Platform: x86_64-apple-darwin20
-
-Running under: macOS Sequoia 15.3.2
-
-Packages (not including dependencies):
-
-- sf 1.0-18        
-- mapdata 2.3.1
-- maps 3.4.2       
-- ggmap 4.0.0     
-- patchwork 1.2.0  
-- openxlsx 4.2.5.2 
-- readxl 1.4.3      
-- lubridate 1.9.3
-- tidyverse 2.0.0 
-- collapse 2.0.15 
-- pls 2.8-3
-- spls 2.2-3 
-- modelr 0.1.11  
-- fs 1.6.4
-- magrittr 2.0.3 
-- vegan 2.6-6.1
+Dependencies are listed in `DESCRIPTION`. Key packages: `spls`, `pls`, `tidyverse`, `collapse`, `sf`, `patchwork`, `Distance`.

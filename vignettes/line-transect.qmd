@@ -1,0 +1,423 @@
+---
+title: "Supplement: Line transect analysis for Satterthwaite et al."
+subtitle: "_Microbial and small zooplankton communities predict density of baleen whales in the southern California Current Ecosystem_"
+format: 
+  pdf:
+    echo: false
+    number-sections: true
+    toc: true
+    toc-depth: 2
+    toc-title: "Contents"
+    papersize: letter
+    geometry:
+      - bottom=3cm
+      - top=2cm
+      - left=2cm
+      - right=2cm
+execute: 
+  cache: true
+---
+
+```{r}
+#| echo: false
+#| output: false
+#Load required libraries
+library(readxl)
+library(Distance)
+library(tidyverse)
+library(kableExtra)
+library(ggplot2)
+set.seed(71246)
+```
+
+{{< pagebreak >}}
+
+# Introduction
+
+This document contains details of the line transect analysis of blue, fin and humpback whale sightings survey data undertaken for the paper
+
+> E.V. Satterthwaite, T.D. Ruiz, N.V. Patin, M.N. Alksne, L. Thomas, J. Dinasquet, R.H. Lampe, K.G. Chan, N.A. Patrick, A.E. Allen, S. Baumann-Pickering, B.X. Semmens. Microbial and small zooplankton communities predict density of baleen whales in the southern California Current Ecosystem.
+
+It is based on a Quarto (`.qmd`) file, which contains all of the underlying code required to undertake the analysis.  Input data are in the same directory as this file, as `R`-format `.Rmd` files.  Details of the `R` and package versions used in compiling this file are given at the end of this document.
+
+# Data
+
+```{r}
+sample_table <- read_rds(here::here("data/sample_table.Rds"))
+region_table <- read_rds(here::here("data/region_table.Rds"))
+obs_table <- read_rds(here::here("data/obs_table.Rds"))
+```
+
+There are two types of input data to a line transect analysis: effort data, which records the survey effort, and detection data, which records information about detected animals.  
+
+## Effort data
+
+Here, the effort data is input as two files, (1) a "region" file `region_table` with one line per cruise, (2) a "sample" file `sample_table` with one line per day of effort within cruises.  Each "region" (i.e., cruise) is treated as a stratum in the analysis, so we will get one estimate of density per cruise.  The sample file tells the software about the total line length, and also how the survey effort is divided up into independent units (here survey days) for variance estimation.
+
+@tbl-pop-size shows number of survey days ("k") and line length ("L") by cruise.  Note that the survey area ("Area") is set to an arbitrary value of 1 because our primary interest here is in cetacean density rather than abundance, so the study area size is not relevant.
+
+```{r}
+#| label: tbl-pop-size
+#| tbl-cap: "Summary of effort data by cruise."
+region_table %>% kbl(longtable =  TRUE) %>% 
+  kable_classic(full_width = FALSE)
+```
+
+The same information about line length and number of days of surveying per cruise is shown in graphical form in @fig-pop-size.
+
+```{r}
+#| label: fig-pop-size
+#| fig-cap: "Summary of effort data by cruise.  Larger black dots indicate the cruise took place in the winter season."
+ggplot(region_table, aes(x = start_date)) +
+  geom_line( aes(y = L), color = "red") + 
+  geom_line( aes(y = k * 100), color = "blue", linetype = "dashed") +
+  geom_point( aes(y = L), size = ifelse(region_table$season == "winter", 2, 0)) +
+  scale_y_continuous(
+    name = "Line length",
+    sec.axis = sec_axis(~ . / 100, name="Days of surveying"),
+    limits = c(0, 1600)
+  ) + 
+  xlab("Start date of cruise") +
+  theme(
+    axis.title.y = element_text(color = "red"),
+    axis.title.y.right = element_text(color = "blue")
+  )
+```
+
+## Detection data
+
+The observation data is contained in a file `obs_table`, with one line per visual detection.  Here, only confirmed sightings of species blue whale (`BM`), fin whale (`BP`) and humpback whale (`MN`) are retained in the dataset.  For each detection, in addition to recorded species, perpendicular distance, and group size (`size`) there are associated covariates Beaufort sea state (`ss`), swell height (`swell`), and observer height above water (`f_obs_height`, a factor variable with 3 levels: `A` 9m or less; `B` 9-12m; `C` over 12m).  
+
+Before distance truncation, the dataset contains `r sum(obs_table$species == "BM")` blue whale detections, `r sum(obs_table$species == "BP")` fin whale detections and `r sum(obs_table$species == "MN")` humpback whale detections.  We followed Campbell et al. (2015) (and after visual inspection of perpendicular distance histograms) and truncated observations with perpendicular distances beyond 2400m.  @tbl-obs-summary shows the number of observations after truncation, and summary statistics on the numerical covariates. 
+
+\AddToHookNext{env/Highlighting/begin}{\tiny}
+```{r}
+#| label: tbl-obs-summary
+#| tbl-cap: "Summary of number of observations and observation-level covariates (size = cluster size, ss = sea state, swell = swell height) by species, after truncation at 2400m.  For each covariate, 5th, 50th and 95th quantiles are shown, as indicated by 5, 50 and 95 in the header."
+
+#Left truncation
+w <- 2400
+obs_table <- obs_table %>% filter(distance <= w)
+
+#Summary of observations
+obs_summary <- obs_table %>%
+  group_by(species) %>%
+  summarise(n = n(), 
+            sizeL = quantile(size, 0.05), sizeM = median(size), sizeU = quantile(size, 0.95), 
+            ssL = quantile(ss, 0.05), ssM = median(ss), ssU = quantile(ss, 0.95), 
+            swellL = quantile(swell, 0.05), swellM = median(swell), swellU = quantile(swell, 0.95))
+obs_summary %>% kbl(col.names = c("species", "n", 
+                                  "size 5", "size 50", "size 95", 
+                                  "ss 5", "ss 50", "ss 95", 
+                                  "swell 5", "swell 50", "swell 95")) %>% 
+  kable_classic(full_width = FALSE)
+```
+
+# Detection function modeling
+
+As described in the main paper, candidate detection functions were fitted for each species incrementally using forward selection, starting with a key function and adding terms if the resulting model had a lower Akaike Information Criterion (AIC) score.  Key functions were uniform, half-normal and hazard rate. In one set of analyses the terms added were cosine (with uniform or half-normal) or polynomial (with hazard rate) adjustment terms.  In another set of analyses using just half-normal and hazard rate key functions, the terms added were covariates affecting the scale parameter of the key functions: sea state, swell height, observer height above water and group size. The final model chosen for inference was the one with lowest AIC over both sets.  Goodness of fit was assessed visually by comparing the fitted detection function with histograms of observed distances, and using a Cramér-von Mises test.
+
+All of the analyses were performed using the `Distance` package in `R`.
+
+```{r}
+#Define function to fit detection functions to data passed in as data frame/tibble dat. 
+# w is the truncation distance.
+# fits a set of key function and adjustments with forward selection of covariates, specified in the function body
+# returns a data frame with one row for each fitted detection function, and an AIC column
+#Note - season not passed in by default
+fit_det_func <- function(dat, w,
+  keys = c("unif", "hn", "hr"),
+  adjustments = c("cos", "cos", "poly"),
+  max_adjustments = c(3, 2, 1),
+  covariates = c("ss", "swell", "size", "f_obs_height"),
+  covariates_and_adjustments = FALSE){
+  
+  #Note only fits covariates for hn and hr key functions
+  
+  n_covariates <- length(covariates)
+  model <- 0
+  for(key_series in 1:length(keys)){
+  
+    key <- keys[key_series]
+    adjustment <- adjustments[key_series]
+    for(nadj in 0:max_adjustments[key_series]){
+      
+      #Fit model with no covariates - assumes no error will be generated here
+      res <- ds(dat, w, key = key, adjustment = adjustment, nadj = nadj, quiet = TRUE)
+      model <- model + 1
+      min_AIC_within_keyfct <- AIC(res)$AIC
+      if(model == 1){
+        res_table <- data.frame(model = model, key = key, adjustment = adjustment,
+                                nadj = nadj, covar = "", AIC = min_AIC_within_keyfct)
+      } else {
+        res_table <- rbind(res_table, 
+                           data.frame(model = model, key = key, adjustment = adjustment,
+                                nadj = nadj, covar = "", AIC = min_AIC_within_keyfct))
+      }
+      
+      if((key %in% c("hn", "hr")) & ((nadj == 0) | covariates_and_adjustments)){
+        #Forward selection for model covariates
+        round <- 1
+        covar_selected <- rep(FALSE, n_covariates)
+        while(round <= n_covariates){
+          res_AIC <- rep(Inf, n_covariates)
+          for(cov in 1:n_covariates){
+            #Skip this model if the covariate is already selected
+            if(covar_selected[cov]) next
+            #Build up the covariate string
+            if(any(covar_selected)) {
+              covar_text <- paste(paste(covariates[covar_selected], collapse = " + "), covariates[cov], sep = " + ")
+            } else {
+              covar_text <- covariates[cov]
+            }
+            #Fit the model
+            res <- try(ds(dat, w, key = key, adjustment = adjustment, nadj = nadj,
+                      formula = eval(parse(text = paste("~", covar_text))), quiet = TRUE))
+            if(inherits(res, "try-error")){
+              #There was an error during the fitting - do not save the result, and move on to the next model
+              next()
+            } else {
+              #Save the result
+              model <- model + 1
+              res_AIC[cov] <- AIC(res)$AIC
+              res_table <- rbind(res_table, 
+                                 data.frame(model = model, key = key, adjustment = adjustment,
+                                      nadj = nadj, covar = covar_text, AIC = res_AIC[cov]))
+            }
+          }
+          #Select best model in this round
+          best_model <- which.min(res_AIC)
+          if(res_AIC[best_model] < min_AIC_within_keyfct){
+            min_AIC_within_keyfct <- res_AIC[best_model]  
+            covar_selected[best_model] <- TRUE
+            round <- round + 1
+          } else{
+            break
+          }
+        }
+      }
+      
+      #Determine whether to fit more adjustments
+      if(nadj == 0){
+        min_AIC <- min_AIC_within_keyfct
+      } else {
+        if(min_AIC_within_keyfct < min_AIC){
+          #Go on to next adjustment term
+          min_AIC <- min_AIC_within_keyfct
+        } else {
+          #No more adjustments
+          break
+        }
+      }
+      
+    } #end adjustments
+  } #end key_series
+
+  res_order <- order(res_table$AIC)
+  res_table <- res_table[res_order, ]
+  res_table$Delta_AIC <- res_table$AIC - res_table$AIC[1]
+  return(res_table)
+}
+```
+
+```{r}
+#| output: false
+#| warning: false
+
+#Fit each species in turn
+
+species <- unique(obs_table$species)
+n_species <- length(species)
+convert_units <- 1/1000000
+fits <- det_func_tables <- vector("list", n_species)
+names(fits) <- names(det_func_tables) <- species
+
+for(i in 1:n_species){
+  
+  dat <- obs_table[obs_table$species == species[i], ]
+  
+  #Fit the detection functions
+  det_func_tables[[i]] <- fit_det_func(dat, w)
+  
+  #Refit with the AIC_best model
+  if(det_func_tables[[i]]$covar[1] == "") {
+    fits[[i]] <- ds(dat, w, key = det_func_tables[[i]]$key[1], 
+                    adjustment = det_func_tables[[i]]$adjustment[1], nadj = det_func_tables[[i]]$nadj[1], 
+                    region_table = region_table, sample_table = sample_table,
+                    convert_units = convert_units, quiet = TRUE)
+  } else {
+    fits[[i]] <- ds(dat, w, key = det_func_tables[[i]]$key[1], 
+                    adjustment = det_func_tables[[i]]$adjustment[1], 
+                    nadj = det_func_tables[[i]]$nadj[1], region_table = region_table, 
+                    sample_table = sample_table,
+                    formula = eval(parse(text = paste("~", det_func_tables[[i]]$covar[1]))), 
+                    convert_units = convert_units, quiet = TRUE)
+  }
+
+}
+```
+
+## Blue whale
+
+The list of fitted models, ordered by AIC (lowest to highest) is shown in @tbl-det-blue.  The AIC-best model is uniform + cosine order 1 was the AIC-best fit.  We note that 6 other models are within 2 AIC points, including the half normal with no adjustments and uniform with 2 cosine adjustments. 
+
+```{r}
+#| label: tbl-det-blue
+#| tbl-cap: "Fitted detection function models for blue whale, ordered from lowest to highest AIC."
+#| output: asis
+tmp <- det_func_tables[2][[1]][, -1] %>% 
+  kbl(digits = 2, row.names = FALSE, longtable = TRUE) %>% 
+  kable_classic(full_width = FALSE)
+print(tmp)
+```
+
+Below is summary output for the AIC-best model.
+
+```{r}
+summary_BM <- summary(fits[[2]]$ddf)
+print(summary_BM)
+```
+```{r}
+#| label: fig-blue-det-func
+#| fig-cap: "Fitted detection function for blue whale. Circles show estimated detection probability for each observation.  Histogram shows measured distances."
+plot(fits[[2]])
+```
+```{r}
+#| label: fig-blue-gof
+#| fig-cap: "Q-q plot for blue whale detection function."
+gof_BM <-gof_ds(fits[[2]])
+```
+
+@fig-blue-det-func shows the fitted detection function and @fig-blue-gof is the corresponding qq-plot.  The overall fit is good, with a CvM test p-value of `r format(gof_BM$dsgof$CvM$p, digits = 2)`.  The fit is very similar to that of Campbell et al. (2015) for the same species.  The average probability of detection, $p$, between 0 and `r w`m is `r format(summary_BM$average.p, digits = 2)`.
+
+## Fin whale
+
+The list of fitted models, ordered by AIC (lowest to highest) is shown in @tbl-det-fin.  Half-normal with 3 covariates (sea state, group size and observer height) is AIC-best fit, with swell as a 4th covariate being 0.58 AIC points lower and a 2-covariate model without obs height being 1.78 AIC points lower. 
+
+```{r}
+#| label: tbl-det-fin
+#| tbl-cap: "Fitted detection function models for fin whale, ordered from lowest to highest AIC."
+#| output: asis
+tmp <- det_func_tables[1][[1]][, -1] %>% 
+  kbl(digits = 2, row.names = FALSE, longtable = TRUE) %>% 
+  kable_classic(full_width = FALSE)
+print(tmp)
+```
+
+Below is summary output for the AIC-best model. 
+
+```{r}
+summary_BP <- summary(fits[[1]]$ddf)
+print(summary_BP)
+```
+
+Fitted covariate values look sensible: detectability goes down with increasing sea state (`ss`), up with size, and up for f-obs-height C (which is the highest) -- but it is estimate to be lower with f-obs-height B (next highest) than for the intercept which is height A (the lowest), which is not intuitive (although the SE is close to the estimate so not strongly significant).  
+
+```{r}
+#| label: fig-fin-det-func
+#| fig-cap: "Fitted detection function for fin whale. Circles show estimated detection probability for each observation.  Histogram shows measured distances."
+plot(fits[[1]])
+```
+```{r}
+#| label: fig-fin-gof
+#| fig-cap: "Q-q plot for fin whale detection function."
+gof_BP <-gof_ds(fits[[1]])
+```
+
+@fig-fin-det-func shows the fitted detection function and @fig-fin-gof is the corresponding qq-plot.  The overall fit is good, with a CvM test p-value of `r format(gof_BP$dsgof$CvM$p, digits = 2)`.  The fit is similar to that of Campbell et al. (2015) for the same species, although more covariates are selected (in the Campbell paper it was just sea state). This could be explained by the increase in sample size: $n$ is `r summary_BP$n` compared to 166 in the Campbell analysis.  
+
+The average $p$ between 0 and `r w`m is `r format(summary_BP$average.p, digits = 2)`.
+
+## Humpback whale
+
+The list of fitted models, ordered by AIC (lowest to highest) is shown in @tbl-det-humpback.  The AIC-best model is half-normal with swell, observer height and sea state as covariates.  There are 8 models within 2 AIC points of the lowest-AIC model, with the second best (uniform + 1 cos) being only 0.36 points worse.  Given the outputs will be used to estimate density by year, it seems especially sensible to stick with the AIC-best model that allows detectability to vary by year if the covariates vary. 
+
+```{r}
+#| label: tbl-det-humpback
+#| tbl-cap: "Fitted detection function models for humpback whale, ordered from lowest to highest AIC."
+#| output: asis
+tmp <- det_func_tables[3][[1]][, -1] %>% 
+  kbl(digits = 2, row.names = FALSE, longtable = TRUE) %>% 
+  kable_classic(full_width = FALSE)
+print(tmp)
+```
+
+Below is summary output for the AIC-best model. 
+
+```{r}
+summary_MN <- summary(fits[[3]]$ddf)
+print(summary_MN)
+```
+
+Fitted covariate values show that detectability goes down with increasing swell, but conversely increase with sea state (`ss`), which seems counter-intuitive.  This may be due to covariation between swell and sea state in the data.  Detectability is higher at observer height B than the intercept (height A) and higher again at observer height C.
+
+```{r}
+#| label: fig-humpback-det-func
+#| fig-cap: "Fitted detection function for humpback whale. Circles show estimated detection probability for each observation.  Histogram shows measured distances."
+plot(fits[[1]])
+```
+```{r}
+#| label: fig-humpback-gof
+#| fig-cap: "Q-q plot for humpback whale detection function."
+gof_MN <- gof_ds(fits[[1]])
+```
+
+@fig-humpback-det-func shows the fitted detection function and @fig-humpback-gof is the corresponding qq-plot.  The overall fit is good, with a CvM test p-value of `r format(gof_MN$dsgof$CvM$p, digits = 2)`.  The overall fit is similar to that of Campbell et al. (2015) for the same species, although unlike the Campbell paper covariates are selected.  This could be explained by the large increase in sample size: $n$ is `r summary_MN$n` compared to 66 in the Campbell analysis.  
+
+The average $p$ between 0 and `r w`m is `r format(summary_MN$average.p, digits = 2)`, a little higher than blue and fin whale.
+
+# Density estimates
+
+Density estimates by cruise are shown in @tbl-dens-blue for blue whale, @tbl-dens-fin for fin whale and @tbl-dens-humpback for humpback whale.
+
+```{r}
+#| label: tbl-dens-blue
+#| tbl-cap: "Density estimates by cruise for blue whale."
+#| output: asis
+
+tmp <- summary(fits[[2]])$dht$individuals$D
+tmp2 <- tmp %>% 
+  kbl(digits = 2, longtable = TRUE) %>%
+  kable_classic(full_width = FALSE)
+print(tmp2)
+```
+
+```{r}
+#| label: tbl-dens-fin
+#| tbl-cap: "Density estimates by cruise for fin whale."
+#| output: asis
+
+tmp <- summary(fits[[1]])$dht$individuals$D
+tmp2 <- tmp %>% 
+  kbl(digits = 2, longtable = TRUE) %>%
+  kable_classic(full_width = FALSE)
+print(tmp2)
+```
+
+```{r}
+#| label: tbl-dens-humpback
+#| tbl-cap: "Density estimates by cruise for humpback whale."
+#| output: asis
+
+tmp <- summary(fits[[3]])$dht$individuals$D
+tmp2 <- tmp %>% 
+  kbl(digits = 2, longtable = TRUE) %>%
+  kable_classic(full_width = FALSE)
+print(tmp2)
+```
+
+
+
+# R session information
+
+This Quarto document was compiled in `R` with the following session information (obtained by running the `SessionInfo()` function):
+
+```{r}
+sessionInfo()
+```
+
+# References
+
+- Campbell et al. (2015) Inter-annual and seasonal trends in cetacean distribution, density and abundance off southern California. [doi:10.1016/j.dsr2.2014.10.008](https://doi.org/10.1016/j.dsr2.2014.10.008)
+
+

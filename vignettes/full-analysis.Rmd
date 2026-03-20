@@ -1,0 +1,51 @@
+---
+title: "Predicting whale density from eDNA: full analysis"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Predicting whale density from eDNA: full analysis}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+> **This vignette is a stub.** It covers all three eDNA markers (16S, 18SV4,
+> 18SV9) and three whale species (blue, fin, humpback), reproducing the nine
+> (marker × species) model combinations from the paper.
+>
+> **Requires:** processed data files in `data/` — run `source("analysis/setup-data.R")`
+> first. Stability selection and nested validation results are loaded from
+> `rslt/` rather than recomputed (full computation: ~3 hours per marker via
+> `analysis/run-all.R`).
+
+## Overview
+
+*TODO: describe the full analysis structure — three markers, three species,
+stability selection → nested validation → model fitting pipeline*
+
+## Data preparation
+
+*TODO: load and describe ncog16s.RData, ncog18sv4.RData, ncog18sv9.RData,
+density-estimates.RData; show sample counts and feature space dimensions*
+
+## Stability selection
+
+*TODO: describe the sPLS stability selection procedure and hyperparameter grid;
+load and summarize rslt/stability-selection/*/stable-sets.rds*
+
+## Nested validation
+
+*TODO: describe the nested CV procedure; load and summarize
+rslt/nested-validation/*/validation-stable-sets.rds*
+
+## Model fitting
+
+*TODO: load rslt/models/fitted-models-*.RData; show adjusted R² and RMSE
+across all nine combinations*
+
+## Comparison with naive baselines
+
+*TODO: load rslt/models/naive-preds.rds; compare eDNA predictions to lag and
+seasonal-mean baselines*

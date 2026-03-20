@@ -1,0 +1,61 @@
+---
+title: "Predicting whale density from eDNA: a single-iteration walkthrough"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Predicting whale density from eDNA: a single-iteration walkthrough}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+> **This vignette is a stub.** It demonstrates the full analysis pipeline for a
+> single eDNA marker (16S) and a single whale species (blue whale, BM) using a
+> bundled 500-ASV example dataset. No additional data downloads are required.
+>
+> See `vignettes/full-analysis.Rmd` for the complete 3-marker × 3-species
+> analysis and `analysis/run-all.R` for paper-exact reproduction.
+
+## Overview
+
+*TODO: narrative introduction to the eDNA → whale density prediction problem*
+
+## Data
+
+```{r load-data}
+load(system.file("../data/example-data-16s.RData", package = "marineedna",
+                 mustWork = FALSE) |>
+       (\(x) if (nchar(x) > 0) x else "data/example-data-16s.RData")())
+```
+
+*TODO: describe example_16s, example_density, dimensions, and how the example
+data relates to the full dataset*
+
+## Stability selection
+
+*TODO: explain the stability selection concept; show sel_freq_bm; demonstrate
+candidate range construction from avg_n_bm; show candidate_sets_bm*
+
+> **Note on computation:** Stability selection on the 500-ASV example data
+> (55 η × 9 ncomp × 25 LOO folds = 12,375 sPLS fits) takes approximately
+> 3 minutes. Results are pre-cached in `example-data-16s.RData`; the code
+> below is shown for illustration but not executed.
+>
+> The example data contains 500 of the 6,234 ASVs in the full 16S dataset.
+> Because the stability selection false-positive bound scales as
+> √(0.6 × p), stable sets from the example (p = 500) are smaller (~15–25
+> ASVs) than those from the full analysis (~35–48 ASVs). All selected
+> features are verified against the full analysis stable set. Sensitivity of
+> stable set membership to data perturbations is a known property of the
+> method; see Meinshausen & Bühlmann (2010).
+
+## Model fitting
+
+*TODO: use candidate_sets_bm to fit final PLS model; show coefficients*
+
+## Results
+
+*TODO: back-transform predictions using dens_means; compare to observed density
+using dens_raw; show adjusted R²*
