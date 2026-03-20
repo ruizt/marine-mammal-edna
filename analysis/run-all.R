@@ -34,7 +34,7 @@ source('analysis/5-naive-preds.R')
 
 ## LINE TRANSECT ANALYSIS ------------------------------------------------------
 
-source('analysis/6-line-transect.R')
+source('analysis/line-transect/line-transect.R')
 
 ## RESULTS ---------------------------------------------------------------------
 
