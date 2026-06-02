@@ -89,21 +89,21 @@ cat("Grid size:", length(eta_vals), "eta x", length(ncomp_vals),
 partitions <- loo_partitions(whales_ex)
 
 # ~12,375 sPLS fits; ~3 minutes on the 500-ASV example data
-├── analysis/                 # Executable analysis scripts
-│   ├── run-all.R             # Top-level orchestration
-│   ├── 1-setup-data.R        # Download data from Zenodo
-│   ├── 0_line-transect/      # Step 0a: distance-sampling density estimation
-│   │   └── 0a-line-transect.R
-│   ├── 0_processing/         # Steps 0b–0g: raw data processing (requires unpublished raw data)
-│   │   └── 0b–0g-*.R
-│   ├── 2a–2c-stability-selection-*.R   # Step 2: sPLS stability selection (a/b/c = 16S/18SV4/18SV9)
-│   ├── 3a–3c-nested-validation-*.R     # Step 3: nested CV to select stable sets
-│   ├── 4a–4c-model-fitting-*.R         # Step 4: PLS model fitting
-│   ├── 5-naive-preds.R                 # Step 5: naive baseline predictions
-│   ├── 6a-figures.R                    # Step 6: manuscript outputs
-│   ├── 6b-tables.R
-│   ├── 6c-data.R
-│   └── create-example-data.R # Developer: generates bundled example dataset
+sel_freq_bm <- run_stability_selection(
+  whales_ex, response = "bm",
+  eta_vals   = eta_vals,
+  ncomp_vals = ncomp_vals,
+  partitions = partitions
+)
+```
+
+The result, `sel_freq_bm`, is pre-computed and bundled with the example data. Selection frequencies for a representative hyperparameter configuration (ncomp = 4, eta ≈ 0.7):
+
+```{r sel-freq-plot, fig.cap = "Selection frequencies for the top 30 ASVs at ncomp = 4, eta \u2248 0.7. The dashed red line marks the 0.8 stability threshold."}
+target_eta <- eta_vals[which.min(abs(eta_vals - 0.7))]
+
+sel_freq_bm |>
+  filter(ncomp == 4, eta == target_eta) |>
   slice_max(n, n = 30) |>
   mutate(asv  = fct_reorder(asv, n),
          freq = n / nrow(whales_ex)) |>
