@@ -32,7 +32,6 @@ For the complete analysis across all three markers and species, see `vignette("f
 ```{r libraries, message = FALSE, warning = FALSE}
 library(satterthwaite2026)
 library(tidyverse)
-library(here)
 ```
 
 ## Data
@@ -40,7 +39,7 @@ library(here)
 The example dataset is bundled with the package: a 500-ASV subset of the full 16S data designed so that every ASV identified as stable in the full analysis is present. The companion density estimates are the same 25 observations used in the paper.
 
 ```{r load-data}
-load(here("data/example-data-16s.RData"))
+load(system.file("data/example-data-16s.RData", package = "satterthwaite2026"))
 ```
 
 This loads several objects. The two primary inputs are `example_16s` (eDNA data) and `example_density` (blue, fin, and humpback whale log-ratio density estimates):
@@ -216,8 +215,8 @@ fit_df |>
   ggplot(aes(x = dens.obs, y = dens.fit)) +
   geom_point() +
   geom_abline(linetype = "dashed") +
-  labs(x = "Observed density (ind. km\u00b2)",
-       y = "Fitted density (ind. km\u00b2)",
+  labs(x = "Observed density (ind. km\u207b\u00b2)",
+       y = "Fitted density (ind. km\u207b\u00b2)",
        title = "Blue whale — 16S model")
 ```
 
