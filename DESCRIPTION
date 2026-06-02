@@ -2,7 +2,7 @@ Package: satterthwaite2026
 Title: Predicting Marine Mammal Density from eDNA
 Version: 1.1.0
 Authors@R: c(
-    person("Trevor D.", "Ruiz", role = c("aut", "cre"),
+    person("Trevor D.", "Ruiz", email = "truiz01@calpoly.edu", role = c("aut", "cre"),
            comment = c(ORCID = "0009-0001-1452-2542")),
     person("Nick A.", "Patrick", role = "aut"),
     person("Katherine G.", "Chan", role = "aut"),
