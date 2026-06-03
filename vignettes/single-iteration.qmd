@@ -1,18 +1,24 @@
 ---
 title: "Predicting whale density from eDNA: a single-model walkthrough"
-output: rmarkdown::html_vignette
+format: html
 vignette: >
   %\VignetteIndexEntry{Predicting whale density from eDNA: a single-model walkthrough}
-  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEngine{quarto::quarto}
   %\VignetteEncoding{UTF-8}
+knitr:
+  opts_chunk:
+    collapse: true
+    comment: "#>"
+fig-width: 6
+fig-height: 4
 ---
 
-```{r setup, include = FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment  = "#>",
-  fig.width = 6, fig.height = 4
-)
+```{r}
+#| label: libraries
+#| message: false
+#| warning: false
+library(satterthwaite2026)
+library(tidyverse)
 ```
 
 This vignette walks through the complete analysis pipeline using one eDNA marker (16S rRNA) and one whale species (blue whale, *Balaenoptera musculus*). The goal is to show the methodology in full — from eDNA feature selection through model fitting to prediction — using a small bundled dataset that requires no additional downloads.
@@ -27,27 +33,20 @@ The pipeline is implemented in three stages, each with a dedicated package funct
 
 For the complete analysis across all three markers and species, see `vignette("full-analysis")`. For the line-transect density estimation underlying the response variable, see `vignette("line-transect")`.
 
-## Setup
-
-```{r libraries, message = FALSE, warning = FALSE}
-library(satterthwaite2026)
-library(tidyverse)
-```
-
 ## Data
-
-The example dataset is bundled with the package: a 500-ASV subset of the full 16S data designed so that every ASV identified as stable in the full analysis is present. The companion density estimates are the same 25 observations used in the paper.
 
 All datasets are bundled with the package and available automatically after `library(satterthwaite2026)` — no separate download needed. The two primary inputs are `example_16s` (eDNA data) and `example_density` (blue, fin, and humpback whale log-ratio density estimates):
 
-```{r inspect-data}
+```{r}
+#| label: inspect-data
 dim(example_16s)     # 27 cruises x (1 cruise ID + 500 ASVs)
 dim(example_density) # 25 cruises with density estimates for all 3 species
 ```
 
 Two cruises in `example_16s` have no matching density estimate (due to survey gaps), so the working dataset has 25 observations:
 
-```{r join}
+```{r}
+#| label: join
 whales_ex <- inner_join(example_density, example_16s, by = "cruise")
 cat("n =", nrow(whales_ex), "cruises,  p =",
     sum(startsWith(names(whales_ex), "asv")), "ASVs\n")
@@ -55,7 +54,9 @@ cat("n =", nrow(whales_ex), "cruises,  p =",
 
 The response variable — `bm` — is the log-ratio of blue whale density relative to a seasonal mean, specifically $\log(\hat{D} / \bar{D}_\text{season})$ where $\hat{D}$ is the LOO-cross-validated line-transect density estimate (individuals km⁻²) and $\bar{D}_\text{season}$ is the seasonal mean across all cruises. This centering removes gross seasonal trends and focuses the model on interseasonal variation.
 
-```{r response-dist, fig.cap = "Distribution of log-ratio blue whale density across 25 cruises."}
+```{r}
+#| label: response-dist
+#| fig-cap: "Distribution of log-ratio blue whale density across 25 cruises."
 ggplot(whales_ex, aes(x = bm)) +
   geom_histogram(bins = 12) +
   labs(x = "Log-ratio BM density", y = "Count")
@@ -69,7 +70,8 @@ The core feature selection method is sparse PLS (sPLS) stability selection (Mein
 
 sPLS has two key hyperparameters: `eta` (sparsity, higher = fewer features selected) and `K` (number of PLS components). We search over a grid covering the interesting range:
 
-```{r grid}
+```{r}
+#| label: grid
 eta_vals   <- eta_grid(n = 55)   # 55 values from ~0.4 to ~0.93 on a log scale
 ncomp_vals <- 4:12
 cat("Grid size:", length(eta_vals), "eta x", length(ncomp_vals),
@@ -78,9 +80,11 @@ cat("Grid size:", length(eta_vals), "eta x", length(ncomp_vals),
 
 ### Running stability selection
 
-`run_stability_selection()` fits sPLS to each LOO training subset at every (eta, ncomp) combination and tallies how often each ASV is selected. The code below shows the full computation; it takes approximately 3 minutes on the 500-ASV example data and is **not evaluated** here — results are loaded from cache in the next step.
+`run_stability_selection()` fits sPLS to each LOO training subset at every (eta, ncomp) combination and tallies how often each ASV is selected. The code below shows the full computation; it takes approximately 3 minutes on the 500-ASV example data and is **not evaluated** here — `sel_freq_bm` is pre-computed and bundled with the package.
 
-```{r stability-selection-code, eval = FALSE}
+```{r}
+#| label: stability-selection-code
+#| eval: false
 partitions <- loo_partitions(whales_ex)
 
 # ~12,375 sPLS fits; ~3 minutes on the 500-ASV example data
@@ -92,9 +96,11 @@ sel_freq_bm <- run_stability_selection(
 )
 ```
 
-The result, `sel_freq_bm`, is pre-computed and bundled with the example data. Selection frequencies for a representative hyperparameter configuration (ncomp = 4, eta ≈ 0.7):
+Selection frequencies for a representative hyperparameter configuration (ncomp = 4, eta ≈ 0.7):
 
-```{r sel-freq-plot, fig.cap = "Selection frequencies for the top 30 ASVs at ncomp = 4, eta \u2248 0.7. The dashed red line marks the 0.8 stability threshold."}
+```{r}
+#| label: sel-freq-plot
+#| fig-cap: "Selection frequencies for the top 30 ASVs at ncomp = 4, eta ≈ 0.7. The dashed red line marks the 0.8 stability threshold."
 target_eta <- eta_vals[which.min(abs(eta_vals - 0.7))]
 
 sel_freq_bm |>
@@ -113,7 +119,8 @@ sel_freq_bm |>
 
 `extract_stable_sets()` scans over all eta intervals and identifies configurations where the mean number of selected features satisfies the Meinshausen-Bühlmann false-positive bound. It infers the eta grid and mean selection counts directly from `sel_freq_bm`:
 
-```{r candidate-sets}
+```{r}
+#| label: candidate-sets
 p <- sum(startsWith(names(whales_ex), "asv"))
 candidates <- extract_stable_sets(sel_freq_bm, p = p)
 candidates |> select(ncomp, eta.min, eta.max, n_stable)
@@ -121,7 +128,8 @@ candidates |> select(ncomp, eta.min, eta.max, n_stable)
 
 The full analysis uses nested cross-validation (`analysis/nested-validation-16s.R`) to select the best-performing candidate. Here we take the most conservative candidate (narrowest eta interval, implying the tightest false-positive control):
 
-```{r select-stable-set}
+```{r}
+#| label: select-stable-set
 best <- candidates |>
   mutate(interval_width = eta.max - eta.min) |>
   slice_min(interval_width, with_ties = FALSE)
@@ -135,18 +143,22 @@ cat("Stable set: ncomp =", best$ncomp,
 
 For reference, `all_stable` contains the 93 ASVs identified as stable for any species in the full 16S analysis. The fraction of the example stable set that is a genuine stable feature:
 
-```{r recovery}
+```{r}
+#| label: recovery
 cat(sum(stable_asvs %in% all_stable), "/", length(stable_asvs),
     "selected ASVs confirmed stable in full analysis\n")
 ```
 
-> **Note on example vs. full data:** The stability selection false-positive bound is $q_\text{max} = \sqrt{0.6p}$, where $p$ is the total feature count. With $p = 500$ (this example), $q_\text{max} \approx 17$, compared to $q_\text{max} \approx 61$ in the full 16S analysis ($p = 6{,}234$). Stable sets from the example are therefore more conservative (15–25 ASVs vs. 35–48 in the full analysis), but all selected features are confirmed to be genuine stable features from the full analysis.
+::: callout-note
+**Note on example vs. full data:** The stability selection false-positive bound is $q_\text{max} = \sqrt{0.6p}$, where $p$ is the total feature count. With $p = 500$ (this example), $q_\text{max} \approx 17$, compared to $q_\text{max} \approx 61$ in the full 16S analysis ($p = 6{,}234$). Stable sets from the example are therefore more conservative (15–25 ASVs vs. 35–48 in the full analysis), but all selected features are confirmed to be genuine stable features from the full analysis.
+:::
 
 ## Model fitting
 
 `fit_pls_stable()` takes the joined data, the response name, the selected ASV names, and the number of components — it handles subsetting and model fitting in one step:
 
-```{r model-fit}
+```{r}
+#| label: model-fit
 fit_bm <- fit_pls_stable(
   whales_ex, response = "bm",
   stable_asvs = stable_asvs, ncomp = best$ncomp
@@ -155,7 +167,9 @@ fit_bm <- fit_pls_stable(
 
 PLS component loadings describe the linear combination of ASV abundances most associated with whale density. The regression coefficients summarise each feature's net contribution after accounting for all components:
 
-```{r coefficients, fig.cap = "PLS regression coefficients for blue whale density. Positive values indicate ASVs whose abundance increases with blue whale density."}
+```{r}
+#| label: coefficients
+#| fig-cap: "PLS regression coefficients for blue whale density. Positive values indicate ASVs whose abundance increases with blue whale density."
 coefs <- coef(fit_bm)[, , paste(best$ncomp, "comps")] |>
   enframe(name = "asv", value = "coef") |>
   mutate(direction = if_else(coef > 0, "positive", "negative"))
@@ -173,11 +187,12 @@ coefs |>
 
 Fitted values on the log-ratio scale and back-transformed predictions on the original density scale:
 
-```{r fitted-values}
+```{r}
+#| label: fitted-values
 lr_obs <- whales_ex$bm
 lr_fit <- fitted(fit_bm)[, , paste(best$ncomp, "comps")]
 
-# Back-transform: dens = exp(lr.fit + seasonal_mean)
+# Back-transform: dens = exp(lr.fit + log(seasonal_mean_density))
 dens_means_long <- dens_means |>
   pivot_longer(-season, names_to = "species", values_to = "seasonal.mean") |>
   mutate(species = str_remove(species, "log\\.") |> str_remove("\\.imp\\.mean"))
@@ -187,8 +202,8 @@ fit_df <- tibble(cruise = whales_ex$cruise, lr.obs = lr_obs, lr.fit = lr_fit) |>
               select(cruise, season, dens.obs = estimate),
             by = "cruise") |>
   left_join(filter(dens_means_long, species == "bm"), by = "season") |>
-  mutate(dens.fit  = exp(lr.fit + seasonal.mean),
-         lr.resid  = lr.obs - lr.fit,
+  mutate(dens.fit   = exp(lr.fit + seasonal.mean),
+         lr.resid   = lr.obs - lr.fit,
          dens.resid = dens.obs - dens.fit)
 
 n_obs  <- nrow(fit_df)
@@ -206,7 +221,9 @@ These figures reflect in-sample fit on all 25 observations; the full analysis re
 
 ### Predictions vs. observed
 
-```{r pred-plot, fig.cap = "PLS model fitted values vs. observed blue whale density (individuals km\u207b\u00b2). Points represent individual CalCOFI cruises; the dashed line is the 1:1 reference."}
+```{r}
+#| label: pred-plot
+#| fig-cap: "PLS model fitted values vs. observed blue whale density (individuals km⁻²). Points represent individual CalCOFI cruises; the dashed line is the 1:1 reference."
 fit_df |>
   ggplot(aes(x = dens.obs, y = dens.fit)) +
   geom_point() +
