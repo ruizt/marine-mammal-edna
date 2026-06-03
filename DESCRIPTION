@@ -18,7 +18,6 @@ Description: Code repository for Satterthwaite et al., "Microbial and small
 License: CC BY 4.0
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.2
 Depends:
     R (>= 4.4.0)
 Imports:
@@ -47,3 +46,4 @@ Suggests:
     quarto
 Config/testthat/edition: 3
 LazyData: true
+Config/roxygen2/version: 8.0.0
