@@ -1,6 +1,8 @@
 ---
 title: "Predicting whale density from eDNA: a single-model walkthrough"
-format: html
+format:
+  html:
+    embed-resources: true
 vignette: >
   %\VignetteIndexEntry{Predicting whale density from eDNA: a single-model walkthrough}
   %\VignetteEngine{quarto::quarto}
@@ -161,7 +163,7 @@ cat(sum(stable_asvs %in% all_stable), "/", length(stable_asvs),
 #| label: model-fit
 fit_bm <- fit_pls_stable(
   whales_ex, response = "bm",
-  stable_asvs = stable_asvs, ncomp = best$ncomp
+  stable_asvs = best$stable_asvs[[1]], ncomp = best$ncomp
 )
 ```
 
