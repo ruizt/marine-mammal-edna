@@ -48,7 +48,7 @@ fit <- fit_pls_stable(data, response = "bm",
                       ncomp = candidates$ncomp[[1]])
 ```
 
-The [**single-model walkthrough**](https://htmlpreview.github.io/?https://github.com/ruizt/marine-mammal-edna/blob/main/doc/single-iteration.html) (`vignettes/single-iteration.Rmd`) demonstrates use for one eDNA marker (16S) and one whale species (blue whale) using a bundled 500-ASV example dataset.
+The [**single-model walkthrough**](https://htmlpreview.github.io/?https://github.com/ruizt/marine-mammal-edna/blob/main/doc/single-iteration.html) (`vignettes/single-iteration.qmd`) demonstrates use for one eDNA marker (16S) and one whale species (blue whale) using a bundled 500-ASV example dataset.
 
 ### For reproducibility
 
@@ -104,7 +104,7 @@ Raw eDNA sequencing data (ASV count tables) are not included in this repository 
 │   └── create-example-data.R   # Developer: generates bundled example dataset
 │
 ├── vignettes/                  # Narrative walkthroughs
-│   ├── single-iteration.Rmd    # Single-model walkthrough (package API)
+│   ├── single-iteration.qmd    # Single-model walkthrough (package API)
 │   ├── full-analysis.Rmd       # Full pipeline guide (paper reproduction)
 │   └── line-transect.qmd       # Distance-sampling supplement
 │
