@@ -38,11 +38,7 @@ library(tidyverse)
 
 The example dataset is bundled with the package: a 500-ASV subset of the full 16S data designed so that every ASV identified as stable in the full analysis is present. The companion density estimates are the same 25 observations used in the paper.
 
-```{r load-data}
-load(system.file("data/example-data-16s.RData", package = "satterthwaite2026"))
-```
-
-This loads several objects. The two primary inputs are `example_16s` (eDNA data) and `example_density` (blue, fin, and humpback whale log-ratio density estimates):
+All datasets are bundled with the package and available automatically after `library(satterthwaite2026)` — no separate download needed. The two primary inputs are `example_16s` (eDNA data) and `example_density` (blue, fin, and humpback whale log-ratio density estimates):
 
 ```{r inspect-data}
 dim(example_16s)     # 27 cruises x (1 cruise ID + 500 ASVs)
